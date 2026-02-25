@@ -1,0 +1,148 @@
+.monster-sprite {
+  --primary: #ff6b9d;
+  --secondary: #c44569;
+  --accent: #ffd478;
+}
+
+.monster-body {
+  position: relative;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset -10px -10px 20px rgba(0, 0, 0, 0.2),
+    inset 5px 5px 15px rgba(255, 255, 255, 0.2),
+    0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.monster-size-small .monster-body {
+  width: 60px;
+  height: 60px;
+}
+
+.monster-size-medium .monster-body {
+  width: 120px;
+  height: 120px;
+}
+
+.monster-size-large .monster-body {
+  width: 160px;
+  height: 160px;
+}
+
+.monster-round .monster-body {
+  border-radius: 50%;
+}
+
+.monster-spiky .monster-body {
+  border-radius: 45% 55% 50% 50% / 50% 50% 55% 45%;
+}
+
+.monster-slim .monster-body {
+  border-radius: 50% / 60%;
+  transform: scaleX(0.8);
+}
+
+.monster-fluffy .monster-body {
+  border-radius: 50%;
+  overflow: visible;
+}
+
+.monster-angular .monster-body {
+  border-radius: 20%;
+}
+
+.monster-bubbly .monster-body {
+  border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+}
+
+.monster-eyes {
+  display: flex;
+  gap: 0.3em;
+  margin-bottom: 0.2em;
+}
+
+.monster-size-small .monster-eyes { gap: 0.15em; }
+.monster-size-large .monster-eyes { gap: 0.4em; }
+
+.eye {
+  width: 0.25em;
+  height: 0.25em;
+  background: #1a0a2e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.05em var(--accent);
+}
+
+.monster-size-small .eye {
+  width: 0.2em;
+  height: 0.2em;
+}
+
+.monster-size-large .eye {
+  width: 0.35em;
+  height: 0.35em;
+}
+
+.monster-mouth {
+  width: 0.2em;
+  height: 0.1em;
+  background: var(--secondary);
+  border-radius: 0 0 50% 50%;
+}
+
+.monster-size-large .monster-mouth {
+  width: 0.3em;
+  height: 0.15em;
+}
+
+.spikes {
+  position: absolute;
+  top: -15%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.1em;
+}
+
+.spike {
+  width: 0.15em;
+  height: 0.25em;
+  background: var(--secondary);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  transform: rotate(calc(var(--i) * 20deg - 40deg));
+}
+
+.monster-size-large .spike {
+  width: 0.2em;
+  height: 0.35em;
+}
+
+.fluff {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120%;
+  height: 120%;
+  pointer-events: none;
+}
+
+.fluff-ball {
+  position: absolute;
+  width: 0.2em;
+  height: 0.2em;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0.8;
+  top: 50%;
+  left: 50%;
+  transform: rotate(calc(var(--i) * 60deg)) translateY(-80%);
+}
+
+.monster-size-large .fluff-ball {
+  width: 0.25em;
+  height: 0.25em;
+}

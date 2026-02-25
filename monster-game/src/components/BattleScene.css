@@ -1,0 +1,137 @@
+.battle-scene {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0d0218;
+  z-index: 100;
+}
+
+.battle-3d {
+  flex: 1;
+  min-height: 40vh;
+}
+
+.battle-ui {
+  padding: 1rem;
+  background: linear-gradient(180deg, transparent, rgba(13, 2, 24, 0.95));
+  flex-shrink: 0;
+}
+
+.battle-hp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.hp-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hp-bar span {
+  font-size: 0.8rem;
+  color: #a0a0c0;
+  min-width: 80px;
+}
+
+.hp-bar .hp-fill {
+  height: 12px;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.hp-bar.player .hp-fill {
+  background: linear-gradient(90deg, #40e0d0, #2a9d8f);
+  flex: 1;
+}
+
+.hp-bar.enemy .hp-fill {
+  background: linear-gradient(90deg, #e76f51, #c44569);
+  flex: 1;
+}
+
+.battle-log {
+  min-height: 60px;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.battle-log p {
+  margin: 0.2rem 0;
+  font-size: 0.85rem;
+  color: #e0e0e0;
+}
+
+.battle-moves {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.move-btn {
+  padding: 0.75rem;
+  background: rgba(255, 212, 120, 0.2);
+  border: 2px solid rgba(255, 212, 120, 0.5);
+  border-radius: 12px;
+  color: #ffd478;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.move-btn:hover:not(:disabled) {
+  background: rgba(255, 212, 120, 0.3);
+  transform: scale(1.02);
+}
+
+.move-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.battle-result {
+  text-align: center;
+  padding: 1rem;
+}
+
+.battle-result h2 {
+  font-size: 1.5rem;
+  color: #ffd478;
+  margin-bottom: 1rem;
+}
+
+.btn-exit {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #40e0d0, #2a9d8f);
+  color: #0d0218;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-flee {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: #a0a0c0;
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.btn-flee:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #f4f4f4;
+}

@@ -1,0 +1,230 @@
+.home-screen {
+  min-height: 100vh;
+  padding: 1rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.home-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.home-header h1 {
+  font-size: 1.5rem;
+  color: #ffd478;
+  margin: 0;
+}
+
+.level-badge {
+  background: linear-gradient(135deg, #40e0d0, #2a9d8f);
+  color: #0d0218;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.monster-area {
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 1.5rem;
+}
+
+.monster-stage {
+  background: linear-gradient(180deg, rgba(26, 10, 46, 0.8), rgba(13, 2, 24, 0.9));
+  border-radius: 24px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  border: 2px solid rgba(255, 212, 120, 0.2);
+  box-shadow: 0 0 40px rgba(64, 224, 208, 0.1);
+}
+
+.mood-display {
+  text-align: center;
+  margin-top: 0.75rem;
+}
+
+.mood-emoji {
+  font-size: 1.5rem;
+  margin-right: 0.5rem;
+}
+
+.mood-text {
+  color: #a0a0c0;
+  font-size: 0.9rem;
+}
+
+.stats-grid {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stat-icon {
+  font-size: 1.2rem;
+  width: 1.5rem;
+  text-align: center;
+}
+
+.stat-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.stat-fill.hunger { background: linear-gradient(90deg, #e76f51, #f4a261); }
+.stat-fill.happiness { background: linear-gradient(90deg, #e9c46a, #ffd478); }
+.stat-fill.energy { background: linear-gradient(90deg, #2a9d8f, #40e0d0); }
+.stat-fill.cleanliness { background: linear-gradient(90deg, #9b5de5, #f15bb5); }
+
+.stat-value {
+  color: #a0a0c0;
+  font-size: 0.85rem;
+  min-width: 2rem;
+}
+
+.care-actions {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 340px;
+  margin-bottom: 1.5rem;
+}
+
+.care-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.6rem 0.4rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 212, 120, 0.3);
+  border-radius: 12px;
+  color: #f4f4f4;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.care-btn:hover {
+  background: rgba(255, 212, 120, 0.15);
+  border-color: rgba(255, 212, 120, 0.6);
+  transform: translateY(-2px);
+}
+
+.care-btn:active {
+  transform: scale(0.95);
+}
+
+.care-icon {
+  font-size: 1.4rem;
+}
+
+.battle-btn {
+  padding: 1rem 2.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #c44569, #ff6b9d);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(196, 69, 105, 0.4);
+}
+
+.battle-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 6px 30px rgba(196, 69, 105, 0.5);
+}
+
+.battle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.battle-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.reset-btn {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #8080a0;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  color: #a0a0c0;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.reset-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  z-index: 50;
+}
+
+.reset-modal p {
+  margin-bottom: 1.5rem;
+  text-align: center;
+  color: #f4f4f4;
+}
+
+.reset-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.reset-actions button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.reset-actions button:first-child {
+  background: #e76f51;
+  color: white;
+}
+
+.reset-actions button:last-child {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4f4f4;
+}
