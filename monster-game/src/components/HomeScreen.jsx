@@ -45,7 +45,7 @@ export function HomeScreen({ onBattle, onNewMonster }) {
 
       <div className="monster-area">
         <div className="monster-stage">
-          <MonsterSprite monster={monster} size="large" />
+          <MonsterSprite monster={monster} size="large" wandering />
         </div>
         <div className="mood-display">
           <span className="mood-emoji">{mood.emoji}</span>

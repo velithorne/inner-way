@@ -1,30 +1,45 @@
-import { useState, useRef } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useState, useRef, useMemo } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGameStore } from '../store/gameStore'
 import './BattleScene.css'
 
 const MOVES = [
-  { name: 'Strike', power: 25, type: 'physical' },
-  { name: 'Blast', power: 30, type: 'special' },
-  { name: 'Defend', power: 0, type: 'defense' },
-  { name: 'Heal', power: -20, type: 'heal' },
+  { name: 'Strike', power: 25, type: 'physical', isMelee: true },
+  { name: 'Blast', power: 30, type: 'special', isMelee: false },
+  { name: 'Defend', power: 0, type: 'defense', isMelee: false },
+  { name: 'Heal', power: -20, type: 'heal', isMelee: false },
 ]
 
-function BattleMonster({ position, color, scale = 1 }) {
-  const meshRef = useRef()
+function BattleMonster({ basePosition, color, scale = 1, targetPosition, isHit, isHealing }) {
+  const groupRef = useRef()
+  const currentPos = useRef(new THREE.Vector3(...basePosition))
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return
+    const pos = groupRef.current.position
+    const target = targetPosition ? new THREE.Vector3(...targetPosition) : new THREE.Vector3(...basePosition)
+    currentPos.current.lerp(target, delta * 6)
+    pos.copy(currentPos.current)
+
+    if (isHit) {
+      groupRef.current.scale.lerp(new THREE.Vector3(scale * 1.2, scale * 1.2, scale * 1.2), delta * 10)
+    } else {
+      groupRef.current.scale.lerp(new THREE.Vector3(scale, scale, scale), delta * 8)
+    }
+  })
 
   return (
-    <group position={position} scale={scale}>
-      <mesh ref={meshRef} castShadow receiveShadow>
+    <group ref={groupRef} position={basePosition} scale={scale}>
+      <mesh castShadow receiveShadow>
         <sphereGeometry args={[0.5, 32, 32]} />
         <meshStandardMaterial
           color={color}
           roughness={0.4}
           metalness={0.2}
           emissive={color}
-          emissiveIntensity={0.2}
+          emissiveIntensity={isHealing ? 0.6 : 0.2}
         />
       </mesh>
       <mesh position={[0, 0, 0.55]} castShadow>
@@ -72,6 +87,71 @@ function toThreeColor(colorStr) {
   }
 }
 
+function BattleContent({ playerColor, enemyColor, animationPhase }) {
+  const playerBasePos = [0, 0, -2]
+  const enemyBasePos = [0, 0, 2]
+  const meleeMeetPos = [0, 0, 0]
+
+  const playerTarget = useMemo(() => {
+    if (animationPhase === 'player-melee') return meleeMeetPos
+    return null
+  }, [animationPhase])
+
+  const enemyTarget = useMemo(() => {
+    if (animationPhase === 'enemy-melee') return meleeMeetPos
+    return null
+  }, [animationPhase])
+
+  const showHitOnEnemy = animationPhase === 'enemy-hit'
+  const showHitOnPlayer = animationPhase === 'player-hit'
+  const showHealOnPlayer = animationPhase === 'player-heal'
+
+  return (
+    <>
+      <BattleEnvironment />
+      <BattleMonster
+        basePosition={playerBasePos}
+        color={playerColor}
+        scale={1.2}
+        targetPosition={playerTarget}
+        isHit={showHitOnPlayer}
+        isHealing={showHealOnPlayer}
+      />
+      <BattleMonster
+        basePosition={enemyBasePos}
+        color={enemyColor}
+        scale={1}
+        targetPosition={enemyTarget}
+        isHit={showHitOnEnemy}
+      />
+      {showHitOnEnemy && (
+        <mesh position={[0, 0, 2]}>
+          <sphereGeometry args={[0.8, 16, 16]} />
+          <meshBasicMaterial color="#ff4444" transparent opacity={0.4} />
+        </mesh>
+      )}
+      {showHitOnPlayer && (
+        <mesh position={[0, 0, -2]}>
+          <sphereGeometry args={[0.8, 16, 16]} />
+          <meshBasicMaterial color="#ff4444" transparent opacity={0.4} />
+        </mesh>
+      )}
+      {showHealOnPlayer && (
+        <mesh position={[0, 0, -2]}>
+          <sphereGeometry args={[0.9, 16, 16]} />
+          <meshBasicMaterial color="#44ff88" transparent opacity={0.3} />
+        </mesh>
+      )}
+      <OrbitControls
+        enableZoom={false}
+        enablePan={false}
+        minPolarAngle={Math.PI / 3}
+        maxPolarAngle={Math.PI / 2}
+      />
+    </>
+  )
+}
+
 export function BattleScene({ onExit }) {
   const monster = useGameStore((s) => s.monster)
   const getBattleStats = useGameStore((s) => s.getBattleStats)
@@ -86,19 +166,59 @@ export function BattleScene({ onExit }) {
   const [turn, setTurn] = useState('player')
   const [battleOver, setBattleOver] = useState(false)
   const [result, setResult] = useState(null)
+  const [animationPhase, setAnimationPhase] = useState('idle')
 
   const enemyColor = '#e76f51'
   const playerColor = toThreeColor(monster?.colors?.primary)
 
   const addLog = (msg) => setBattleLog((prev) => [...prev.slice(-4), msg])
 
+  const runPlayerAttack = (move, damage, isMelee) => {
+    addLog(`${monster?.name} used ${move.name} for ${damage} damage!`)
+    setTurn('enemy')
+
+    if (isMelee) {
+      setAnimationPhase('player-melee')
+      setTimeout(() => {
+        setAnimationPhase('enemy-hit')
+        setTimeout(() => {
+          setAnimationPhase('idle')
+          setEnemyHp((h) => {
+            const newHp = Math.max(0, h - damage)
+            if (newHp <= 0) setTimeout(() => endBattle(true), 500)
+            return newHp
+          })
+          setTimeout(() => enemyTurn(false), 400)
+        }, 400)
+      }, 600)
+    } else {
+      setAnimationPhase('player-blast')
+      setTimeout(() => {
+        setAnimationPhase('enemy-hit')
+        setTimeout(() => {
+          setAnimationPhase('idle')
+          setEnemyHp((h) => {
+            const newHp = Math.max(0, h - damage)
+            if (newHp <= 0) setTimeout(() => endBattle(true), 500)
+            return newHp
+          })
+          setTimeout(() => enemyTurn(false), 400)
+        }, 500)
+      }, 400)
+    }
+  }
+
   const executeMove = (move, isPlayer) => {
     if (battleOver || turn !== 'player') return
 
     if (move.type === 'defense') {
       addLog(`${monster?.name || 'Your monster'} is defending!`)
+      setAnimationPhase('player-defend')
       setTurn('enemy')
-      setTimeout(() => enemyTurn(true), 1000)
+      setTimeout(() => {
+        setAnimationPhase('idle')
+        setTimeout(() => enemyTurn(true), 200)
+      }, 800)
       return
     }
 
@@ -106,8 +226,12 @@ export function BattleScene({ onExit }) {
       const heal = Math.floor(20 * (playerStats.attack / 50))
       setPlayerHp((h) => Math.min(playerStats.hp, h + heal))
       addLog(`${monster?.name} healed for ${heal}!`)
+      setAnimationPhase('player-heal')
       setTurn('enemy')
-      setTimeout(() => enemyTurn(false), 1500)
+      setTimeout(() => {
+        setAnimationPhase('idle')
+        setTimeout(() => enemyTurn(false), 400)
+      }, 1000)
       return
     }
 
@@ -115,14 +239,7 @@ export function BattleScene({ onExit }) {
       const damage = Math.floor(
         (move.power * (playerStats.attack / 50)) * (0.8 + Math.random() * 0.4)
       )
-      setEnemyHp((h) => {
-        const newHp = Math.max(0, h - damage)
-        if (newHp <= 0) setTimeout(() => endBattle(true), 500)
-        return newHp
-      })
-      addLog(`${monster?.name} used ${move.name} for ${damage} damage!`)
-      setTurn('enemy')
-      setTimeout(() => enemyTurn(false), 1500)
+      runPlayerAttack(move, damage, move.isMelee)
     }
   }
 
@@ -133,13 +250,37 @@ export function BattleScene({ onExit }) {
     const damage = Math.floor(
       (move.power * 0.8) * (0.8 + Math.random() * 0.4) * (wasDefending ? 0.5 : 1)
     )
-    setPlayerHp((h) => {
-      const newHp = Math.max(0, h - Math.max(0, damage))
-      if (newHp <= 0) setTimeout(() => endBattle(false), 500)
-      return newHp
-    })
     addLog(`Enemy used ${move.name} for ${damage} damage!`)
-    setTurn('player')
+
+    if (move.isMelee) {
+      setAnimationPhase('enemy-melee')
+      setTimeout(() => {
+        setAnimationPhase('player-hit')
+        setTimeout(() => {
+          setAnimationPhase('idle')
+          setPlayerHp((h) => {
+            const newHp = Math.max(0, h - Math.max(0, damage))
+            if (newHp <= 0) setTimeout(() => endBattle(false), 500)
+            return newHp
+          })
+          setTurn('player')
+        }, 400)
+      }, 600)
+    } else {
+      setAnimationPhase('enemy-blast')
+      setTimeout(() => {
+        setAnimationPhase('player-hit')
+        setTimeout(() => {
+          setAnimationPhase('idle')
+          setPlayerHp((h) => {
+            const newHp = Math.max(0, h - Math.max(0, damage))
+            if (newHp <= 0) setTimeout(() => endBattle(false), 500)
+            return newHp
+          })
+          setTurn('player')
+        }, 500)
+      }, 400)
+    }
   }
 
   const endBattle = (won) => {
@@ -196,30 +337,29 @@ export function BattleScene({ onExit }) {
         )}
       </div>
 
-      <div className="battle-3d">
-        <Canvas
+      <div className="battle-3d-wrapper">
+        {animationPhase === 'enemy-hit' && <div className="battle-flash battle-flash-red" />}
+        {animationPhase === 'player-hit' && <div className="battle-flash battle-flash-red" />}
+        {animationPhase === 'player-heal' && <div className="battle-flash battle-flash-green" />}
+        <div
+          className={`battle-3d ${
+            animationPhase === 'player-melee' || animationPhase === 'enemy-melee'
+              ? 'battle-animating'
+              : ''
+          }`}
+        >
+          <Canvas
           camera={{ position: [0, 2, 6], fov: 50 }}
           shadows
           gl={{ alpha: true, antialias: true }}
         >
-          <BattleEnvironment />
-          <BattleMonster
-            position={[0, 0, -2]}
-            color={playerColor}
-            scale={1.2}
-          />
-          <BattleMonster
-            position={[0, 0, 2]}
-            color={enemyColor}
-            scale={1}
-          />
-          <OrbitControls
-            enableZoom={false}
-            enablePan={false}
-            minPolarAngle={Math.PI / 3}
-            maxPolarAngle={Math.PI / 2}
+          <BattleContent
+            playerColor={playerColor}
+            enemyColor={enemyColor}
+            animationPhase={animationPhase}
           />
         </Canvas>
+        </div>
       </div>
 
       <button className="btn-flee" onClick={onExit}>
