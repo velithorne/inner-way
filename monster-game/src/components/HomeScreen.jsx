@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MonsterSprite } from './MonsterSprite'
 import { StatAllocationModal } from './StatAllocationModal'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore, getExpForLevel } from '../store/gameStore'
 import { ELEMENT_BACKGROUNDS } from '../data/elementBackgrounds'
 import './HomeScreen.css'
 
@@ -13,6 +13,7 @@ export function HomeScreen({ onBattle, onNewMonster }) {
   const energy = useGameStore((s) => s.energy)
   const cleanliness = useGameStore((s) => s.cleanliness)
   const level = useGameStore((s) => s.level)
+  const exp = useGameStore((s) => s.exp)
   const evolutionStage = useGameStore((s) => s.evolutionStage)
   const feed = useGameStore((s) => s.feed)
   const play = useGameStore((s) => s.play)
@@ -40,6 +41,8 @@ export function HomeScreen({ onBattle, onNewMonster }) {
 
   const element = monster?.element || 'fire'
   const bg = ELEMENT_BACKGROUNDS[element] || ELEMENT_BACKGROUNDS.fire
+  const expForNextLevel = getExpForLevel(level)
+  const expProgress = (exp / expForNextLevel) * 100
 
   return (
     <div
@@ -53,8 +56,14 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         <header className="home-header">
           <h1>{monster?.name || 'Monster'}</h1>
           <span className="level-badge">Lv.{level}</span>
-          {evolutionStage > 0 && <span className="evolution-badge">Evolved</span>}
+          {evolutionStage > 0 && (
+            <span className="evolution-badge">Evo {evolutionStage}</span>
+          )}
         </header>
+        <div className="exp-bar">
+          <div className="exp-fill" style={{ width: `${expProgress}%` }} />
+          <span className="exp-label">{exp} / {expForNextLevel} EXP</span>
+        </div>
 
         <div className="monster-area">
           <div className="monster-stage" style={{ borderColor: `${bg.accent}40` }}>

@@ -51,20 +51,16 @@
   height: 160px;
 }
 
-/* Evolved form - bigger, with limbs */
-.monster-body.monster-evolved {
-  position: relative;
-}
+/* Evolution stages - each adds size and features */
+.monster-body.evolution-stage-1.monster-size-large { width: 180px; height: 180px; }
+.monster-body.evolution-stage-2.monster-size-large { width: 200px; height: 200px; }
+.monster-body.evolution-stage-3.monster-size-large { width: 220px; height: 220px; }
+.monster-body.evolution-stage-4.monster-size-large { width: 240px; height: 240px; }
 
-.monster-body.monster-size-large.monster-evolved {
-  width: 200px;
-  height: 200px;
-}
-
-.monster-body.monster-size-medium.monster-evolved {
-  width: 150px;
-  height: 150px;
-}
+.monster-body.evolution-stage-1.monster-size-medium { width: 135px; height: 135px; }
+.monster-body.evolution-stage-2.monster-size-medium { width: 150px; height: 150px; }
+.monster-body.evolution-stage-3.monster-size-medium { width: 165px; height: 165px; }
+.monster-body.evolution-stage-4.monster-size-medium { width: 180px; height: 180px; }
 
 .monster-arm {
   position: absolute;
@@ -112,6 +108,83 @@
 .monster-size-large .monster-leg {
   width: 0.35em;
   height: 0.55em;
+}
+
+/* Stage 2: Horns */
+.monster-horn {
+  position: absolute;
+  width: 0.15em;
+  height: 0.35em;
+  background: var(--accent);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  top: -5%;
+}
+
+.monster-horn.horn-left {
+  left: 20%;
+  transform: rotate(-20deg);
+}
+
+.monster-horn.horn-right {
+  right: 20%;
+  transform: rotate(20deg) scaleX(-1);
+}
+
+.monster-size-large .monster-horn {
+  width: 0.2em;
+  height: 0.45em;
+}
+
+/* Stage 3: Wings */
+.monster-wings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.monster-wings .wing {
+  position: absolute;
+  width: 0.5em;
+  height: 0.25em;
+  background: var(--accent);
+  border-radius: 50% 50% 0 0;
+  opacity: 0.7;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.monster-wings .wing-left {
+  left: -60%;
+  transform: translateY(-50%) rotate(-30deg);
+}
+
+.monster-wings .wing-right {
+  right: -60%;
+  transform: translateY(-50%) rotate(30deg) scaleX(-1);
+}
+
+.monster-size-large .monster-wings .wing {
+  width: 0.6em;
+  height: 0.35em;
+}
+
+/* Stage 4: Aura glow */
+.monster-aura {
+  position: absolute;
+  inset: -15%;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, var(--accent) 100%);
+  opacity: 0.15;
+  animation: aura-pulse 2s ease-in-out infinite;
+}
+
+@keyframes aura-pulse {
+  0%, 100% { opacity: 0.1; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.05); }
 }
 
 .monster-round .monster-body {

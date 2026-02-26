@@ -26,8 +26,8 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false, evo
 
   if (!monster) return null
 
-  const evolved = evolutionStage > 0
-  const bodyClass = `monster-body monster-${monster.bodyType} monster-size-${size} ${evolved ? 'monster-evolved' : ''}`
+  const stage = Math.min(evolutionStage, 4)
+  const bodyClass = `monster-body monster-${monster.bodyType} monster-size-${size} evolution-stage-${stage}`
 
   const wrapperStyle = wandering
     ? {
@@ -39,10 +39,15 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false, evo
       }
     : {}
 
+  const hasLimbs = stage >= 1
+  const hasHorns = stage >= 2
+  const hasWings = stage >= 3
+  const isFinalForm = stage >= 4
+
   return (
     <div className={`monster-sprite ${wandering ? 'monster-wandering' : ''}`} style={{ ...style, ...wrapperStyle }}>
       <div className={bodyClass}>
-        {evolved && (
+        {hasLimbs && (
           <>
             <div className="monster-arm arm-left" />
             <div className="monster-arm arm-right" />
@@ -50,6 +55,19 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false, evo
             <div className="monster-leg leg-right" />
           </>
         )}
+        {hasHorns && (
+          <>
+            <div className="monster-horn horn-left" />
+            <div className="monster-horn horn-right" />
+          </>
+        )}
+        {hasWings && (
+          <div className="monster-wings">
+            <div className="wing wing-left" />
+            <div className="wing wing-right" />
+          </div>
+        )}
+        {isFinalForm && <div className="monster-aura" />}
         <div className="monster-eyes">
           <div className="eye left" />
           <div className="eye right" />

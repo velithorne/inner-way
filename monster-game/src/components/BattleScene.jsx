@@ -112,7 +112,7 @@ function BattleContent({ playerColor, enemyColor, animationPhase, evolutionStage
       <BattleMonster
         basePosition={playerBasePos}
         color={playerColor}
-        scale={evolutionStage > 0 ? 1.5 : 1.2}
+        scale={1.2 + evolutionStage * 0.15}
         targetPosition={playerTarget}
         isHit={showHitOnPlayer}
         isHealing={showHealOnPlayer}
