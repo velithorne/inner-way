@@ -87,7 +87,7 @@ function toThreeColor(colorStr) {
   }
 }
 
-function BattleContent({ playerColor, enemyColor, animationPhase }) {
+function BattleContent({ playerColor, enemyColor, animationPhase, evolutionStage = 0 }) {
   const playerBasePos = [0, 0, -2]
   const enemyBasePos = [0, 0, 2]
   const meleeMeetPos = [0, 0, 0]
@@ -112,7 +112,7 @@ function BattleContent({ playerColor, enemyColor, animationPhase }) {
       <BattleMonster
         basePosition={playerBasePos}
         color={playerColor}
-        scale={1.2}
+        scale={evolutionStage > 0 ? 1.5 : 1.2}
         targetPosition={playerTarget}
         isHit={showHitOnPlayer}
         isHealing={showHealOnPlayer}
@@ -154,8 +154,8 @@ function BattleContent({ playerColor, enemyColor, animationPhase }) {
 
 export function BattleScene({ onExit }) {
   const monster = useGameStore((s) => s.monster)
+  const evolutionStage = useGameStore((s) => s.evolutionStage)
   const getBattleStats = useGameStore((s) => s.getBattleStats)
-  const addExp = useGameStore((s) => s.addExp)
   const recordBattleWin = useGameStore((s) => s.recordBattleWin)
   const recordBattleLoss = useGameStore((s) => s.recordBattleLoss)
 
@@ -177,17 +177,21 @@ export function BattleScene({ onExit }) {
     addLog(`${monster?.name} used ${move.name} for ${damage} damage!`)
     setTurn('enemy')
 
+    const applyEnemyDamage = () => {
+      setEnemyHp((h) => {
+        const newHp = Math.max(0, h - damage)
+        if (newHp <= 0) setTimeout(() => endBattle(true), 500)
+        return newHp
+      })
+    }
+
     if (isMelee) {
       setAnimationPhase('player-melee')
       setTimeout(() => {
         setAnimationPhase('enemy-hit')
+        applyEnemyDamage()
         setTimeout(() => {
           setAnimationPhase('idle')
-          setEnemyHp((h) => {
-            const newHp = Math.max(0, h - damage)
-            if (newHp <= 0) setTimeout(() => endBattle(true), 500)
-            return newHp
-          })
           setTimeout(() => enemyTurn(false), 400)
         }, 400)
       }, 600)
@@ -195,13 +199,9 @@ export function BattleScene({ onExit }) {
       setAnimationPhase('player-blast')
       setTimeout(() => {
         setAnimationPhase('enemy-hit')
+        applyEnemyDamage()
         setTimeout(() => {
           setAnimationPhase('idle')
-          setEnemyHp((h) => {
-            const newHp = Math.max(0, h - damage)
-            if (newHp <= 0) setTimeout(() => endBattle(true), 500)
-            return newHp
-          })
           setTimeout(() => enemyTurn(false), 400)
         }, 500)
       }, 400)
@@ -252,17 +252,21 @@ export function BattleScene({ onExit }) {
     )
     addLog(`Enemy used ${move.name} for ${damage} damage!`)
 
+    const applyPlayerDamage = () => {
+      setPlayerHp((h) => {
+        const newHp = Math.max(0, h - Math.max(0, damage))
+        if (newHp <= 0) setTimeout(() => endBattle(false), 500)
+        return newHp
+      })
+    }
+
     if (move.isMelee) {
       setAnimationPhase('enemy-melee')
       setTimeout(() => {
         setAnimationPhase('player-hit')
+        applyPlayerDamage()
         setTimeout(() => {
           setAnimationPhase('idle')
-          setPlayerHp((h) => {
-            const newHp = Math.max(0, h - Math.max(0, damage))
-            if (newHp <= 0) setTimeout(() => endBattle(false), 500)
-            return newHp
-          })
           setTurn('player')
         }, 400)
       }, 600)
@@ -270,13 +274,9 @@ export function BattleScene({ onExit }) {
       setAnimationPhase('enemy-blast')
       setTimeout(() => {
         setAnimationPhase('player-hit')
+        applyPlayerDamage()
         setTimeout(() => {
           setAnimationPhase('idle')
-          setPlayerHp((h) => {
-            const newHp = Math.max(0, h - Math.max(0, damage))
-            if (newHp <= 0) setTimeout(() => endBattle(false), 500)
-            return newHp
-          })
           setTurn('player')
         }, 500)
       }, 400)
@@ -288,7 +288,6 @@ export function BattleScene({ onExit }) {
     setResult(won ? 'win' : 'lose')
     if (won) {
       recordBattleWin()
-      addExp(50)
     } else {
       recordBattleLoss()
     }
@@ -299,12 +298,16 @@ export function BattleScene({ onExit }) {
       <div className="battle-ui">
         <div className="battle-hp">
           <div className="hp-bar player">
-            <div className="hp-fill" style={{ width: `${(playerHp / playerStats.hp) * 100}%` }} />
             <span>{monster?.name || 'Your Monster'}</span>
+            <div className="hp-track">
+              <div className="hp-fill" style={{ width: `${Math.max(0, (playerHp / playerStats.hp) * 100)}%` }} />
+            </div>
           </div>
           <div className="hp-bar enemy">
-            <div className="hp-fill" style={{ width: `${(enemyHp / 80) * 100}%` }} />
             <span>Wild Foe</span>
+            <div className="hp-track">
+              <div className="hp-fill" style={{ width: `${Math.max(0, (enemyHp / 80) * 100)}%` }} />
+            </div>
           </div>
         </div>
 
@@ -357,6 +360,7 @@ export function BattleScene({ onExit }) {
             playerColor={playerColor}
             enemyColor={enemyColor}
             animationPhase={animationPhase}
+            evolutionStage={evolutionStage}
           />
         </Canvas>
         </div>

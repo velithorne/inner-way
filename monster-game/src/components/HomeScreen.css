@@ -4,6 +4,46 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+.home-screen-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-screen-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+  animation: bg-pulse 8s ease-in-out infinite;
+}
+
+@keyframes bg-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.home-screen-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.evolution-badge {
+  background: linear-gradient(135deg, #9b5de5, #f15bb5);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .home-header {
@@ -36,7 +76,7 @@
 
 .monster-stage {
   position: relative;
-  background: linear-gradient(180deg, rgba(26, 10, 46, 0.8), rgba(13, 2, 24, 0.9));
+  background: linear-gradient(180deg, rgba(26, 10, 46, 0.6), rgba(13, 2, 24, 0.8));
   border-radius: 24px;
   padding: 2rem;
   min-height: 200px;

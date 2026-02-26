@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware'
 
 const CARE_DECAY_RATE = 0.02
 const MAX_STATS = 100
+const EVOLVE_LEVEL = 5
+const STAT_POINTS_PER_LEVEL = 2
 
 export const useGameStore = create(
   persist(
@@ -18,11 +20,16 @@ export const useGameStore = create(
       cleanliness: 80,
       lastCareUpdate: Date.now(),
 
-      // Battle stats (derived from care + training)
+      // Battle stats
       level: 1,
       exp: 0,
       wins: 0,
       losses: 0,
+
+      // Evolution & allocated stats
+      evolutionStage: 0,
+      allocatedStats: { strength: 0, agility: 0, defense: 0 },
+      pendingStatPoints: 0,
 
       // Game flow
       hasMonster: () => !!get().monster,
@@ -37,6 +44,9 @@ export const useGameStore = create(
         lastCareUpdate: Date.now(),
         level: 1,
         exp: 0,
+        evolutionStage: 0,
+        allocatedStats: { strength: 0, agility: 0, defense: 0 },
+        pendingStatPoints: 0,
       }),
 
       feed: () => set((state) => ({
@@ -50,12 +60,29 @@ export const useGameStore = create(
         lastCareUpdate: Date.now(),
       })),
 
-      train: () => set((state) => ({
-        hunger: Math.max(0, state.hunger - 10),
-        energy: Math.max(0, state.energy - 20),
-        exp: state.exp + 15,
-        lastCareUpdate: Date.now(),
-      })),
+      train: () => set((state) => {
+        const newExp = state.exp + 15
+        const expForLevel = state.level * 100
+        if (newExp >= expForLevel) {
+          const newLevel = state.level + 1
+          const shouldEvolve = newLevel >= EVOLVE_LEVEL && state.evolutionStage === 0
+          return {
+            hunger: Math.max(0, state.hunger - 10),
+            energy: Math.max(0, state.energy - 20),
+            exp: newExp - expForLevel,
+            level: newLevel,
+            pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
+            evolutionStage: shouldEvolve ? 1 : state.evolutionStage,
+            lastCareUpdate: Date.now(),
+          }
+        }
+        return {
+          hunger: Math.max(0, state.hunger - 10),
+          energy: Math.max(0, state.energy - 20),
+          exp: newExp,
+          lastCareUpdate: Date.now(),
+        }
+      }),
 
       clean: () => set((state) => ({
         cleanliness: Math.min(MAX_STATS, state.cleanliness + 30),
@@ -71,7 +98,7 @@ export const useGameStore = create(
       decayStats: () => {
         const state = get()
         const now = Date.now()
-        const elapsed = (now - state.lastCareUpdate) / 1000 / 60 // minutes
+        const elapsed = (now - state.lastCareUpdate) / 1000 / 60
 
         if (elapsed < 1) return
 
@@ -90,18 +117,46 @@ export const useGameStore = create(
         const newExp = state.exp + amount
         const expForLevel = state.level * 100
         if (newExp >= expForLevel) {
+          const newLevel = state.level + 1
+          const shouldEvolve = newLevel >= EVOLVE_LEVEL && state.evolutionStage === 0
           return {
             exp: newExp - expForLevel,
-            level: state.level + 1,
+            level: newLevel,
+            pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
+            evolutionStage: shouldEvolve ? 1 : state.evolutionStage,
           }
         }
         return { exp: newExp }
       }),
 
-      recordBattleWin: () => set((state) => ({
-        wins: state.wins + 1,
-        exp: state.exp + 50,
-      })),
+      allocateStat: (stat) => set((state) => {
+        if (state.pendingStatPoints <= 0) return state
+        if (!state.allocatedStats[stat]) return state
+        return {
+          pendingStatPoints: state.pendingStatPoints - 1,
+          allocatedStats: {
+            ...state.allocatedStats,
+            [stat]: state.allocatedStats[stat] + 1,
+          },
+        }
+      }),
+
+      recordBattleWin: () => set((state) => {
+        const newExp = state.exp + 50
+        const expForLevel = state.level * 100
+        if (newExp >= expForLevel) {
+          const newLevel = state.level + 1
+          const shouldEvolve = newLevel >= EVOLVE_LEVEL && state.evolutionStage === 0
+          return {
+            wins: state.wins + 1,
+            exp: newExp - expForLevel,
+            level: newLevel,
+            pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
+            evolutionStage: shouldEvolve ? 1 : state.evolutionStage,
+          }
+        }
+        return { wins: state.wins + 1, exp: newExp }
+      }),
 
       recordBattleLoss: () => set((state) => ({
         losses: state.losses + 1,
@@ -111,11 +166,13 @@ export const useGameStore = create(
         const state = get()
         const avgCare = (state.hunger + state.happiness + state.energy + state.cleanliness) / 4
         const base = 50 + (state.level * 10) + (avgCare / 4)
+        const { strength, agility, defense } = state.allocatedStats || { strength: 0, agility: 0, defense: 0 }
+        const evoBonus = state.evolutionStage > 0 ? 1.2 : 1
         return {
-          hp: Math.floor(base * 1.2),
-          attack: Math.floor(base * 0.8 + state.exp / 10),
-          defense: Math.floor(base * 0.6 + state.cleanliness / 5),
-          speed: Math.floor(base * 0.5 + state.energy / 5),
+          hp: Math.floor((base * 1.2 + defense * 8) * evoBonus),
+          attack: Math.floor((base * 0.8 + state.exp / 10 + strength * 6) * evoBonus),
+          defense: Math.floor((base * 0.6 + state.cleanliness / 5 + defense * 5) * evoBonus),
+          speed: Math.floor((base * 0.5 + state.energy / 5 + agility * 6) * evoBonus),
         }
       },
 
@@ -131,6 +188,9 @@ export const useGameStore = create(
         exp: 0,
         wins: 0,
         losses: 0,
+        evolutionStage: 0,
+        allocatedStats: { strength: 0, agility: 0, defense: 0 },
+        pendingStatPoints: 0,
       }),
     }),
     { name: 'monster-soul-game' }

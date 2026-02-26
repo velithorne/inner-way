@@ -51,6 +51,69 @@
   height: 160px;
 }
 
+/* Evolved form - bigger, with limbs */
+.monster-body.monster-evolved {
+  position: relative;
+}
+
+.monster-body.monster-size-large.monster-evolved {
+  width: 200px;
+  height: 200px;
+}
+
+.monster-body.monster-size-medium.monster-evolved {
+  width: 150px;
+  height: 150px;
+}
+
+.monster-arm {
+  position: absolute;
+  width: 0.35em;
+  height: 0.5em;
+  background: var(--secondary);
+  border-radius: 50%;
+  top: 35%;
+}
+
+.monster-arm.arm-left {
+  left: -15%;
+  transform: rotate(-30deg);
+}
+
+.monster-arm.arm-right {
+  right: -15%;
+  transform: rotate(30deg);
+}
+
+.monster-size-large .monster-arm {
+  width: 0.4em;
+  height: 0.6em;
+}
+
+.monster-leg {
+  position: absolute;
+  width: 0.3em;
+  height: 0.45em;
+  background: var(--secondary);
+  border-radius: 40% 40% 20% 20%;
+  bottom: -10%;
+}
+
+.monster-leg.leg-left {
+  left: 25%;
+  transform: rotate(5deg);
+}
+
+.monster-leg.leg-right {
+  right: 25%;
+  transform: rotate(-5deg);
+}
+
+.monster-size-large .monster-leg {
+  width: 0.35em;
+  height: 0.55em;
+}
+
 .monster-round .monster-body {
   border-radius: 50%;
 }

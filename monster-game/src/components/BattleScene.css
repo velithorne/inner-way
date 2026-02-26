@@ -78,20 +78,27 @@
   min-width: 80px;
 }
 
-.hp-bar .hp-fill {
+.hp-track {
+  flex: 1;
   height: 12px;
+  background: rgba(0, 0, 0, 0.4);
   border-radius: 6px;
-  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.hp-bar .hp-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease-out;
+  min-width: 2px;
 }
 
 .hp-bar.player .hp-fill {
   background: linear-gradient(90deg, #40e0d0, #2a9d8f);
-  flex: 1;
 }
 
 .hp-bar.enemy .hp-fill {
   background: linear-gradient(90deg, #e76f51, #c44569);
-  flex: 1;
 }
 
 .battle-log {

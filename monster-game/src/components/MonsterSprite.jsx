@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import './MonsterSprite.css'
 
-export function MonsterSprite({ monster, size = 'medium', wandering = false }) {
+export function MonsterSprite({ monster, size = 'medium', wandering = false, evolutionStage = 0 }) {
   const [position, setPosition] = useState({ x: 50, y: 50 })
 
   useEffect(() => {
@@ -26,7 +26,8 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false }) {
 
   if (!monster) return null
 
-  const bodyClass = `monster-body monster-${monster.bodyType} monster-size-${size}`
+  const evolved = evolutionStage > 0
+  const bodyClass = `monster-body monster-${monster.bodyType} monster-size-${size} ${evolved ? 'monster-evolved' : ''}`
 
   const wrapperStyle = wandering
     ? {
@@ -41,6 +42,14 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false }) {
   return (
     <div className={`monster-sprite ${wandering ? 'monster-wandering' : ''}`} style={{ ...style, ...wrapperStyle }}>
       <div className={bodyClass}>
+        {evolved && (
+          <>
+            <div className="monster-arm arm-left" />
+            <div className="monster-arm arm-right" />
+            <div className="monster-leg leg-left" />
+            <div className="monster-leg leg-right" />
+          </>
+        )}
         <div className="monster-eyes">
           <div className="eye left" />
           <div className="eye right" />
