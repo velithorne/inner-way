@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import './MonsterSprite.css'
 
-export function MonsterSprite({ monster, size = 'medium', wandering = false, evolutionStage = 0 }) {
+export function MonsterSprite({ monster, size = 'medium', wandering = false, evolutionStage = 0, cleanliness = 100 }) {
   const [position, setPosition] = useState({ x: 50, y: 50 })
 
   useEffect(() => {
@@ -43,9 +43,11 @@ export function MonsterSprite({ monster, size = 'medium', wandering = false, evo
   const hasHorns = stage >= 2
   const hasWings = stage >= 3
   const isFinalForm = stage >= 4
+  const isDirty = cleanliness < 60
 
   return (
-    <div className={`monster-sprite ${wandering ? 'monster-wandering' : ''}`} style={{ ...style, ...wrapperStyle }}>
+    <div className={`monster-sprite ${wandering ? 'monster-wandering' : ''} ${isDirty ? 'monster-dirty' : ''}`} style={{ ...style, ...wrapperStyle }}>
+      {isDirty && <div className="dirty-overlay" />}
       <div className={bodyClass}>
         {hasLimbs && (
           <>

@@ -1,0 +1,279 @@
+.stage-scenery {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+/* Ground layer */
+.scenery-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  border-radius: 0 0 24px 24px;
+}
+
+.scenery-lava {
+  background: linear-gradient(180deg, transparent, rgba(255, 80, 40, 0.25) 40%, rgba(180, 40, 20, 0.4));
+}
+
+.scenery-water {
+  background: linear-gradient(180deg, transparent, rgba(40, 120, 200, 0.2) 40%, rgba(20, 80, 150, 0.35));
+}
+
+.scenery-grass {
+  background: linear-gradient(180deg, transparent, rgba(40, 120, 60, 0.3) 40%, rgba(30, 90, 50, 0.5));
+}
+
+.scenery-clouds {
+  background: linear-gradient(180deg, transparent, rgba(180, 200, 255, 0.15) 50%, rgba(140, 160, 220, 0.25));
+}
+
+.scenery-crystal {
+  background: linear-gradient(180deg, transparent, rgba(200, 180, 255, 0.15) 40%, rgba(150, 100, 255, 0.3));
+}
+
+.scenery-void {
+  background: linear-gradient(180deg, transparent, rgba(80, 40, 120, 0.2) 40%, rgba(40, 20, 60, 0.4));
+}
+
+.scenery-golden {
+  background: linear-gradient(180deg, transparent, rgba(255, 220, 120, 0.15) 40%, rgba(255, 200, 80, 0.3));
+}
+
+/* Fire elements */
+.scenery-rock {
+  position: absolute;
+  bottom: 15%;
+  width: 25px;
+  height: 18px;
+  background: rgba(80, 60, 50, 0.6);
+  border-radius: 50%;
+}
+
+.scenery-rock-1 { left: 15%; }
+.scenery-rock-2 { right: 20%; bottom: 12%; width: 18px; height: 14px; }
+
+.scenery-flame {
+  position: absolute;
+  width: 8px;
+  height: 12px;
+  background: rgba(255, 150, 80, 0.4);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  animation: flame-flicker 2s ease-in-out infinite;
+}
+
+.scenery-flame-1 { left: 20%; bottom: 25%; animation-delay: 0s; }
+.scenery-flame-2 { right: 25%; bottom: 30%; width: 6px; height: 10px; animation-delay: 0.5s; }
+.scenery-flame-3 { left: 50%; bottom: 20%; width: 5px; height: 8px; animation-delay: 1s; }
+
+@keyframes flame-flicker {
+  0%, 100% { opacity: 0.4; transform: scaleY(1); }
+  50% { opacity: 0.7; transform: scaleY(1.2); }
+}
+
+/* Water elements */
+.scenery-wave {
+  position: absolute;
+  bottom: 20%;
+  height: 4px;
+  background: rgba(100, 180, 255, 0.3);
+  border-radius: 50%;
+  animation: wave-move 3s ease-in-out infinite;
+}
+
+.scenery-wave-1 { left: 10%; width: 40px; animation-delay: 0s; }
+.scenery-wave-2 { right: 15%; width: 30px; animation-delay: 1s; }
+
+@keyframes wave-move {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  50% { transform: translateX(5px) scaleX(1.1); }
+}
+
+.scenery-bubble {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(150, 220, 255, 0.5);
+  border-radius: 50%;
+  animation: bubble-float 4s ease-in-out infinite;
+}
+
+.scenery-bubble-1 { left: 25%; bottom: 30%; animation-delay: 0s; }
+.scenery-bubble-2 { right: 30%; bottom: 25%; width: 4px; height: 4px; animation-delay: 1.5s; }
+.scenery-bubble-3 { left: 60%; bottom: 35%; width: 5px; height: 5px; animation-delay: 2.5s; }
+
+@keyframes bubble-float {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-15px); opacity: 0.8; }
+}
+
+/* Earth elements */
+.scenery-mound {
+  position: absolute;
+  bottom: 12%;
+  width: 35px;
+  height: 15px;
+  background: rgba(100, 80, 60, 0.5);
+  border-radius: 50%;
+}
+
+.scenery-mound-1 { left: 10%; }
+.scenery-mound-2 { right: 15%; width: 25px; height: 12px; }
+
+.scenery-stone {
+  position: absolute;
+  bottom: 18%;
+  width: 12px;
+  height: 10px;
+  background: rgba(120, 100, 80, 0.6);
+  border-radius: 30%;
+}
+
+.scenery-stone-1 { left: 70%; }
+.scenery-stone-2 { right: 70%; width: 8px; height: 6px; }
+
+/* Air elements */
+.scenery-cloud {
+  position: absolute;
+  background: rgba(200, 220, 255, 0.25);
+  border-radius: 50%;
+  animation: cloud-drift 8s ease-in-out infinite;
+}
+
+.scenery-cloud-1 { width: 40px; height: 20px; left: 10%; bottom: 40%; animation-delay: 0s; }
+.scenery-cloud-2 { width: 30px; height: 15px; right: 15%; bottom: 50%; animation-delay: 2s; }
+.scenery-cloud-3 { width: 25px; height: 12px; left: 50%; bottom: 35%; animation-delay: 4s; }
+
+@keyframes cloud-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+/* Nature elements */
+.scenery-plant {
+  position: absolute;
+  bottom: 15%;
+  width: 4px;
+  background: rgba(60, 140, 80, 0.6);
+  border-radius: 2px;
+  transform-origin: bottom;
+}
+
+.scenery-plant-1 { height: 25px; left: 25%; transform: rotate(-5deg); }
+.scenery-plant-2 { height: 20px; right: 30%; transform: rotate(8deg); }
+
+.scenery-flower {
+  position: absolute;
+  bottom: 18%;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 150, 80, 0.5);
+  border-radius: 50%;
+}
+
+.scenery-flower-1 { left: 23%; }
+.scenery-flower-2 { right: 28%; background: rgba(255, 100, 150, 0.5); }
+
+/* Electric elements */
+.scenery-spark {
+  position: absolute;
+  width: 2px;
+  height: 15px;
+  background: rgba(255, 220, 100, 0.5);
+  border-radius: 2px;
+  animation: spark-flash 1.5s ease-in-out infinite;
+}
+
+.scenery-spark-1 { left: 20%; bottom: 35%; animation-delay: 0s; }
+.scenery-spark-2 { right: 25%; bottom: 40%; animation-delay: 0.7s; }
+
+@keyframes spark-flash {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.scenery-crystal-shard {
+  position: absolute;
+  bottom: 15%;
+  width: 8px;
+  height: 20px;
+  background: rgba(200, 180, 255, 0.3);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+}
+
+.scenery-crystal-1 { left: 15%; }
+.scenery-crystal-2 { right: 20%; height: 15px; }
+
+/* Shadow elements */
+.scenery-mist {
+  position: absolute;
+  width: 50px;
+  height: 20px;
+  background: rgba(120, 80, 180, 0.2);
+  border-radius: 50%;
+  animation: mist-float 5s ease-in-out infinite;
+}
+
+.scenery-mist-1 { left: 10%; bottom: 30%; animation-delay: 0s; }
+.scenery-mist-2 { right: 15%; bottom: 50%; width: 35px; height: 15px; animation-delay: 2s; }
+
+@keyframes mist-float {
+  0%, 100% { opacity: 0.2; transform: translateX(0); }
+  50% { opacity: 0.35; transform: translateX(0); }
+}
+
+.scenery-orb {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: rgba(180, 100, 255, 0.3);
+  border-radius: 50%;
+  animation: orb-pulse 3s ease-in-out infinite;
+}
+
+.scenery-orb-1 { left: 30%; bottom: 25%; animation-delay: 0s; }
+.scenery-orb-2 { right: 35%; bottom: 35%; width: 6px; height: 6px; animation-delay: 1s; }
+
+@keyframes orb-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+/* Light elements */
+.scenery-ray {
+  position: absolute;
+  width: 3px;
+  height: 60px;
+  background: linear-gradient(180deg, rgba(255, 255, 200, 0.3), transparent);
+  bottom: 0;
+  animation: ray-glow 4s ease-in-out infinite;
+}
+
+.scenery-ray-1 { left: 15%; transform: rotate(-5deg); animation-delay: 0s; }
+.scenery-ray-2 { right: 20%; transform: rotate(5deg); animation-delay: 2s; }
+
+@keyframes ray-glow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+
+.scenery-sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 220, 0.6);
+  border-radius: 50%;
+  animation: sparkle-twinkle 2s ease-in-out infinite;
+}
+
+.scenery-sparkle-1 { left: 25%; bottom: 40%; animation-delay: 0s; }
+.scenery-sparkle-2 { right: 30%; bottom: 45%; animation-delay: 1s; }
+
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.2); }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MonsterSprite } from './MonsterSprite'
+import { StageScenery } from './StageScenery'
 import { StatAllocationModal } from './StatAllocationModal'
 import { useGameStore, getExpForLevel } from '../store/gameStore'
 import { ELEMENT_BACKGROUNDS } from '../data/elementBackgrounds'
@@ -67,11 +68,13 @@ export function HomeScreen({ onBattle, onNewMonster }) {
 
         <div className="monster-area">
           <div className="monster-stage" style={{ borderColor: `${bg.accent}40` }}>
+            <StageScenery element={element} />
             <MonsterSprite
               monster={monster}
               size="large"
               wandering
               evolutionStage={evolutionStage}
+              cleanliness={cleanliness}
             />
           </div>
           <div className="mood-display">

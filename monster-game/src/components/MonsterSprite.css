@@ -4,6 +4,22 @@
   --accent: #ffd478;
 }
 
+.monster-sprite.monster-dirty {
+  position: relative;
+}
+
+.dirty-overlay {
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 25% 35%, rgba(90, 70, 50, 0.4) 0%, transparent 35%),
+    radial-gradient(circle at 75% 55%, rgba(70, 55, 40, 0.35) 0%, transparent 30%),
+    radial-gradient(circle at 50% 80%, rgba(80, 60, 45, 0.3) 0%, transparent 25%);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .monster-sprite.monster-wandering .monster-body {
   animation: monster-float 3s ease-in-out infinite;
 }

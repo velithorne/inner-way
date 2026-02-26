@@ -60,6 +60,7 @@ export const useGameStore = create(
       play: () => set((state) => ({
         happiness: Math.min(MAX_STATS, state.happiness + 20),
         energy: Math.max(0, state.energy - 15),
+        cleanliness: Math.max(0, state.cleanliness - 15),
         lastCareUpdate: Date.now(),
       })),
 
@@ -143,6 +144,11 @@ export const useGameStore = create(
           },
         }
       }),
+
+      dirtyFromBattle: () => set((state) => ({
+        cleanliness: Math.max(0, state.cleanliness - 25),
+        lastCareUpdate: Date.now(),
+      })),
 
       recordBattleWin: () => set((state) => {
         const newExp = state.exp + 50
