@@ -1,0 +1,11 @@
+# Android (inner-way)
+inner-way/local.properties
+inner-way/*.iml
+inner-way/.idea/
+inner-way/.gradle/
+inner-way/build/
+inner-way/*.apk
+inner-way/*.aab
+
+# OS
+.DS_Store

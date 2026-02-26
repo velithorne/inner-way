@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.InnerWay" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/black_deep</item>
+        <item name="android:navigationBarColor">@color/black_deep</item>
+        <item name="android:windowBackground">@color/black_deep</item>
+        <item name="android:colorPrimary">@color/red_primary</item>
+        <item name="android:colorPrimaryDark">@color/black_deep</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
