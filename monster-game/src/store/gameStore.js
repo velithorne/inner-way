@@ -5,6 +5,7 @@ const CARE_DECAY_RATE = 0.02
 const MAX_STATS = 100
 const EVOLUTION_LEVELS = [8, 16, 24, 32]
 const STAT_POINTS_PER_LEVEL = 2
+const LEVEL_UP_CARE_BONUS = 8
 
 // Scaling exp: each level requires more than the last (100*level + 25*level²)
 export const getExpForLevel = (level) => Math.floor(100 * level + 25 * level * level)
@@ -71,8 +72,10 @@ export const useGameStore = create(
           const newLevel = state.level + 1
           const newStage = EVOLUTION_LEVELS.filter((lvl) => newLevel >= lvl).length
           return {
-            hunger: Math.max(0, state.hunger - 10),
-            energy: Math.max(0, state.energy - 20),
+            hunger: Math.min(MAX_STATS, Math.max(0, state.hunger - 10) + LEVEL_UP_CARE_BONUS),
+            energy: Math.min(MAX_STATS, Math.max(0, state.energy - 20) + LEVEL_UP_CARE_BONUS),
+            happiness: Math.min(MAX_STATS, state.happiness + LEVEL_UP_CARE_BONUS),
+            cleanliness: Math.min(MAX_STATS, state.cleanliness + LEVEL_UP_CARE_BONUS),
             exp: newExp - expForLevel,
             level: newLevel,
             pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
@@ -126,8 +129,13 @@ export const useGameStore = create(
           return {
             exp: newExp - expForLevel,
             level: newLevel,
+            hunger: Math.min(MAX_STATS, state.hunger + LEVEL_UP_CARE_BONUS),
+            happiness: Math.min(MAX_STATS, state.happiness + LEVEL_UP_CARE_BONUS),
+            energy: Math.min(MAX_STATS, state.energy + LEVEL_UP_CARE_BONUS),
+            cleanliness: Math.min(MAX_STATS, state.cleanliness + LEVEL_UP_CARE_BONUS),
             pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
             evolutionStage: Math.max(state.evolutionStage, newStage),
+            lastCareUpdate: Date.now(),
           }
         }
         return { exp: newExp }
@@ -135,7 +143,7 @@ export const useGameStore = create(
 
       allocateStat: (stat) => set((state) => {
         if (state.pendingStatPoints <= 0) return state
-        if (!state.allocatedStats[stat]) return state
+        if (!(stat in state.allocatedStats)) return state
         return {
           pendingStatPoints: state.pendingStatPoints - 1,
           allocatedStats: {
@@ -160,8 +168,13 @@ export const useGameStore = create(
             wins: state.wins + 1,
             exp: newExp - expForLevel,
             level: newLevel,
+            hunger: Math.min(MAX_STATS, state.hunger + LEVEL_UP_CARE_BONUS),
+            happiness: Math.min(MAX_STATS, state.happiness + LEVEL_UP_CARE_BONUS),
+            energy: Math.min(MAX_STATS, state.energy + LEVEL_UP_CARE_BONUS),
+            cleanliness: Math.min(MAX_STATS, state.cleanliness + LEVEL_UP_CARE_BONUS),
             pendingStatPoints: state.pendingStatPoints + STAT_POINTS_PER_LEVEL,
             evolutionStage: Math.max(state.evolutionStage, newStage),
+            lastCareUpdate: Date.now(),
           }
         }
         return { wins: state.wins + 1, exp: newExp }

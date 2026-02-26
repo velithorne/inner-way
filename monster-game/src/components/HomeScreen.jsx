@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MonsterSprite } from './MonsterSprite'
 import { StageScenery } from './StageScenery'
+import { HomeBackground3D } from './HomeBackground3D'
 import { StatAllocationModal } from './StatAllocationModal'
 import { useGameStore, getExpForLevel } from '../store/gameStore'
 import { ELEMENT_BACKGROUNDS } from '../data/elementBackgrounds'
@@ -46,13 +47,14 @@ export function HomeScreen({ onBattle, onNewMonster }) {
   const expProgress = (exp / expForNextLevel) * 100
 
   return (
-    <div
-      className="home-screen"
-      style={{
-        background: bg.gradient,
-      }}
-    >
-      <div className="home-screen-overlay" style={{ background: bg.overlay }} />
+    <div className="home-screen">
+      <HomeBackground3D element={element} />
+      <div
+        className="home-screen-overlay"
+        style={{
+          background: `linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0.5) 100%), ${bg.overlay}`,
+        }}
+      />
       <div className="home-screen-content">
         <header className="home-header">
           <h1>{monster?.name || 'Monster'}</h1>

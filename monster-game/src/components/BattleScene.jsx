@@ -177,6 +177,8 @@ export function BattleScene({ onExit }) {
     addLog(`${monster?.name} used ${move.name} for ${damage} damage!`)
     setTurn('enemy')
 
+    const enemyDefeated = enemyHp - damage <= 0
+
     const applyEnemyDamage = () => {
       setEnemyHp((h) => {
         const newHp = Math.max(0, h - damage)
@@ -185,25 +187,24 @@ export function BattleScene({ onExit }) {
       })
     }
 
+    const afterHit = () => {
+      setAnimationPhase('idle')
+      if (!enemyDefeated) setTimeout(() => enemyTurn(false), 400)
+    }
+
     if (isMelee) {
       setAnimationPhase('player-melee')
       setTimeout(() => {
         setAnimationPhase('enemy-hit')
         applyEnemyDamage()
-        setTimeout(() => {
-          setAnimationPhase('idle')
-          setTimeout(() => enemyTurn(false), 400)
-        }, 400)
+        setTimeout(afterHit, 400)
       }, 600)
     } else {
       setAnimationPhase('player-blast')
       setTimeout(() => {
         setAnimationPhase('enemy-hit')
         applyEnemyDamage()
-        setTimeout(() => {
-          setAnimationPhase('idle')
-          setTimeout(() => enemyTurn(false), 400)
-        }, 500)
+        setTimeout(afterHit, 500)
       }, 400)
     }
   }
