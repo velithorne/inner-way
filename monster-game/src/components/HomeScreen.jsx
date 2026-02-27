@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { HomeBackground3D } from './HomeBackground3D'
+import { VelithorneSprite } from './VelithorneSprite'
 import { StatAllocationModal } from './StatAllocationModal'
 import { useGameStore, getExpForLevel } from '../store/gameStore'
 import { ELEMENT_BACKGROUNDS } from '../data/elementBackgrounds'
@@ -48,12 +49,7 @@ export function HomeScreen({ onBattle, onNewMonster }) {
 
   return (
     <div className="home-screen">
-      <HomeBackground3D
-        element={element}
-        monster={monster}
-        evolutionStage={evolutionStage}
-        cleanliness={cleanliness}
-      />
+      <HomeBackground3D element={element} />
       <div
         className="home-screen-overlay"
         style={{
@@ -75,6 +71,9 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         </header>
 
         <div className="monster-area">
+          <div className="velithorne-container">
+            <VelithorneSprite evolutionStage={evolutionStage} wandering />
+          </div>
           <div className="mood-display">
             <span className="mood-emoji">{mood.emoji}</span>
             <span className="mood-text">{mood.text}</span>

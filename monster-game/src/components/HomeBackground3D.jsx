@@ -1,7 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Monster3D } from './Monster3D'
 
 // Pseudo-noise for procedural terrain
 function noise2D(x, z, seed = 0) {
@@ -211,7 +210,7 @@ const ELEMENT_SCENES = {
   },
 }
 
-function Scene({ element, monster, evolutionStage, cleanliness }) {
+function Scene({ element }) {
   const scene = ELEMENT_SCENES[element] || ELEMENT_SCENES.fire
 
   return (
@@ -236,28 +235,11 @@ function Scene({ element, monster, evolutionStage, cleanliness }) {
       <ProceduralTerrain element={element} color1={scene.terrain} />
       <ProceduralRocks element={element} terrainColor={scene.terrain} />
       <FloatingParticles color={scene.particleColor} count={50} />
-      {monster && (
-        <>
-          <mesh position={[0, -0.6, 0]} receiveShadow>
-            <cylinderGeometry args={[0.8, 1, 0.15, 32]} />
-            <meshStandardMaterial
-              color="#1a0a2e"
-              roughness={0.9}
-              metalness={0.05}
-            />
-          </mesh>
-          <Monster3D
-            monster={monster}
-            evolutionStage={evolutionStage}
-            cleanliness={cleanliness}
-          />
-        </>
-      )}
     </>
   )
 }
 
-export function HomeBackground3D({ element, monster, evolutionStage, cleanliness }) {
+export function HomeBackground3D({ element }) {
   return (
     <div className="home-bg-3d">
       <Canvas
@@ -265,12 +247,7 @@ export function HomeBackground3D({ element, monster, evolutionStage, cleanliness
         gl={{ alpha: true, antialias: true }}
         shadows
       >
-        <Scene
-          element={element}
-          monster={monster}
-          evolutionStage={evolutionStage}
-          cleanliness={cleanliness}
-        />
+        <Scene element={element} />
       </Canvas>
     </div>
   )
