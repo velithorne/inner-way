@@ -19,6 +19,12 @@
   justify-content: center;
 }
 
+.monster-display-portrait {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  overflow: hidden;
+}
+
 .monster-name {
   font-size: 1.5rem;
   color: #ffd478;

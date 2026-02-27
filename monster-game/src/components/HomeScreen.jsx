@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react'
-import { MonsterSprite } from './MonsterSprite'
-import { StageScenery } from './StageScenery'
 import { HomeBackground3D } from './HomeBackground3D'
 import { StatAllocationModal } from './StatAllocationModal'
 import { useGameStore, getExpForLevel } from '../store/gameStore'
@@ -50,7 +48,12 @@ export function HomeScreen({ onBattle, onNewMonster }) {
 
   return (
     <div className="home-screen">
-      <HomeBackground3D element={element} />
+      <HomeBackground3D
+        element={element}
+        monster={monster}
+        evolutionStage={evolutionStage}
+        cleanliness={cleanliness}
+      />
       <div
         className="home-screen-overlay"
         style={{
@@ -76,24 +79,15 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         </div>
 
         <div className="monster-area">
-          <div className="monster-stage" style={{ borderColor: `${bg.accent}40` }}>
-            <StageScenery element={element} />
-            <MonsterSprite
-              monster={monster}
-              size="large"
-              wandering
-              evolutionStage={evolutionStage}
-              cleanliness={cleanliness}
-              evolutionTraits={evolutionTraits}
-            />
-          </div>
-          <div className="mood-display">
+          <div className="monster-stage monster-stage-3d" style={{ borderColor: `${bg.accent}30` }}>
+            <div className="mood-display">
             <span className="mood-emoji">{mood.emoji}</span>
             <span className="mood-text">{mood.text}</span>
           </div>
           {feedbackMessage && (
             <div className="feedback-message">{feedbackMessage}</div>
           )}
+          </div>
         </div>
 
         <div className="stats-grid">

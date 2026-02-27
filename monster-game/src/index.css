@@ -1,9 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+
 :root {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  color: #f4f4f4;
+  color: rgba(255, 255, 255, 0.95);
   background-color: #0d0218;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -19,7 +21,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: linear-gradient(180deg, #0d0218 0%, #1a0a2e 50%, #0d0218 100%);
+  background: linear-gradient(180deg, #0d0218 0%, #150a28 40%, #0d0218 100%);
 }
 
 button {

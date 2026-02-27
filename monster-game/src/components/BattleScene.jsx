@@ -57,23 +57,28 @@ function BattleMonster({ basePosition, color, scale = 1, targetPosition, isHit, 
 function BattleEnvironment() {
   return (
     <>
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={0.5} />
       <directionalLight
-        position={[5, 8, 5]}
-        intensity={1}
+        position={[5, 10, 5]}
+        intensity={1.2}
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[2048, 2048]}
         shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
       />
-      <pointLight position={[-5, 5, -5]} intensity={0.5} color="#40e0d0" />
-      <pointLight position={[5, 3, 5]} intensity={0.5} color="#ff6b9d" />
+      <pointLight position={[-6, 6, -4]} intensity={0.6} color="#40e0d0" />
+      <pointLight position={[6, 4, 4]} intensity={0.6} color="#ff6b9d" />
+      <pointLight position={[0, 8, 0]} intensity={0.3} color="#ffffff" />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1, 0]} receiveShadow>
-        <planeGeometry args={[20, 20]} />
-        <meshStandardMaterial color="#0d0218" />
+        <circleGeometry args={[12, 64]} />
+        <meshStandardMaterial
+          color="#1a0a2e"
+          roughness={0.85}
+          metalness={0.05}
+        />
       </mesh>
     </>
   )

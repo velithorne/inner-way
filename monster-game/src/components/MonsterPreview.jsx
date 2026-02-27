@@ -1,12 +1,12 @@
-import { MonsterSprite } from './MonsterSprite'
+import { MonsterPortrait } from './MonsterPortrait'
 import './MonsterPreview.css'
 
 export function MonsterPreview({ monster, onConfirm }) {
   return (
     <div className="monster-preview">
       <div className="preview-container">
-        <div className="monster-display">
-          <MonsterSprite monster={monster} size="large" />
+        <div className="monster-display monster-display-portrait">
+          <MonsterPortrait monster={monster} size={180} />
         </div>
         <h2 className="monster-name">{monster.name}</h2>
         <div className="monster-tags">
