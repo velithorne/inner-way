@@ -17,6 +17,7 @@ export function HomeScreen({ onBattle, onNewMonster }) {
   const level = useGameStore((s) => s.level)
   const exp = useGameStore((s) => s.exp)
   const evolutionStage = useGameStore((s) => s.evolutionStage)
+  const evolutionTraits = useGameStore((s) => s.evolutionTraits)
   const feed = useGameStore((s) => s.feed)
   const play = useGameStore((s) => s.play)
   const train = useGameStore((s) => s.train)
@@ -24,6 +25,7 @@ export function HomeScreen({ onBattle, onNewMonster }) {
   const rest = useGameStore((s) => s.rest)
   const decayStats = useGameStore((s) => s.decayStats)
   const resetGame = useGameStore((s) => s.resetGame)
+  const feedbackMessage = useGameStore((s) => s.feedbackMessage)
 
   useEffect(() => {
     decayStats()
@@ -60,7 +62,12 @@ export function HomeScreen({ onBattle, onNewMonster }) {
           <h1>{monster?.name || 'Monster'}</h1>
           <span className="level-badge">Lv.{level}</span>
           {evolutionStage > 0 && (
-            <span className="evolution-badge">Evo {evolutionStage}</span>
+            <>
+              <span className="evolution-badge">Evo {evolutionStage}</span>
+              <span className="trait-badge" title={`Care style: ${evolutionTraits.build}, ${evolutionTraits.demeanor}`}>
+                {evolutionTraits.build}
+              </span>
+            </>
           )}
         </header>
         <div className="exp-bar">
@@ -77,12 +84,16 @@ export function HomeScreen({ onBattle, onNewMonster }) {
               wandering
               evolutionStage={evolutionStage}
               cleanliness={cleanliness}
+              evolutionTraits={evolutionTraits}
             />
           </div>
           <div className="mood-display">
             <span className="mood-emoji">{mood.emoji}</span>
             <span className="mood-text">{mood.text}</span>
           </div>
+          {feedbackMessage && (
+            <div className="feedback-message">{feedbackMessage}</div>
+          )}
         </div>
 
         <div className="stats-grid">

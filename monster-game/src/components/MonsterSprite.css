@@ -78,6 +78,15 @@
 .monster-body.evolution-stage-3.monster-size-medium { width: 165px; height: 165px; }
 .monster-body.evolution-stage-4.monster-size-medium { width: 180px; height: 180px; }
 
+/* Evolution traits - unique per care style */
+.build-plump .monster-body { border-radius: 55% 45% 50% 50% / 55% 55% 45% 45%; }
+.build-athletic .monster-arm { width: 0.42em; height: 0.55em; }
+.build-athletic .monster-leg { width: 0.35em; height: 0.5em; }
+.build-serene .monster-body { box-shadow: inset -8px -8px 16px rgba(0, 0, 0, 0.15), 0 4px 20px rgba(255, 255, 255, 0.1); }
+.demeanor-playful .monster-mouth { border-radius: 50%; width: 0.25em; }
+.demeanor-ferocious .monster-horn { height: 0.5em; }
+.demeanor-pristine .monster-body { box-shadow: inset 2px 2px 8px rgba(255, 255, 255, 0.3), 0 4px 15px rgba(0, 0, 0, 0.2); }
+
 .monster-arm {
   position: absolute;
   width: 0.35em;

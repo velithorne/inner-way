@@ -52,6 +52,16 @@
   font-weight: 700;
 }
 
+.trait-badge {
+  background: rgba(255, 212, 120, 0.25);
+  color: #ffd478;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
 .exp-bar {
   position: relative;
   width: 100%;
@@ -133,6 +143,17 @@
 .mood-text {
   color: #a0a0c0;
   font-size: 0.9rem;
+}
+
+.feedback-message {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(230, 80, 80, 0.3);
+  border: 1px solid rgba(230, 80, 80, 0.6);
+  border-radius: 8px;
+  color: #ff8a8a;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .stats-grid {
