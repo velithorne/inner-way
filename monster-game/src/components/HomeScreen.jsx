@@ -79,15 +79,13 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         </div>
 
         <div className="monster-area">
-          <div className="monster-stage monster-stage-3d" style={{ borderColor: `${bg.accent}30` }}>
-            <div className="mood-display">
+          <div className="mood-display">
             <span className="mood-emoji">{mood.emoji}</span>
             <span className="mood-text">{mood.text}</span>
           </div>
           {feedbackMessage && (
             <div className="feedback-message">{feedbackMessage}</div>
           )}
-          </div>
         </div>
 
         <div className="stats-grid">
