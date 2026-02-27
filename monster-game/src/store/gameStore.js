@@ -70,6 +70,8 @@ export const useGameStore = create(
       careCounts: { feed: 0, play: 0, train: 0, clean: 0, rest: 0 },
       lastActions: [],
       lastActionTimes: {},
+      campaignStage: 0,
+      adventureNode: 0,
 
       hasMonster: () => !!get().monster,
 
@@ -91,6 +93,8 @@ export const useGameStore = create(
         careCounts: { feed: 0, play: 0, train: 0, clean: 0, rest: 0 },
         lastActions: [],
         lastActionTimes: {},
+        campaignStage: 0,
+        adventureNode: 0,
       }),
 
       feed: () => set((state) => {
@@ -326,12 +330,14 @@ export const useGameStore = create(
       }),
 
       dirtyFromBattle: () => set((state) => ({
+        energy: Math.max(0, state.energy - 25),
+        hunger: Math.max(0, state.hunger - 15),
         cleanliness: Math.max(0, state.cleanliness - 25),
         lastCareUpdate: Date.now(),
       })),
 
-      recordBattleWin: () => set((state) => {
-        const newExp = state.exp + 50
+      recordBattleWin: (customExp = 50) => set((state) => {
+        const newExp = state.exp + customExp
         const expForLevel = getExpForLevel(state.level)
         if (newExp >= expForLevel) {
           const newLevel = state.level + 1
@@ -352,6 +358,23 @@ export const useGameStore = create(
           }
         }
         return { wins: state.wins + 1, exp: newExp }
+      }),
+
+      advanceCampaignStage: () => set((state) => ({
+        campaignStage: Math.min(state.campaignStage + 1, 20),
+      })),
+
+      advanceAdventureNode: () => set((state) => ({
+        adventureNode: Math.min(state.adventureNode + 1, 7),
+      })),
+
+      resetAdventure: () => set({ adventureNode: 0 }),
+
+      applyAdventureReward: (reward) => set((state) => {
+        const updates = {}
+        if (reward.energy) updates.energy = Math.min(MAX_STATS, state.energy + reward.energy)
+        if (reward.hunger) updates.hunger = Math.min(MAX_STATS, state.hunger + reward.hunger)
+        return updates
       }),
 
       recordBattleLoss: () => set((state) => ({
@@ -392,6 +415,8 @@ export const useGameStore = create(
         careCounts: { feed: 0, play: 0, train: 0, clean: 0, rest: 0 },
         lastActions: [],
         lastActionTimes: {},
+        campaignStage: 0,
+        adventureNode: 0,
       }),
     }),
     {

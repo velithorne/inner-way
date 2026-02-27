@@ -152,24 +152,32 @@ function BattleContent({ playerColor, enemyColor, animationPhase, evolutionStage
   )
 }
 
-export function BattleScene({ onExit }) {
+const DEFAULT_ENEMY = { name: 'Wild Foe', hp: 80, color: '#e76f51', expReward: 50 }
+
+export function BattleScene({ onExit, enemy: enemyProp = null, battleMode = 'wild' }) {
   const monster = useGameStore((s) => s.monster)
   const evolutionStage = useGameStore((s) => s.evolutionStage)
   const getBattleStats = useGameStore((s) => s.getBattleStats)
   const recordBattleWin = useGameStore((s) => s.recordBattleWin)
   const recordBattleLoss = useGameStore((s) => s.recordBattleLoss)
+  const advanceCampaignStage = useGameStore((s) => s.advanceCampaignStage)
+  const advanceAdventureNode = useGameStore((s) => s.advanceAdventureNode)
+
+  const enemy = enemyProp || DEFAULT_ENEMY
+  const enemyHpMax = enemy.hp || 80
 
   const playerStats = getBattleStats()
   const [playerHp, setPlayerHp] = useState(playerStats.hp)
-  const [enemyHp, setEnemyHp] = useState(80)
+  const [enemyHp, setEnemyHp] = useState(enemyHpMax)
   const [battleLog, setBattleLog] = useState([])
   const [turn, setTurn] = useState('player')
   const [battleOver, setBattleOver] = useState(false)
   const [result, setResult] = useState(null)
   const [animationPhase, setAnimationPhase] = useState('idle')
 
-  const enemyColor = '#e76f51'
+  const enemyColor = toThreeColor(enemy.color)
   const playerColor = toThreeColor(monster?.colors?.primary)
+  const enemyAttack = enemy.attack || 40
 
   const addLog = (msg) => setBattleLog((prev) => [...prev.slice(-4), msg])
 
@@ -249,7 +257,7 @@ export function BattleScene({ onExit }) {
 
     const move = MOVES[Math.floor(Math.random() * 3)]
     const damage = Math.floor(
-      (move.power * 0.8) * (0.8 + Math.random() * 0.4) * (wasDefending ? 0.5 : 1)
+      (move.power * (enemyAttack / 50)) * (0.8 + Math.random() * 0.4) * (wasDefending ? 0.5 : 1)
     )
     addLog(`Enemy used ${move.name} for ${damage} damage!`)
 
@@ -288,7 +296,9 @@ export function BattleScene({ onExit }) {
     setBattleOver(true)
     setResult(won ? 'win' : 'lose')
     if (won) {
-      recordBattleWin()
+      recordBattleWin(enemy.expReward || 50)
+      if (battleMode === 'campaign') advanceCampaignStage()
+      if (battleMode === 'adventure') advanceAdventureNode()
     } else {
       recordBattleLoss()
     }
@@ -305,9 +315,9 @@ export function BattleScene({ onExit }) {
             </div>
           </div>
           <div className="hp-bar enemy">
-            <span>Wild Foe</span>
+            <span>{enemy.name}</span>
             <div className="hp-track">
-              <div className="hp-fill" style={{ width: `${Math.max(0, (enemyHp / 80) * 100)}%` }} />
+              <div className="hp-fill" style={{ width: `${Math.max(0, (enemyHp / enemyHpMax) * 100)}%` }} />
             </div>
           </div>
         </div>
