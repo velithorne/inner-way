@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { HomeBackground3D } from './HomeBackground3D'
-import { VelithorneSprite } from './VelithorneSprite'
+import { MonsterImageSprite } from './MonsterImageSprite'
 import { StatAllocationModal } from './StatAllocationModal'
 import { useGameStore, getExpForLevel } from '../store/gameStore'
 import { ELEMENT_BACKGROUNDS } from '../data/elementBackgrounds'
@@ -71,8 +71,13 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         </header>
 
         <div className="monster-area">
-          <div className="velithorne-container">
-            <VelithorneSprite evolutionStage={evolutionStage} wandering />
+          <div className="monster-sprite-container">
+            <MonsterImageSprite
+              monsterId={monster?.name?.toLowerCase().replace(/\d+$/, '') || 'flare'}
+              level={level}
+              sizePx={140}
+              wandering
+            />
           </div>
           <div className="mood-display">
             <span className="mood-emoji">{mood.emoji}</span>

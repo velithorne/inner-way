@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" fill="transparent"/>
+  <ellipse cx="64" cy="75" rx="40" ry="35" fill="#2d2d2d"/>
+  <ellipse cx="64" cy="70" rx="30" ry="25" fill="#e8e8e8"/>
+  <circle cx="52" cy="58" r="8" fill="#00ff88"/>
+  <circle cx="76" cy="58" r="8" fill="#00ff88"/>
+  <circle cx="53" cy="57" r="2" fill="#0a0a0a"/>
+  <circle cx="77" cy="57" r="2" fill="#0a0a0a"/>
+  <text x="64" y="115" text-anchor="middle" font-size="10" fill="rgba(255,212,120,0.6)">Stage 0</text>
+</svg>

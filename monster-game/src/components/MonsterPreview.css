@@ -25,9 +25,9 @@
   overflow: hidden;
 }
 
-.monster-display-velithorne {
-  width: 160px;
-  height: 140px;
+.monster-display-sprite {
+  width: 180px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
