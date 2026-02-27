@@ -261,7 +261,7 @@ export function HomeBackground3D({ element, monster, evolutionStage, cleanliness
   return (
     <div className="home-bg-3d">
       <Canvas
-        camera={{ position: [0, 1.5, 6], fov: 50 }}
+        camera={{ position: [0, 0.4, 6], fov: 50 }}
         gl={{ alpha: true, antialias: true }}
         shadows
       >

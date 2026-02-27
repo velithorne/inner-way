@@ -73,10 +73,6 @@ export function HomeScreen({ onBattle, onNewMonster }) {
             </>
           )}
         </header>
-        <div className="exp-bar">
-          <div className="exp-fill" style={{ width: `${expProgress}%` }} />
-          <span className="exp-label">{exp} / {expForNextLevel} EXP</span>
-        </div>
 
         <div className="monster-area">
           <div className="mood-display">
@@ -86,37 +82,6 @@ export function HomeScreen({ onBattle, onNewMonster }) {
           {feedbackMessage && (
             <div className="feedback-message">{feedbackMessage}</div>
           )}
-        </div>
-
-        <div className="stats-grid">
-          <div className="stat-bar">
-            <span className="stat-icon">🍖</span>
-            <div className="stat-track">
-              <div className="stat-fill hunger" style={{ width: `${hunger}%` }} />
-            </div>
-            <span className="stat-value">{Math.round(hunger)}</span>
-          </div>
-          <div className="stat-bar">
-            <span className="stat-icon">🎮</span>
-            <div className="stat-track">
-              <div className="stat-fill happiness" style={{ width: `${happiness}%` }} />
-            </div>
-            <span className="stat-value">{Math.round(happiness)}</span>
-          </div>
-          <div className="stat-bar">
-            <span className="stat-icon">⚡</span>
-            <div className="stat-track">
-              <div className="stat-fill energy" style={{ width: `${energy}%` }} />
-            </div>
-            <span className="stat-value">{Math.round(energy)}</span>
-          </div>
-          <div className="stat-bar">
-            <span className="stat-icon">✨</span>
-            <div className="stat-track">
-              <div className="stat-fill cleanliness" style={{ width: `${cleanliness}%` }} />
-            </div>
-            <span className="stat-value">{Math.round(cleanliness)}</span>
-          </div>
         </div>
 
         <div className="care-actions">
@@ -156,6 +121,46 @@ export function HomeScreen({ onBattle, onNewMonster }) {
         >
           New Monster
         </button>
+
+        <div className="bottom-stats">
+        <div className="stats-grid">
+          <div className="stat-bar">
+            <span className="stat-icon">🍖</span>
+            <div className="stat-track">
+              <div className="stat-fill hunger" style={{ width: `${hunger}%` }} />
+            </div>
+            <span className="stat-value">{Math.round(hunger)}</span>
+          </div>
+          <div className="stat-bar">
+            <span className="stat-icon">🎮</span>
+            <div className="stat-track">
+              <div className="stat-fill happiness" style={{ width: `${happiness}%` }} />
+            </div>
+            <span className="stat-value">{Math.round(happiness)}</span>
+          </div>
+          <div className="stat-bar">
+            <span className="stat-icon">⚡</span>
+            <div className="stat-track">
+              <div className="stat-fill energy" style={{ width: `${energy}%` }} />
+            </div>
+            <span className="stat-value">{Math.round(energy)}</span>
+          </div>
+          <div className="stat-bar">
+            <span className="stat-icon">✨</span>
+            <div className="stat-track">
+              <div className="stat-fill cleanliness" style={{ width: `${cleanliness}%` }} />
+            </div>
+            <span className="stat-value">{Math.round(cleanliness)}</span>
+          </div>
+        </div>
+
+        <div className="exp-bar">
+          <div className="exp-bar-track">
+            <div className="exp-fill" style={{ width: `${expProgress}%` }} />
+          </div>
+          <span className="exp-label">{exp} / {expForNextLevel} EXP</span>
+        </div>
+        </div>
       </div>
 
       {showReset && (
