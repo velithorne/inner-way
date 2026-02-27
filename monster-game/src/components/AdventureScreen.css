@@ -1,0 +1,136 @@
+.adventure-screen {
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(180deg, #0d0218 0%, #1a0a2e 50%, #0d0218 100%);
+}
+
+.adventure-screen h1 {
+  color: #ffd478;
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.adventure-sub {
+  color: #a0a0c0;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.adventure-path {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.path-node {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.path-node.passed {
+  background: rgba(64, 224, 208, 0.3);
+  border-color: #40e0d0;
+}
+
+.path-node.current {
+  background: rgba(255, 212, 120, 0.3);
+  border-color: #ffd478;
+  box-shadow: 0 0 12px rgba(255, 212, 120, 0.5);
+}
+
+.path-node.battle { border-left: 3px solid #e76f51; }
+.path-node.rest { border-left: 3px solid #74b9ff; }
+.path-node.treasure { border-left: 3px solid #fdcb6e; }
+
+.adventure-node-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 1.5rem;
+  border-radius: 20px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.adventure-node-card.battle {
+  background: rgba(231, 111, 81, 0.15);
+  border: 2px solid rgba(231, 111, 81, 0.5);
+}
+
+.adventure-node-card.rest {
+  background: rgba(116, 185, 255, 0.15);
+  border: 2px solid rgba(116, 185, 255, 0.5);
+}
+
+.adventure-node-card.treasure {
+  background: rgba(253, 203, 110, 0.15);
+  border: 2px solid rgba(253, 203, 110, 0.5);
+}
+
+.adventure-node-card h2 {
+  color: #f4f4f4;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.adventure-node-card p {
+  color: #a0a0c0;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.btn-enter {
+  width: 100%;
+  padding: 1rem;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #40e0d0, #2a9d8f);
+  color: #0d0218;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-enter:hover {
+  transform: scale(1.02);
+}
+
+.btn-restart {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #9b5de5, #6c5ce7);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.btn-back {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  color: #a0a0c0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.btn-back:hover {
+  color: #f4f4f4;
+  border-color: rgba(255, 255, 255, 0.5);
+}
