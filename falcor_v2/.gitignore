@@ -1,0 +1,44 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Data (generated)
+lab_results/
+*.parquet
+!tests/fixtures/*.parquet
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# PyVista
+*.vtk
+*.vtu
