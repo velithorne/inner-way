@@ -21,7 +21,11 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Create local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+        run: |
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "sdk.dir=$SDK_DIR" > local.properties
+          echo "SDK path: $SDK_DIR"
+          ls -la "$SDK_DIR" 2>/dev/null || echo "SDK dir listing failed"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
