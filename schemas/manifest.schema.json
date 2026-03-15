@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "manifest.schema.json",
+  "title": "Folded Package Manifest",
+  "description": "Schema for the manifest of a folded project package",
+  "type": "object",
+  "required": ["version", "project_id", "ledger_path"],
+  "properties": {
+    "version": { "type": "string", "const": "0.1.0" },
+    "project_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "mode": { "type": "string", "enum": ["exact", "approximate"] },
+    "ledger_path": { "type": "string" },
+    "shared_dir": { "type": "string" },
+    "maps_dir": { "type": "string" },
+    "reports_dir": { "type": "string" },
+    "snapshots_dir": { "type": "string" },
+    "file_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "language": { "type": "string" },
+          "fold_count": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

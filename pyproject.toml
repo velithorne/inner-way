@@ -1,0 +1,11 @@
+[project]
+name = "origami-fold-engine"
+version = "0.1.0"
+description = "Structure-aware information folding engine for source-code projects"
+requires-python = ">=3.11"
+dependencies = [
+    "pytest>=7.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

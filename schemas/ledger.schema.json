@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ledger.schema.json",
+  "title": "Fold Ledger",
+  "description": "Schema for the fold ledger recording all folds applied to a project",
+  "type": "object",
+  "required": ["version", "project_id", "folds"],
+  "properties": {
+    "version": { "type": "string", "const": "0.1.0" },
+    "project_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "mode": { "type": "string", "enum": ["exact", "approximate"] },
+    "folds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fold_id", "operator_type", "source_targets", "invariants", "unfold_recipe"],
+        "properties": {
+          "fold_id": { "type": "string" },
+          "operator_type": { "type": "string" },
+          "source_targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string" },
+                "region_start": { "type": "integer" },
+                "region_end": { "type": "integer" }
+              }
+            }
+          },
+          "shared_representation": { "type": "string" },
+          "invariants": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "stress_score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "compression_gain": { "type": "integer" },
+          "unfold_recipe": { "type": "object" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "original_bytes": { "type": "integer" },
+        "folded_bytes": { "type": "integer" },
+        "fold_count": { "type": "integer" }
+      }
+    }
+  }
+}
