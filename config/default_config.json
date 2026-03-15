@@ -1,0 +1,51 @@
+{
+  "project": {
+    "include_hidden": false,
+    "include_vendor": false,
+    "mode": "exact"
+  },
+  "parsers": {
+    "strict": false,
+    "min_confidence": 0.8
+  },
+  "operators": {
+    "exact_repetition": {
+      "enabled": true,
+      "min_region_length": 64,
+      "min_occurrences": 2
+    },
+    "template_skeleton": {
+      "enabled": true,
+      "min_family_size": 3,
+      "min_scaffold_similarity": 0.8
+    },
+    "symbol_table": {
+      "enabled": true,
+      "min_reuse_count": 5
+    },
+    "hierarchy_mirror": {
+      "enabled": true,
+      "min_depth": 2,
+      "min_similarity": 0.85
+    },
+    "dependency_motif": {
+      "enabled": true,
+      "min_occurrences": 3,
+      "min_node_count": 3
+    }
+  },
+  "validation": {
+    "max_stress": 0.35,
+    "min_net_bytes_saved": 32,
+    "require_syntax_valid": true
+  },
+  "benchmarks": {
+    "run_zip": true,
+    "run_gzip": true,
+    "run_zstd": false
+  },
+  "reports": {
+    "export_json": true,
+    "export_text": true
+  }
+}
