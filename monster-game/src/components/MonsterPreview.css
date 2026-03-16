@@ -1,0 +1,91 @@
+.monster-preview {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.preview-container {
+  text-align: center;
+}
+
+.monster-display {
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.monster-display-portrait {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.monster-display-sprite {
+  width: 180px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.monster-name {
+  font-size: 1.5rem;
+  color: #ffd478;
+  margin-bottom: 0.75rem;
+}
+
+.monster-tags {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tag {
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.tag.element {
+  background: linear-gradient(135deg, rgba(64, 224, 208, 0.3), rgba(255, 107, 157, 0.3));
+  color: #40e0d0;
+}
+
+.tag.body {
+  background: rgba(255, 212, 120, 0.2);
+  color: #ffd478;
+}
+
+.tag.personality {
+  background: rgba(196, 69, 105, 0.3);
+  color: #ff9ebb;
+}
+
+.btn-confirm {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #40e0d0, #ff6b9d);
+  color: #0d0218;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-confirm:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 30px rgba(64, 224, 208, 0.4);
+}
+
+.btn-confirm:active {
+  transform: scale(0.98);
+}

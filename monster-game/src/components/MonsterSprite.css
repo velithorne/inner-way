@@ -1,0 +1,328 @@
+.monster-sprite {
+  --primary: #ff6b9d;
+  --secondary: #c44569;
+  --accent: #ffd478;
+}
+
+.monster-sprite.monster-dirty {
+  position: relative;
+}
+
+.dirty-overlay {
+  position: absolute;
+  inset: -8%;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 25% 35%, rgba(90, 70, 50, 0.4) 0%, transparent 35%),
+    radial-gradient(circle at 75% 55%, rgba(70, 55, 40, 0.35) 0%, transparent 30%),
+    radial-gradient(circle at 50% 80%, rgba(80, 60, 45, 0.3) 0%, transparent 25%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.monster-sprite.monster-wandering .monster-body {
+  animation: monster-float 3s ease-in-out infinite;
+}
+
+@keyframes monster-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.monster-slim.monster-wandering .monster-body {
+  animation: monster-float-slim 3s ease-in-out infinite;
+}
+
+@keyframes monster-float-slim {
+  0%, 100% { transform: scaleX(0.8) translateY(0); }
+  50% { transform: scaleX(0.8) translateY(-8px); }
+}
+
+.monster-body {
+  position: relative;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset -10px -10px 20px rgba(0, 0, 0, 0.2),
+    inset 5px 5px 15px rgba(255, 255, 255, 0.2),
+    0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.monster-size-small .monster-body {
+  width: 60px;
+  height: 60px;
+}
+
+.monster-size-medium .monster-body {
+  width: 120px;
+  height: 120px;
+}
+
+.monster-size-large .monster-body {
+  width: 160px;
+  height: 160px;
+}
+
+/* Evolution stages - each adds size and features */
+.monster-body.evolution-stage-1.monster-size-large { width: 180px; height: 180px; }
+.monster-body.evolution-stage-2.monster-size-large { width: 200px; height: 200px; }
+.monster-body.evolution-stage-3.monster-size-large { width: 220px; height: 220px; }
+.monster-body.evolution-stage-4.monster-size-large { width: 240px; height: 240px; }
+
+.monster-body.evolution-stage-1.monster-size-medium { width: 135px; height: 135px; }
+.monster-body.evolution-stage-2.monster-size-medium { width: 150px; height: 150px; }
+.monster-body.evolution-stage-3.monster-size-medium { width: 165px; height: 165px; }
+.monster-body.evolution-stage-4.monster-size-medium { width: 180px; height: 180px; }
+
+/* Evolution traits - unique per care style */
+.build-plump .monster-body { border-radius: 55% 45% 50% 50% / 55% 55% 45% 45%; }
+.build-athletic .monster-arm { width: 0.42em; height: 0.55em; }
+.build-athletic .monster-leg { width: 0.35em; height: 0.5em; }
+.build-serene .monster-body { box-shadow: inset -8px -8px 16px rgba(0, 0, 0, 0.15), 0 4px 20px rgba(255, 255, 255, 0.1); }
+.demeanor-playful .monster-mouth { border-radius: 50%; width: 0.25em; }
+.demeanor-ferocious .monster-horn { height: 0.5em; }
+.demeanor-pristine .monster-body { box-shadow: inset 2px 2px 8px rgba(255, 255, 255, 0.3), 0 4px 15px rgba(0, 0, 0, 0.2); }
+
+.monster-arm {
+  position: absolute;
+  width: 0.35em;
+  height: 0.5em;
+  background: var(--secondary);
+  border-radius: 50%;
+  top: 35%;
+}
+
+.monster-arm.arm-left {
+  left: -15%;
+  transform: rotate(-30deg);
+}
+
+.monster-arm.arm-right {
+  right: -15%;
+  transform: rotate(30deg);
+}
+
+.monster-size-large .monster-arm {
+  width: 0.4em;
+  height: 0.6em;
+}
+
+.monster-leg {
+  position: absolute;
+  width: 0.3em;
+  height: 0.45em;
+  background: var(--secondary);
+  border-radius: 40% 40% 20% 20%;
+  bottom: -10%;
+}
+
+.monster-leg.leg-left {
+  left: 25%;
+  transform: rotate(5deg);
+}
+
+.monster-leg.leg-right {
+  right: 25%;
+  transform: rotate(-5deg);
+}
+
+.monster-size-large .monster-leg {
+  width: 0.35em;
+  height: 0.55em;
+}
+
+/* Stage 2: Horns */
+.monster-horn {
+  position: absolute;
+  width: 0.15em;
+  height: 0.35em;
+  background: var(--accent);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  top: -5%;
+}
+
+.monster-horn.horn-left {
+  left: 20%;
+  transform: rotate(-20deg);
+}
+
+.monster-horn.horn-right {
+  right: 20%;
+  transform: rotate(20deg) scaleX(-1);
+}
+
+.monster-size-large .monster-horn {
+  width: 0.2em;
+  height: 0.45em;
+}
+
+/* Stage 3: Wings */
+.monster-wings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.monster-wings .wing {
+  position: absolute;
+  width: 0.5em;
+  height: 0.25em;
+  background: var(--accent);
+  border-radius: 50% 50% 0 0;
+  opacity: 0.7;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.monster-wings .wing-left {
+  left: -60%;
+  transform: translateY(-50%) rotate(-30deg);
+}
+
+.monster-wings .wing-right {
+  right: -60%;
+  transform: translateY(-50%) rotate(30deg) scaleX(-1);
+}
+
+.monster-size-large .monster-wings .wing {
+  width: 0.6em;
+  height: 0.35em;
+}
+
+/* Stage 4: Aura glow */
+.monster-aura {
+  position: absolute;
+  inset: -15%;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 40%, var(--accent) 100%);
+  opacity: 0.15;
+  animation: aura-pulse 2s ease-in-out infinite;
+}
+
+@keyframes aura-pulse {
+  0%, 100% { opacity: 0.1; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.05); }
+}
+
+.monster-round .monster-body {
+  border-radius: 50%;
+}
+
+.monster-spiky .monster-body {
+  border-radius: 45% 55% 50% 50% / 50% 50% 55% 45%;
+}
+
+.monster-slim .monster-body {
+  border-radius: 50% / 60%;
+  transform: scaleX(0.8);
+  transform-origin: center;
+}
+
+.monster-fluffy .monster-body {
+  border-radius: 50%;
+  overflow: visible;
+}
+
+.monster-angular .monster-body {
+  border-radius: 20%;
+}
+
+.monster-bubbly .monster-body {
+  border-radius: 60% 40% 50% 50% / 50% 60% 40% 50%;
+}
+
+.monster-eyes {
+  display: flex;
+  gap: 0.3em;
+  margin-bottom: 0.2em;
+}
+
+.monster-size-small .monster-eyes { gap: 0.15em; }
+.monster-size-large .monster-eyes { gap: 0.4em; }
+
+.eye {
+  width: 0.25em;
+  height: 0.25em;
+  background: #1a0a2e;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.05em var(--accent);
+}
+
+.monster-size-small .eye {
+  width: 0.2em;
+  height: 0.2em;
+}
+
+.monster-size-large .eye {
+  width: 0.35em;
+  height: 0.35em;
+}
+
+.monster-mouth {
+  width: 0.2em;
+  height: 0.1em;
+  background: var(--secondary);
+  border-radius: 0 0 50% 50%;
+}
+
+.monster-size-large .monster-mouth {
+  width: 0.3em;
+  height: 0.15em;
+}
+
+.spikes {
+  position: absolute;
+  top: -15%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.1em;
+}
+
+.spike {
+  width: 0.15em;
+  height: 0.25em;
+  background: var(--secondary);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  transform: rotate(calc(var(--i) * 20deg - 40deg));
+}
+
+.monster-size-large .spike {
+  width: 0.2em;
+  height: 0.35em;
+}
+
+.fluff {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120%;
+  height: 120%;
+  pointer-events: none;
+}
+
+.fluff-ball {
+  position: absolute;
+  width: 0.2em;
+  height: 0.2em;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0.8;
+  top: 50%;
+  left: 50%;
+  transform: rotate(calc(var(--i) * 60deg)) translateY(-80%);
+}
+
+.monster-size-large .fluff-ball {
+  width: 0.25em;
+  height: 0.25em;
+}

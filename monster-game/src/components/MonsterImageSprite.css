@@ -1,0 +1,33 @@
+.monster-image-sprite {
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.monster-image {
+  image-rendering: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+  transition: transform 0.2s ease;
+}
+
+.monster-image-sprite:hover .monster-image {
+  transform: scale(1.02);
+}
+
+.monster-image-fallback {
+  background: rgba(26, 10, 46, 0.6);
+  border: 2px dashed rgba(255, 212, 120, 0.4);
+  border-radius: 16px;
+  color: rgba(255, 212, 120, 0.8);
+  font-size: 0.9rem;
+  font-weight: 600;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.monster-image-fallback .fallback-hint {
+  font-size: 0.65rem;
+  opacity: 0.7;
+}

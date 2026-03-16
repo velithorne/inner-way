@@ -1,0 +1,96 @@
+import { useMemo, useState, useEffect } from 'react'
+import './MonsterSprite.css'
+
+export function MonsterSprite({ monster, size = 'medium', wandering = false, evolutionStage = 0, cleanliness = 100, evolutionTraits = {} }) {
+  const [position, setPosition] = useState({ x: 50, y: 50 })
+
+  useEffect(() => {
+    if (!wandering) return
+    const interval = setInterval(() => {
+      setPosition((prev) => ({
+        x: Math.max(15, Math.min(85, prev.x + (Math.random() - 0.5) * 25)),
+        y: Math.max(20, Math.min(80, prev.y + (Math.random() - 0.5) * 20)),
+      }))
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [wandering])
+
+  const style = useMemo(() => {
+    if (!monster?.colors) return {}
+    return {
+      '--primary': monster.colors.primary,
+      '--secondary': monster.colors.secondary,
+      '--accent': monster.colors.accent,
+    }
+  }, [monster])
+
+  if (!monster) return null
+
+  const stage = Math.min(evolutionStage, 4)
+  const { build = 'balanced', demeanor = 'calm' } = evolutionTraits
+  const bodyClass = `monster-body monster-${monster.bodyType} monster-size-${size} evolution-stage-${stage} build-${build} demeanor-${demeanor}`
+
+  const wrapperStyle = wandering
+    ? {
+        position: 'absolute',
+        left: `${position.x}%`,
+        top: `${position.y}%`,
+        transform: 'translate(-50%, -50%)',
+        transition: 'left 2s ease-out, top 2s ease-out',
+      }
+    : {}
+
+  const hasLimbs = stage >= 1
+  const hasHorns = stage >= 2
+  const hasWings = stage >= 3
+  const isFinalForm = stage >= 4
+  const isDirty = cleanliness < 60
+
+  return (
+    <div className={`monster-sprite ${wandering ? 'monster-wandering' : ''} ${isDirty ? 'monster-dirty' : ''}`} style={{ ...style, ...wrapperStyle }}>
+      {isDirty && <div className="dirty-overlay" />}
+      <div className={bodyClass}>
+        {hasLimbs && (
+          <>
+            <div className="monster-arm arm-left" />
+            <div className="monster-arm arm-right" />
+            <div className="monster-leg leg-left" />
+            <div className="monster-leg leg-right" />
+          </>
+        )}
+        {hasHorns && (
+          <>
+            <div className="monster-horn horn-left" />
+            <div className="monster-horn horn-right" />
+          </>
+        )}
+        {hasWings && (
+          <div className="monster-wings">
+            <div className="wing wing-left" />
+            <div className="wing wing-right" />
+          </div>
+        )}
+        {isFinalForm && <div className="monster-aura" />}
+        <div className="monster-eyes">
+          <div className="eye left" />
+          <div className="eye right" />
+        </div>
+        <div className="monster-mouth" />
+        {monster.bodyType === 'spiky' && (
+          <div className="spikes">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="spike" style={{ '--i': i }} />
+            ))}
+          </div>
+        )}
+        {monster.bodyType === 'fluffy' && (
+          <div className="fluff">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="fluff-ball" style={{ '--i': i }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

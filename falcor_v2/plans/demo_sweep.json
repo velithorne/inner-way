@@ -1,0 +1,11 @@
+{
+  "mode": "SIM",
+  "frequency_start_hz": 1.0,
+  "frequency_stop_hz": 50.0,
+  "frequency_steps": 10,
+  "magnet_state_schedule": ["OFF", "ON"],
+  "dwell_time_s": 3.0,
+  "settle_time_s": 1.0,
+  "sample_rate_hz": 10.0,
+  "seed": 42
+}
