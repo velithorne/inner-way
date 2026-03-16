@@ -49,6 +49,13 @@
       "reject_overlap_ambiguity": true
     }
   },
+  "planner": {
+    "min_net_value": -0.5,
+    "logical_weight": 0.001,
+    "utility_weight": 1.0,
+    "stress_weight": -2.0,
+    "metadata_penalty_weight": -0.001
+  },
   "validation": {
     "min_net_gain": 0,
     "max_stress": 1.0,
@@ -58,6 +65,18 @@
   "benchmark": {
     "enabled": true,
     "baselines": ["raw", "zip", "gzip"]
+  },
+  "benchmark_suite": {
+    "enabled": true,
+    "tier2_datasets": [
+      ["tests/fixtures/duplicate_python", "duplicate-heavy-python"],
+      ["tests/fixtures/template_heavy", "template-heavy"],
+      ["tests/fixtures/config_heavy", "config-heavy"],
+      [".", "infold-workspace"],
+      ["tests/fixtures/mixed_project", "mixed-small"],
+      ["tests/fixtures/hierarchy_mirror", "hierarchy-mirror"],
+      ["tests/fixtures/dependency_motif", "dependency-motif"]
+    ]
   },
   "report": {
     "export_json": true,

@@ -1,5 +1,8 @@
 """
 Physical folded package export: manifest, ledger, shared, maps, reports, snapshots.
+
+Package spec v1: required manifest.json, ledger.json; required dirs shared/, maps/, reports/, snapshots/.
+Versioning and compatibility metadata in manifest.
 """
 
 import json
@@ -9,6 +12,10 @@ from typing import Any
 
 from infold.engine.ledger import FoldLedger
 from infold.engine.orchestrator import FoldResult
+from infold.engine.package_spec import (
+    COMPATIBILITY_METADATA,
+    PACKAGE_SPEC_VERSION,
+)
 from infold.models.project_sheet import ProjectSheet
 
 
@@ -32,18 +39,24 @@ def export_package(
     sheet = result.project_sheet
     ledger = result.ledger
 
-    # manifest.json
+    # manifest.json (package spec v1)
+    raw_size = sheet.metrics.get("original_size_bytes", 0)
+    physical_folded = raw_size - ledger.total_bytes_saved
     manifest = {
-        "version": "1.0",
+        "version": PACKAGE_SPEC_VERSION,
+        "package_spec": "1.0",
+        "compatibility": COMPATIBILITY_METADATA,
         "project_id": config.get("project", {}).get("id"),
         "source_path": str(sheet.source_path),
         "created": datetime.now(timezone.utc).isoformat(),
         "file_count": sheet.metrics.get("file_count", 0),
         "folder_count": sheet.metrics.get("folder_count", 0),
-        "original_size_bytes": sheet.metrics.get("original_size_bytes", 0),
+        "original_size_bytes": raw_size,
         "fold_count": ledger.total_folds,
         "logical_gain_bytes": ledger.total_bytes_saved,
-        "physical_folded_size_bytes": sheet.metrics.get("original_size_bytes", 0) - ledger.total_bytes_saved,
+        "physical_folded_size_bytes": physical_folded,
+        "required_files": ["manifest.json", "ledger.json"],
+        "required_dirs": ["shared", "maps", "reports", "snapshots"],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 

@@ -2,6 +2,7 @@
 Infold CLI — entry point for fold operations.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -52,8 +53,32 @@ def verify_intake(config: dict) -> bool:
     return sheet
 
 
+def run_benchmark_suite_cmd(config: dict) -> int:
+    """Run second-tier benchmark suite on configured datasets."""
+    from infold.reporting import run_benchmark_suite, benchmark_suite_to_text
+
+    suite_config = config.get("benchmark_suite", {})
+    if not suite_config.get("enabled", True):
+        print("Benchmark suite disabled in config")
+        return 0
+    datasets_raw = suite_config.get("tier2_datasets", [])
+    base = Path(__file__).parent.parent
+    datasets = [(base / p, did) for p, did in datasets_raw if p and did]
+    results = run_benchmark_suite(datasets, config)
+    print(benchmark_suite_to_text(results))
+    return 0
+
+
 def main() -> int:
     """Main CLI entry point."""
+    parser = argparse.ArgumentParser(description="Infold Core — structure-aware folding engine")
+    parser.add_argument("--benchmark-suite", action="store_true", help="Run second-tier benchmark suite")
+    args = parser.parse_args()
+
+    if args.benchmark_suite:
+        config = load_config()
+        return run_benchmark_suite_cmd(config)
+
     print(f"Infold Core v{__version__}")
     print("Structure-aware folding engine for code projects and structured text")
     print()

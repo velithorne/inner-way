@@ -44,6 +44,8 @@ htmlcov/
 infold_reports/
 infold_sweep_report/
 infold_package/
+infold_package_test/
+tests/fixtures/sweep_summary.json
 *.infold
 
 # OS

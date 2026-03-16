@@ -9,7 +9,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from infold.engine.interaction_policy import (
+    conflicts_with_committed,
+    update_committed_paths,
+)
 from infold.engine.ledger import FoldLedger
+from infold.engine.planner import filter_candidates
 from infold.intake import scan_project
 from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
@@ -31,6 +36,7 @@ class FoldResult:
     folded_state: dict[str, Any] = field(default_factory=dict)  # canonical regions, etc.
     errors: list[str] = field(default_factory=list)
     candidate_counts: dict[str, int] = field(default_factory=dict)  # operator_id -> count detected
+    rejected_candidates: list[dict[str, Any]] = field(default_factory=list)  # for reporting
     exact_reconstruction_ok: bool = True  # verified byte-for-byte recovery
 
 
@@ -75,23 +81,55 @@ def run_fold(
     folded_state: dict[str, Any] = {"canonicals": [], "references": []}
     errors: list[str] = []
     candidate_counts: dict[str, int] = {}
+    rejected_candidates: list[dict[str, Any]] = []
+    committed_paths: set[str] = set()
 
     for op in _get_enabled_operators(config):
         candidates = op.detect_candidates(sheet, config)
         candidate_counts[op.operator_id()] = len(candidates)
-        for c in candidates:
+        accepted, planner_rejected = filter_candidates(candidates, config)
+        for c, reason in planner_rejected:
+            rejected_candidates.append({
+                "operator_id": op.operator_id(),
+                "reason": "planner",
+                "detail": reason,
+                "target_count": len(c.targets),
+            })
+        for c in accepted:
+            conflict, conflict_reason = conflicts_with_committed(c, committed_paths)
+            if conflict:
+                rejected_candidates.append({
+                    "operator_id": op.operator_id(),
+                    "reason": "conflict",
+                    "detail": conflict_reason,
+                    "target_count": len(c.targets),
+                })
+                continue
             vr = validate_candidate(op, c, sheet, config)
             if not vr.accepted:
                 errors.append(f"{op.operator_id()}: candidate rejected: {vr.hard_failures}")
+                rejected_candidates.append({
+                    "operator_id": op.operator_id(),
+                    "reason": "validation",
+                    "detail": str(vr.hard_failures),
+                    "target_count": len(c.targets),
+                })
                 continue
             try:
                 record = op.apply(c, sheet, config)
                 ledger.append(record)
+                update_committed_paths(committed_paths, c, record.targets)
                 folded_state["canonicals"].append(
                     {"operator": op.operator_id(), "targets": len(record.targets), "gain": record.gain}
                 )
             except Exception as e:
                 errors.append(f"{op.operator_id()}: apply failed: {e}")
+                rejected_candidates.append({
+                    "operator_id": op.operator_id(),
+                    "reason": "apply_failed",
+                    "detail": str(e),
+                    "target_count": len(c.targets),
+                })
 
     # Verify exact reconstruction for committed folds
     exact_reconstruction_ok = True
@@ -124,5 +162,6 @@ def run_fold(
         folded_state=folded_state,
         errors=errors,
         candidate_counts=candidate_counts,
+        rejected_candidates=rejected_candidates,
         exact_reconstruction_ok=exact_reconstruction_ok,
     )

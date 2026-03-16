@@ -73,6 +73,20 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     logical_gain = ledger.total_bytes_saved  # bytes saved by deduplication
     physical_folded_size = raw - logical_gain  # size of folded representation
 
+    # Per-operator gain share
+    total_gain = ledger.total_bytes_saved
+    per_operator_gain: dict[str, float] = {}
+    for op_id, data in op_breakdown.items():
+        g = data.get("gain", 0)
+        per_operator_gain[op_id] = g / total_gain if total_gain else 0
+
+    # Family summaries from fold records
+    duplicate_families = [r for r in ledger.fold_records if r.operator_id == "exact_repetition"]
+    template_families = [r for r in ledger.fold_records if r.operator_id == "template_skeleton"]
+    shared_symbol_families = [r for r in ledger.fold_records if r.operator_id == "symbol_table"]
+    hierarchy_templates = [r for r in ledger.fold_records if r.operator_id == "hierarchy_mirror"]
+    dependency_motifs = [r for r in ledger.fold_records if r.operator_id == "dependency_motif"]
+
     return {
         "project_id": config.get("project", {}).get("id"),
         "source_path": str(sheet.source_path),
@@ -94,6 +108,13 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
         "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
         "dependency_metrics": dependency_metrics if dependency_metrics else None,
+        "duplicate_families": [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families],
+        "template_families": [{"targets": len(r.targets), "gain": r.gain} for r in template_families],
+        "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
+        "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
+        "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
+        "per_operator_gain_share": per_operator_gain,
+        "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
     }
 
 
@@ -128,6 +149,21 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
     lines.append("Operator breakdown:")
     for op_id, data in report["operator_breakdown"].items():
         lines.append(f"  {op_id}: {data['count']} folds, {data['gain']} bytes saved, {data['targets']} targets")
+    lines.append("")
+    lines.append("Families:")
+    for name, fams in [
+        ("duplicate_families", report.get("duplicate_families", [])),
+        ("template_families", report.get("template_families", [])),
+        ("shared_symbol_families", report.get("shared_symbol_families", [])),
+        ("hierarchy_templates", report.get("hierarchy_templates", [])),
+        ("dependency_motifs", report.get("dependency_motifs", [])),
+    ]:
+        if fams:
+            lines.append(f"  {name}: {len(fams)} families")
+            for i, f in enumerate(fams[:5]):
+                lines.append(f"    [{i}] targets={f.get('targets', 0)}, gain={f.get('gain', 0)}")
+            if len(fams) > 5:
+                lines.append(f"    ... and {len(fams) - 5} more")
     if report.get("template_skeleton_metrics"):
         tm = report["template_skeleton_metrics"]
         lines.append("")
@@ -173,6 +209,16 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append(f"  net_bytes_saved: {dm.get('net_bytes_saved', 0)}")
         lines.append(f"  dependency_recovery_accuracy: {dm.get('dependency_recovery_accuracy', [])}")
         lines.append(f"  structural_reuse_ratio: {dm.get('structural_reuse_ratio', [])}")
+    lines.append("")
+    lines.append("Per-operator gain share:")
+    for op_id, share in report.get("per_operator_gain_share", {}).items():
+        lines.append(f"  {op_id}: {share:.1%}")
+    lines.append("")
+    lines.append("Rejected candidates summary:")
+    for rc in report.get("rejected_candidates_summary", [])[:20]:
+        lines.append(f"  {rc.get('operator_id', '?')}: {rc.get('reason', '?')} - {rc.get('detail', '')[:60]}")
+    if len(report.get("rejected_candidates_summary", [])) > 20:
+        lines.append(f"  ... and {len(report['rejected_candidates_summary']) - 20} more")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")
