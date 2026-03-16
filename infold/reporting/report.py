@@ -21,6 +21,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     op_breakdown: dict[str, dict[str, Any]] = {}
     template_metrics: dict[str, Any] = {}
     symbol_table_metrics: dict[str, Any] = {}
+    hierarchy_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -34,6 +35,16 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             symbol_table_metrics.setdefault("symbol_reuse_ratio", []).append(recipe.get("symbol_reuse_ratio"))
             symbol_table_metrics.setdefault("net_bytes_saved", 0)
             symbol_table_metrics["net_bytes_saved"] = symbol_table_metrics.get("net_bytes_saved", 0) + r.gain
+        if r.operator_id == "hierarchy_mirror":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            hierarchy_metrics.setdefault("hierarchy_templates_found", 0)
+            hierarchy_metrics["hierarchy_templates_found"] += 1
+            hierarchy_metrics.setdefault("instances_per_template", []).append(recipe.get("instance_count", 0))
+            hierarchy_metrics.setdefault("net_bytes_saved", 0)
+            hierarchy_metrics["net_bytes_saved"] = hierarchy_metrics.get("net_bytes_saved", 0) + r.gain
+            hierarchy_metrics.setdefault("structural_reuse_ratio", []).append(recipe.get("structural_reuse_ratio"))
+            hierarchy_metrics.setdefault("path_reconstruction_accuracy", []).append(recipe.get("path_reconstruction_accuracy"))
+            hierarchy_metrics.setdefault("file_membership_accuracy", []).append(recipe.get("file_membership_accuracy"))
         if r.operator_id == "template_skeleton":
             recipe = getattr(r, "unfold_recipe", {}) or {}
             template_metrics.setdefault("families_found", 0)
@@ -70,6 +81,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "validation_failures": len(result.errors),
         "template_skeleton_metrics": template_metrics if template_metrics else None,
         "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
+        "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
     }
 
 
@@ -129,6 +141,16 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append(f"  net_bytes_saved: {stm.get('net_bytes_saved', 0)}")
         if stm.get("symbol_reuse_ratio"):
             lines.append(f"  symbol_reuse_ratio: {stm['symbol_reuse_ratio']}")
+    if report.get("hierarchy_metrics"):
+        hm = report["hierarchy_metrics"]
+        lines.append("")
+        lines.append("Hierarchy Mirror metrics:")
+        lines.append(f"  hierarchy_templates_found: {hm.get('hierarchy_templates_found', 0)}")
+        lines.append(f"  instances_per_template: {hm.get('instances_per_template', [])}")
+        lines.append(f"  net_bytes_saved: {hm.get('net_bytes_saved', 0)}")
+        lines.append(f"  structural_reuse_ratio: {hm.get('structural_reuse_ratio', [])}")
+        lines.append(f"  path_reconstruction_accuracy: {hm.get('path_reconstruction_accuracy', [])}")
+        lines.append(f"  file_membership_accuracy: {hm.get('file_membership_accuracy', [])}")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")

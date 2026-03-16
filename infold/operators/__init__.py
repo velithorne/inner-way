@@ -2,8 +2,9 @@
 
 from infold.operators.base import BaseOperator
 from infold.operators.exact_repetition import ExactRepetitionOperator
+from infold.operators.hierarchy_mirror import HierarchyMirrorOperator
 from infold.operators.noop_operator import NoOpOperator
 from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
 
-__all__ = ["BaseOperator", "NoOpOperator", "ExactRepetitionOperator", "SymbolTableOperator", "TemplateSkeletonOperator"]
+__all__ = ["BaseOperator", "NoOpOperator", "ExactRepetitionOperator", "SymbolTableOperator", "TemplateSkeletonOperator", "HierarchyMirrorOperator"]

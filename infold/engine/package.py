@@ -70,6 +70,16 @@ def export_package(
                 json.dumps({"id_to_symbol": recipe.get("id_to_symbol")}, indent=2),
                 encoding="utf-8",
             )
+        elif record.operator_id == "hierarchy_mirror":
+            recipe = record.unfold_recipe
+            (shared_dir / f"hierarchy_{i}.json").write_text(
+                json.dumps({
+                    "structure_sig": recipe.get("structure_sig"),
+                    "roots": recipe.get("roots"),
+                    "instance_count": recipe.get("instance_count"),
+                }, indent=2),
+                encoding="utf-8",
+            )
 
     # maps/ - reconstruction mappings
     maps_dir = out / "maps"
