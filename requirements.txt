@@ -1,0 +1,5 @@
+# Infold Core v1 dependencies
+# Python 3.10+ required
+
+# No external runtime dependencies for Phase 1 core
+# Parsers use stdlib ast for Python; text fallback is pure Python
