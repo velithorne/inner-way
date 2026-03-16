@@ -313,15 +313,23 @@ def inspect_archive(archive_path: Path | str) -> dict[str, Any]:
         }
 
 
-def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
+VALIDATION_MODES = ("basic", "strict", "integrity-only", "schema-only")
+
+
+def validate_archive(
+    archive_path: Path | str,
+    mode: str = "strict",
+) -> tuple[bool, list[str]]:
     """
-    Validate archive against package spec v1. Stronger checks:
-    - Ledger consistency (total_folds, total_bytes_saved)
-    - Shared artifact references (each record has corresponding shared file)
-    - Maps/reconstruction integrity (indices, operator_ids)
-    - Manifest/report consistency
+    Validate archive. Modes:
+    - basic: required files/dirs, manifest required keys
+    - strict: basic + ledger consistency, maps, report, manifest-ledger, integrity
+    - integrity-only: only integrity checksums
+    - schema-only: manifest/ledger/integrity schema structure, no content checks
     Returns (ok, list of error messages). Deterministic and readable.
     """
+    if mode not in VALIDATION_MODES:
+        return False, [f"Invalid validation mode: {mode}"]
     errors: list[str] = []
     archive = Path(archive_path).resolve()
     if not archive.exists():
@@ -343,13 +351,14 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
     def has_dir(d: str) -> bool:
         return any(n == d or n.startswith(d + "/") or n == root_prefix + d or n.startswith(root_prefix + d + "/") for n in names)
 
-    for f in REQUIRED_FILES:
-        if not has_file(f):
-            errors.append(f"Missing required file: {f}")
-    for d in REQUIRED_DIRS:
-        if not has_dir(d):
-            errors.append(f"Missing required directory: {d}/")
-    if errors:
+    if mode in ("basic", "strict", "schema-only"):
+        for f in REQUIRED_FILES:
+            if not has_file(f):
+                errors.append(f"Missing required file: {f}")
+        for d in REQUIRED_DIRS:
+            if not has_dir(d):
+                errors.append(f"Missing required directory: {d}/")
+    if errors and mode != "integrity-only":
         return False, errors
 
     import tempfile
@@ -360,33 +369,51 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
 
         manifest_path = root / "manifest.json"
         if not manifest_path.exists():
-            return False, errors + ["Could not find manifest.json"]
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        for key in MANIFEST_REQUIRED_KEYS:
-            if key not in manifest:
-                errors.append(f"Manifest missing required key: {key}")
-        compat = manifest.get("compatibility", {})
-        if compat.get("reconstruction_mode") != "deterministic":
-            errors.append("Compatibility: reconstruction_mode must be 'deterministic'")
+            if mode != "integrity-only":
+                return False, errors + ["Could not find manifest.json"]
+            manifest = {}
+        else:
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                errors.append(f"Manifest invalid JSON: {e}")
+                manifest = {}
+        if mode in ("basic", "strict", "schema-only") and manifest:
+            for key in MANIFEST_REQUIRED_KEYS:
+                if key not in manifest:
+                    errors.append(f"Manifest missing required key: {key}")
+            compat = manifest.get("compatibility", {})
+            if compat.get("reconstruction_mode") != "deterministic":
+                errors.append("Compatibility: reconstruction_mode must be 'deterministic'")
+            if mode == "schema-only":
+                if not isinstance(manifest.get("fold_count"), (int, type(None))):
+                    errors.append("Manifest: fold_count must be int")
+                if not isinstance(manifest.get("logical_gain_bytes"), (int, type(None))):
+                    errors.append("Manifest: logical_gain_bytes must be int")
 
         ledger_path = root / "ledger.json"
-        if ledger_path.exists():
-            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        if ledger_path.exists() and mode in ("strict", "schema-only"):
+            try:
+                ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as e:
+                errors.append(f"Ledger invalid JSON: {e}")
+                ledger = {}
             lr = ledger.get("fold_records", [])
             ltotal = ledger.get("total_folds", 0)
             lbytes = ledger.get("total_bytes_saved", 0)
-            if len(lr) != ltotal:
-                errors.append(f"Ledger inconsistency: fold_records count {len(lr)} != total_folds {ltotal}")
-            computed = sum(r.get("gain", 0) for r in lr)
-            if computed != lbytes:
-                errors.append(f"Ledger inconsistency: sum(gain) {computed} != total_bytes_saved {lbytes}")
-            consistency_errors = check_manifest_ledger_consistency(manifest, ledger)
-            errors.extend(consistency_errors)
-        logical_physical_errors = check_logical_vs_physical(manifest)
-        errors.extend(logical_physical_errors)
+            if mode == "strict":
+                if len(lr) != ltotal:
+                    errors.append(f"Ledger inconsistency: fold_records count {len(lr)} != total_folds {ltotal}")
+                computed = sum(r.get("gain", 0) for r in lr)
+                if computed != lbytes:
+                    errors.append(f"Ledger inconsistency: sum(gain) {computed} != total_bytes_saved {lbytes}")
+                consistency_errors = check_manifest_ledger_consistency(manifest, ledger)
+                errors.extend(consistency_errors)
+            logical_physical_errors = check_logical_vs_physical(manifest)
+            errors.extend(logical_physical_errors)
 
         maps_path = root / "maps" / "reconstruction.json"
-        if maps_path.exists():
+        if maps_path.exists() and mode == "strict":
             maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
             records = maps_data.get("records", [])
             manifest_fold = manifest.get("fold_count", 0)
@@ -417,7 +444,7 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
                         errors.append(f"Maps integrity: record at position {j} has index {idx}, expected {j}")
 
         report_path = root / "reports" / "report.json"
-        if report_path.exists():
+        if report_path.exists() and mode == "strict":
             report = json.loads(report_path.read_text(encoding="utf-8"))
             rfold = report.get("fold_count", -1)
             mfold = manifest.get("fold_count", -1)
@@ -429,7 +456,7 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
                 errors.append(f"Manifest/report inconsistency: report gain {rgain} != manifest {mgain}")
 
         integrity_path = root / "integrity.json"
-        if integrity_path.exists():
+        if integrity_path.exists() and mode in ("strict", "integrity-only"):
             integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
             stored = integrity.get("checksums", {})
             for rel_path, expected in stored.items():

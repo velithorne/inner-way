@@ -49,6 +49,7 @@ tests/fixtures/sweep_summary.json
 tests/fixtures/**/test_report/
 *.infold
 results/
+benchmark/synthetic/
 
 # OS
 .DS_Store

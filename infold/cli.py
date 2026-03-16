@@ -69,6 +69,39 @@ def run_benchmark_suite_cmd(config: dict) -> int:
     return 0
 
 
+def run_benchmark_campaign_cmd(args) -> int:
+    """Run full benchmark campaign with pack, profiling, export."""
+    from infold.benchmark import (
+        run_benchmark_campaign,
+        export_campaign_csv,
+        export_campaign_json,
+        export_campaign_markdown,
+        get_benchmark_datasets,
+    )
+    from infold.benchmark.pack import ensure_stress_datasets
+
+    config = load_config()
+    base = Path(__file__).parent.parent
+    ensure_stress_datasets(base)
+    datasets = get_benchmark_datasets(base)
+    if not datasets:
+        print("No benchmark datasets found")
+        return 1
+    create_archives = getattr(args, "archives", True)
+    results = run_benchmark_campaign(datasets, config, base, create_archives=create_archives)
+    out_dir = getattr(args, "output", None)
+    if out_dir:
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        export_campaign_csv(results, out / "campaign.csv")
+        export_campaign_json(results, out / "campaign.json")
+        export_campaign_markdown(results, out / "campaign.md")
+        print(f"Exported to {out}/campaign.csv, campaign.json, campaign.md")
+    for r in results:
+        print(f"{r['dataset_id']}: raw={r['raw_bytes']:,} fold={r['fold_count']} recon={r['exact_reconstruction_status']}")
+    return 0
+
+
 def archive_create(args) -> int:
     """Create Infold archive."""
     from infold.archive import create_archive
@@ -97,7 +130,8 @@ def archive_inspect(args) -> int:
 def archive_validate(args) -> int:
     """Validate archive."""
     from infold.archive import validate_archive
-    ok, errors = validate_archive(args.archive)
+    mode = getattr(args, "mode", "strict")
+    ok, errors = validate_archive(args.archive, mode=mode)
     if ok:
         print("Valid")
         return 0
@@ -171,6 +205,9 @@ def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Infold Core — structure-aware folding engine")
     parser.add_argument("--benchmark-suite", action="store_true", help="Run second-tier benchmark suite")
+    parser.add_argument("--benchmark-campaign", action="store_true", help="Run full benchmark campaign")
+    parser.add_argument("--campaign-output", dest="campaign_output", help="Output dir for campaign csv/json/md")
+    parser.add_argument("--no-archives", dest="archives", action="store_false", default=True, help="Skip archive create/validate (with --benchmark-campaign)")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
     archive_parser.add_argument("--json", action="store_true", help="Machine-readable JSON output")
@@ -185,6 +222,7 @@ def main() -> int:
     inspect_p.set_defaults(func=archive_inspect)
     validate_p = archive_sub.add_parser("validate", help="Validate archive")
     validate_p.add_argument("archive", help="Archive path")
+    validate_p.add_argument("--mode", choices=["basic", "strict", "integrity-only", "schema-only"], default="strict", help="Validation mode")
     validate_p.set_defaults(func=archive_validate)
     reconstruct_p = archive_sub.add_parser("reconstruct", help="Reconstruct from archive")
     reconstruct_p.add_argument("archive", help="Archive path")
@@ -212,6 +250,13 @@ def main() -> int:
     if args.benchmark_suite:
         config = load_config()
         return run_benchmark_suite_cmd(config)
+    if args.benchmark_campaign:
+        class CampaignArgs:
+            pass
+        ca = CampaignArgs()
+        ca.output = getattr(args, "campaign_output", None)
+        ca.archives = getattr(args, "archives", True)
+        return run_benchmark_campaign_cmd(ca)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)

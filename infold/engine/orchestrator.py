@@ -2,15 +2,18 @@
 Fold engine orchestration: run operators in order, validate, commit, ledger.
 
 Runtime order: Exact Repetition, Symbol Table, Template Skeleton, Hierarchy Mirror, Dependency Motif.
-Phase 1: Only Exact Repetition is implemented.
+Supports profiling via config["_profile"] dict.
 """
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from infold.engine.interaction_policy import (
+    InteractionDiagnostics,
     conflicts_with_committed,
+    record_ownership,
     update_committed_paths,
 )
 from infold.engine.ledger import FoldLedger
@@ -38,6 +41,7 @@ class FoldResult:
     candidate_counts: dict[str, int] = field(default_factory=dict)  # operator_id -> count detected
     rejected_candidates: list[dict[str, Any]] = field(default_factory=list)  # for reporting
     planner_decisions: list[dict[str, Any]] = field(default_factory=list)  # per-candidate planner outcomes
+    interaction_diagnostics: InteractionDiagnostics | None = None  # blocked, superseded, reused
     exact_reconstruction_ok: bool = True  # verified byte-for-byte recovery
 
 
@@ -66,14 +70,26 @@ def run_fold(
     Run the full fold pipeline: scan, parse, run operators, validate, commit, ledger.
 
     Returns FoldResult with project sheet, ledger, and folded state.
+    If config["_profile"] is a dict, populates it with scan_time_s, parse_time_s,
+    operator_times_s, total_fold_time_s.
     """
     source_path = Path(source_path).resolve()
+    profile = config.get("_profile") if isinstance(config.get("_profile"), dict) else None
+    t0_total = time.perf_counter()
+
+    t0_scan = time.perf_counter()
     sheet = scan_project(
         source_path,
         exclude_patterns=config.get("project", {}).get("exclude_patterns"),
         include_extensions=config.get("project", {}).get("include_extensions"),
     )
+    if profile is not None:
+        profile["scan_time_s"] = time.perf_counter() - t0_scan
+
+    t0_parse = time.perf_counter()
     parse_project(sheet)
+    if profile is not None:
+        profile["parse_time_s"] = time.perf_counter() - t0_parse
 
     ledger = FoldLedger(
         project_id=config.get("project", {}).get("id"),
@@ -85,11 +101,17 @@ def run_fold(
     candidate_counts: dict[str, int] = {}
     rejected_candidates: list[dict[str, Any]] = []
     committed_paths: set[str] = set()
-
+    committed_ownerships: list[Any] = []
+    interaction_diag = InteractionDiagnostics()
     planner_decisions: list[dict[str, Any]] = []
+    op_times: dict[str, dict[str, float]] = {}
     for op in _get_enabled_operators(config):
+        op_id = op.operator_id()
+        sim_apply_s = 0.0
+        t0 = time.perf_counter()
         candidates = op.detect_candidates(sheet, config)
-        candidate_counts[op.operator_id()] = len(candidates)
+        detect_s = time.perf_counter() - t0
+        candidate_counts[op_id] = len(candidates)
         accepted, decisions = filter_candidates_v2(candidates, config, committed_paths)
         for d in decisions:
             planner_decisions.append({
@@ -107,9 +129,16 @@ def run_fold(
                     "detail": d.planner_reason,
                     "target_count": len(d.candidate.targets),
                 })
+        sim_apply_s = 0.0
         for c in accepted:
             conflict, conflict_reason = conflicts_with_committed(c, committed_paths)
             if conflict:
+                interaction_diag.blocked_folds.append({
+                    "operator_id": op.operator_id(),
+                    "reason": "conflict",
+                    "detail": conflict_reason,
+                    "target_count": len(c.targets),
+                })
                 rejected_candidates.append({
                     "operator_id": op.operator_id(),
                     "reason": "conflict",
@@ -117,8 +146,10 @@ def run_fold(
                     "target_count": len(c.targets),
                 })
                 continue
+            t0_val = time.perf_counter()
             vr = validate_candidate(op, c, sheet, config)
             if not vr.accepted:
+                sim_apply_s += time.perf_counter() - t0_val
                 errors.append(f"{op.operator_id()}: candidate rejected: {vr.hard_failures}")
                 rejected_candidates.append({
                     "operator_id": op.operator_id(),
@@ -127,14 +158,19 @@ def run_fold(
                     "target_count": len(c.targets),
                 })
                 continue
+            sim_apply_s += time.perf_counter() - t0_val
             try:
+                t0_apply = time.perf_counter()
                 record = op.apply(c, sheet, config)
+                sim_apply_s += time.perf_counter() - t0_apply
                 ledger.append(record)
                 update_committed_paths(committed_paths, c, record.targets)
+                committed_ownerships.append(record_ownership(op.operator_id(), record.targets))
                 folded_state["canonicals"].append(
                     {"operator": op.operator_id(), "targets": len(record.targets), "gain": record.gain}
                 )
             except Exception as e:
+                sim_apply_s += time.perf_counter() - t0_apply
                 errors.append(f"{op.operator_id()}: apply failed: {e}")
                 rejected_candidates.append({
                     "operator_id": op.operator_id(),
@@ -142,6 +178,8 @@ def run_fold(
                     "detail": str(e),
                     "target_count": len(c.targets),
                 })
+        if profile is not None:
+            op_times[op_id] = {"detect_s": detect_s, "simulate_validate_apply_s": sim_apply_s}
 
     # Verify exact reconstruction for committed folds
     exact_reconstruction_ok = True
@@ -168,6 +206,10 @@ def run_fold(
         except Exception:
             exact_reconstruction_ok = False
 
+    if profile is not None:
+        profile["operator_times_s"] = op_times
+        profile["total_fold_time_s"] = time.perf_counter() - t0_total
+
     return FoldResult(
         project_sheet=sheet,
         ledger=ledger,
@@ -176,5 +218,6 @@ def run_fold(
         candidate_counts=candidate_counts,
         rejected_candidates=rejected_candidates,
         planner_decisions=planner_decisions,
+        interaction_diagnostics=interaction_diag,
         exact_reconstruction_ok=exact_reconstruction_ok,
     )

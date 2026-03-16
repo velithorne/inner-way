@@ -128,6 +128,20 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "per_operator_gain_share": per_operator_gain,
         "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
         "planner_decisions": getattr(result, "planner_decisions", []),
+        "interaction_diagnostics": _interaction_diagnostics_to_dict(
+            getattr(result, "interaction_diagnostics", None)
+        ),
+    }
+
+
+def _interaction_diagnostics_to_dict(diag: Any) -> dict[str, Any] | None:
+    """Convert InteractionDiagnostics to report-serializable dict."""
+    if diag is None:
+        return None
+    return {
+        "blocked_folds": getattr(diag, "blocked_folds", []),
+        "superseded_folds": getattr(diag, "superseded_folds", []),
+        "reused_artifacts": getattr(diag, "reused_artifacts", []),
     }
 
 
@@ -255,6 +269,16 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
             lines.append(f"  {pd.get('operator_id', '?')}: {pd.get('planner_decision', '?')} net={pd.get('final_net_value', 0):.3f}")
         if len(planner) > 5:
             lines.append(f"  ... and {len(planner) - 5} more")
+    diag = report.get("interaction_diagnostics")
+    if diag and (diag.get("blocked_folds") or diag.get("superseded_folds") or diag.get("reused_artifacts")):
+        lines.append("")
+        lines.append("Interaction diagnostics:")
+        for b in diag.get("blocked_folds", [])[:5]:
+            lines.append(f"  blocked: {b.get('operator_id', '?')} - {b.get('detail', '')[:50]}")
+        for s in diag.get("superseded_folds", [])[:5]:
+            lines.append(f"  superseded: {s.get('operator_id', '?')}")
+        for r in diag.get("reused_artifacts", [])[:5]:
+            lines.append(f"  reused: {r.get('operator_id', '?')}")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")
