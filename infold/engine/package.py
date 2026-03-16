@@ -74,13 +74,20 @@ def export_package(
         elif record.operator_id == "template_skeleton":
             recipe = record.unfold_recipe
             (shared_dir / f"template_{i}.json").write_text(
-                json.dumps({"const_blocks": recipe.get("const_blocks"), "slot_count": len(recipe.get("slot_groups", []))}, indent=2),
+                json.dumps({
+                    "const_blocks": recipe.get("const_blocks"),
+                    "slot_groups": recipe.get("slot_groups", []),
+                    "paths": recipe.get("paths", [str(t) for t in record.targets]),
+                }, indent=2),
                 encoding="utf-8",
             )
         elif record.operator_id == "symbol_table":
             recipe = record.unfold_recipe
             (shared_dir / f"symbols_{i}.json").write_text(
-                json.dumps({"id_to_symbol": recipe.get("id_to_symbol")}, indent=2),
+                json.dumps({
+                    "id_to_symbol": recipe.get("id_to_symbol"),
+                    "folded_files": recipe.get("folded_files", {}),
+                }, indent=2),
                 encoding="utf-8",
             )
         elif record.operator_id == "hierarchy_mirror":
@@ -90,6 +97,7 @@ def export_package(
                     "structure_sig": recipe.get("structure_sig"),
                     "roots": recipe.get("roots"),
                     "instance_count": recipe.get("instance_count"),
+                    "file_contents": recipe.get("file_contents", {}),
                 }, indent=2),
                 encoding="utf-8",
             )
@@ -102,6 +110,7 @@ def export_package(
                     "paths": recipe.get("paths"),
                     "instance_count": recipe.get("instance_count"),
                     "motif_size": recipe.get("motif_size"),
+                    "file_contents": recipe.get("file_contents", {}),
                 }, indent=2),
                 encoding="utf-8",
             )
@@ -126,12 +135,24 @@ def export_package(
     (reports_dir / "report.json").write_text(report_to_json(result, config), encoding="utf-8")
     (reports_dir / "report.txt").write_text(report_to_text(result, config), encoding="utf-8")
 
-    # snapshots/ - file inventory snapshot
+    # snapshots/ - file inventory; passthrough = files not in any fold (for full reconstruction)
     snapshots_dir = out / "snapshots"
     snapshots_dir.mkdir(exist_ok=True)
+    folded_paths = set()
+    for r in ledger.fold_records:
+        for t in r.targets:
+            folded_paths.add(str(t).replace("\\", "/"))
+    for r in ledger.fold_records:
+        recipe = getattr(r, "unfold_recipe", {}) or {}
+        for p in recipe.get("file_contents", {}).keys():
+            folded_paths.add(str(p).replace("\\", "/"))
+        for p in recipe.get("folded_files", {}).keys():
+            folded_paths.add(str(p).replace("\\", "/"))
     inventory = {
         "files": [{"path": str(p), "size": len(n.raw_text.encode("utf-8")), "language": n.language} for p, n in sheet.file_nodes.items()],
     }
     (snapshots_dir / "inventory.json").write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    passthrough = {str(p): n.raw_text for p, n in sheet.file_nodes.items() if str(p).replace("\\", "/") not in folded_paths}
+    (snapshots_dir / "passthrough.json").write_text(json.dumps(passthrough, indent=2), encoding="utf-8")
 
     return out

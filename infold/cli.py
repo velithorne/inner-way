@@ -69,15 +69,79 @@ def run_benchmark_suite_cmd(config: dict) -> int:
     return 0
 
 
+def archive_create(args) -> int:
+    """Create Infold archive."""
+    from infold.archive import create_archive
+    config = load_config()
+    out = create_archive(args.source, args.output, config)
+    print(f"Created: {out}")
+    return 0
+
+
+def archive_inspect(args) -> int:
+    """Inspect archive."""
+    from infold.archive import inspect_archive
+    info = inspect_archive(args.archive)
+    print(f"Archive: {info['path']}")
+    print(f"Source: {info['source_path']}")
+    print(f"Files: {info['file_count']}, Folds: {info['fold_count']}")
+    print(f"Logical gain: {info['logical_gain_bytes']:,} bytes")
+    print(f"Physical folded: {info['physical_folded_size_bytes']:,} bytes")
+    return 0
+
+
+def archive_validate(args) -> int:
+    """Validate archive."""
+    from infold.archive import validate_archive
+    ok, errors = validate_archive(args.archive)
+    if ok:
+        print("Valid")
+        return 0
+    print("Invalid:")
+    for e in errors:
+        print(f"  - {e}")
+    return 1
+
+
+def archive_reconstruct(args) -> int:
+    """Reconstruct from archive."""
+    from infold.archive import reconstruct_archive
+    result = reconstruct_archive(args.archive, args.output)
+    print(f"Reconstructed {len(result)} files to {args.output}")
+    return 0
+
+
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Infold Core — structure-aware folding engine")
     parser.add_argument("--benchmark-suite", action="store_true", help="Run second-tier benchmark suite")
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
+    archive_sub = archive_parser.add_subparsers(dest="archive_cmd")
+    create_p = archive_sub.add_parser("create", help="Create archive")
+    create_p.add_argument("--source", required=True, help="Source path")
+    create_p.add_argument("--output", required=True, help="Output .infold path")
+    create_p.set_defaults(func=archive_create)
+    inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
+    inspect_p.add_argument("archive", help="Archive path")
+    inspect_p.set_defaults(func=archive_inspect)
+    validate_p = archive_sub.add_parser("validate", help="Validate archive")
+    validate_p.add_argument("archive", help="Archive path")
+    validate_p.set_defaults(func=archive_validate)
+    reconstruct_p = archive_sub.add_parser("reconstruct", help="Reconstruct from archive")
+    reconstruct_p.add_argument("archive", help="Archive path")
+    reconstruct_p.add_argument("--output", required=True, help="Output directory")
+    reconstruct_p.set_defaults(func=archive_reconstruct)
     args = parser.parse_args()
 
     if args.benchmark_suite:
         config = load_config()
         return run_benchmark_suite_cmd(config)
+    if args.command == "archive":
+        if hasattr(args, "func") and args.func is not None:
+            return args.func(args)
+        archive_parser.print_help()
+        return 1
 
     print(f"Infold Core v{__version__}")
     print("Structure-aware folding engine for code projects and structured text")
