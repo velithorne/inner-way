@@ -63,4 +63,4 @@ def test_accept_syntax_valid_template():
     template_folds = [r for r in result.ledger.fold_records if r.operator_id == "template_skeleton"]
     for r in template_folds:
         assert r.unfold_recipe, "Fold record should have unfold recipe"
-        assert r.unfold_recipe.get("family_purity") is not None or "family_purity" in str(r.unfold_recipe)
+        assert "const_blocks" in r.unfold_recipe
