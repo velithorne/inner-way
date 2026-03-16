@@ -157,6 +157,16 @@ def main() -> int:
         print("✓ Fold engine orchestration OK")
         print(f"  - Ledger: {result.ledger.total_folds} folds, {result.ledger.total_bytes_saved} bytes saved")
         print(f"  - Errors: {len(result.errors)}")
+        print()
+        from infold.reporting import export_report, run_benchmark, benchmark_to_text
+
+        json_path, text_path = export_report(result, config)
+        print("✓ Reporting OK")
+        print(f"  - Exported: {json_path}, {text_path}")
+        bench = run_benchmark(result, config)
+        print()
+        print("✓ Benchmark OK")
+        print(benchmark_to_text(bench))
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
