@@ -84,6 +84,17 @@ def main() -> int:
         print(f"  - Total tokens: {total_tokens}")
         print(f"  - Total symbols: {total_symbols}")
         print(f"  - Total imports: {total_imports}")
+        print()
+        from infold.operators import NoOpOperator
+
+        op = NoOpOperator()
+        candidates = op.detect_candidates(sheet, config)
+        assert op.operator_id() == "noop"
+        assert op.scope() == "none"
+        assert len(candidates) == 0
+        print("✓ Base operator interface OK")
+        print(f"  - NoOpOperator: {op.operator_name()}, scope={op.scope()}")
+        print(f"  - detect_candidates returned {len(candidates)} (expected 0)")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
