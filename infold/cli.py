@@ -71,6 +71,19 @@ def main() -> int:
         print(f"  - Files: {sheet.metrics.get('file_count', 0)}")
         print(f"  - Folders: {sheet.metrics.get('folder_count', 0)}")
         print(f"  - Original size: {sheet.metrics.get('original_size_bytes', 0):,} bytes")
+        print()
+        from infold.parsers import parse_project
+
+        parse_project(sheet)
+        py_files = [n for n in sheet.file_nodes.values() if n.language == "python"]
+        total_tokens = sum(len(n.tokens) for n in sheet.file_nodes.values())
+        total_symbols = sum(len(n.symbols) for n in sheet.file_nodes.values())
+        total_imports = sum(len(n.imports) for n in sheet.file_nodes.values())
+        print("✓ Parsers OK — Python + text fallback")
+        print(f"  - Python files: {len(py_files)}")
+        print(f"  - Total tokens: {total_tokens}")
+        print(f"  - Total symbols: {total_symbols}")
+        print(f"  - Total imports: {total_imports}")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
