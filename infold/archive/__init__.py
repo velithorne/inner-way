@@ -1,5 +1,5 @@
 """
-Infold Archive v0.1: create, inspect, validate, reconstruct folded packages.
+Infold Archive v0.1: create, inspect, validate, reconstruct, explain, compare.
 
 Deterministic validation. Preserves exact-mode guarantees.
 """
@@ -9,6 +9,8 @@ from infold.archive.operations import (
     inspect_archive,
     validate_archive,
     reconstruct_archive,
+    explain_archive,
+    compare_archives,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "inspect_archive",
     "validate_archive",
     "reconstruct_archive",
+    "explain_archive",
+    "compare_archives",
 ]

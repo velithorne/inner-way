@@ -52,7 +52,7 @@ Default configuration is in `infold/config.json`. Override with a project-local 
 
 ## Infold Archive
 
-Create, inspect, validate, and reconstruct folded archives:
+Create, inspect, validate, explain, compare, and reconstruct folded archives:
 
 ```bash
 # Create archive (fold + export + zip)
@@ -61,11 +61,66 @@ python3 -m infold.cli archive create --source . --output archive.infold
 # Inspect archive contents
 python3 -m infold.cli archive inspect archive.infold
 
-# Validate package spec
+# Explain: fold counts, gain contributors, rejected candidates, reconstruction guarantees
+python3 -m infold.cli archive explain archive.infold
+
+# Validate package spec (ledger consistency, shared artifacts, manifest/report)
 python3 -m infold.cli archive validate archive.infold
+
+# Compare two archives
+python3 -m infold.cli archive compare archive1.infold archive2.infold
 
 # Reconstruct to directory
 python3 -m infold.cli archive reconstruct archive.infold --output ./restored
+```
+
+### Demo workflow
+
+Full example using the duplicate-heavy fixture:
+
+```bash
+# 1. Create archive from a small project
+python3 -m infold.cli archive create --source tests/fixtures/duplicate_python --output demo.infold
+# Created: /path/to/demo.infold
+
+# 2. Inspect
+python3 -m infold.cli archive inspect demo.infold
+# Archive: /path/to/demo.infold
+# Source: /path/to/tests/fixtures/duplicate_python
+# Files: 8, Folds: 2
+# Logical gain: 1,107 bytes
+# Physical folded: 5,125 bytes
+
+# 3. Explain (fold counts, gain contributors, reconstruction guarantees)
+python3 -m infold.cli archive explain demo.infold
+# Archive Explain
+# ===============
+# Path: /path/to/demo.infold
+# Package summary:
+#   file_count: 8
+#   fold_count: 2
+#   logical_gain_bytes: 1,107
+#   ...
+# Fold counts by operator:
+#   exact_repetition: 2
+# Biggest gain contributors:
+#   exact_repetition: 1,107 bytes
+# Reconstruction guarantees:
+#   mode=deterministic
+#   min_infold=0.2.0
+#   debug_friendly=True
+
+# 4. Validate
+python3 -m infold.cli archive validate demo.infold
+# Valid
+
+# 5. Reconstruct
+python3 -m infold.cli archive reconstruct demo.infold --output ./restored
+# Reconstructed 8 files to ./restored
+
+# 6. Verify (optional)
+diff -rq tests/fixtures/duplicate_python ./restored
+# (no output = identical)
 ```
 
 ## License

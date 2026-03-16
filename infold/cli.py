@@ -111,6 +111,24 @@ def archive_reconstruct(args) -> int:
     return 0
 
 
+def archive_explain(args) -> int:
+    """Explain archive contents."""
+    from infold.archive import explain_archive
+    from infold.archive.operations import explain_to_text
+    info = explain_archive(args.archive)
+    print(explain_to_text(info))
+    return 0
+
+
+def archive_compare(args) -> int:
+    """Compare two archives."""
+    from infold.archive import compare_archives
+    from infold.archive.operations import compare_to_text
+    diff = compare_archives(args.archive_a, args.archive_b)
+    print(compare_to_text(diff))
+    return 0
+
+
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Infold Core — structure-aware folding engine")
@@ -132,6 +150,13 @@ def main() -> int:
     reconstruct_p.add_argument("archive", help="Archive path")
     reconstruct_p.add_argument("--output", required=True, help="Output directory")
     reconstruct_p.set_defaults(func=archive_reconstruct)
+    explain_p = archive_sub.add_parser("explain", help="Explain archive contents")
+    explain_p.add_argument("archive", help="Archive path")
+    explain_p.set_defaults(func=archive_explain)
+    compare_p = archive_sub.add_parser("compare", help="Compare two archives")
+    compare_p.add_argument("archive_a", help="First archive path")
+    compare_p.add_argument("archive_b", help="Second archive path")
+    compare_p.set_defaults(func=archive_compare)
     args = parser.parse_args()
 
     if args.benchmark_suite:
