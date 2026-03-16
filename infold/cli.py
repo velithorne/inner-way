@@ -149,6 +149,14 @@ def main() -> int:
         print("✓ Exact Repetition Fold OK")
         print(f"  - Found {len(ex_candidates)} candidate(s), gain={record.gain} bytes")
         print(f"  - Unfold restored {len(unfolded)} files correctly")
+        print()
+        from infold.engine import run_fold
+
+        source = Path(__file__).parent.parent
+        result = run_fold(source, config)
+        print("✓ Fold engine orchestration OK")
+        print(f"  - Ledger: {result.ledger.total_folds} folds, {result.ledger.total_bytes_saved} bytes saved")
+        print(f"  - Errors: {len(result.errors)}")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
