@@ -38,6 +38,20 @@ def verify_models() -> bool:
     return True
 
 
+def verify_intake(config: dict) -> bool:
+    """Verify intake layer: scan project and build inventory."""
+    from infold.intake import scan_project
+
+    source = Path(config["project"]["source_path"])
+    if source == Path("."):
+        source = Path(__file__).parent.parent  # workspace root
+    excludes = config["project"].get("exclude_patterns", [])
+    includes = config["project"].get("include_extensions", [])
+
+    sheet = scan_project(source, exclude_patterns=excludes, include_extensions=includes)
+    return sheet
+
+
 def main() -> int:
     """Main CLI entry point."""
     print(f"Infold Core v{__version__}")
@@ -51,6 +65,12 @@ def main() -> int:
         print()
         verify_models()
         print("✓ Core data models OK (ProjectSheet, FileNode, CandidateCrease, etc.)")
+        print()
+        sheet = verify_intake(config)
+        print("✓ Intake layer OK — project scanned")
+        print(f"  - Files: {sheet.metrics.get('file_count', 0)}")
+        print(f"  - Folders: {sheet.metrics.get('folder_count', 0)}")
+        print(f"  - Original size: {sheet.metrics.get('original_size_bytes', 0):,} bytes")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
