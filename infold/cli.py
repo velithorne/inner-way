@@ -95,6 +95,22 @@ def main() -> int:
         print("✓ Base operator interface OK")
         print(f"  - NoOpOperator: {op.operator_name()}, scope={op.scope()}")
         print(f"  - detect_candidates returned {len(candidates)} (expected 0)")
+        print()
+        from infold.validation import validate_candidate
+        from infold.models import CandidateCrease, GainEstimate, StressEstimate
+
+        synthetic = CandidateCrease(
+            operator_id="noop",
+            targets=["test"],
+            gain=GainEstimate(0, 0, 0, 0.0, 0.0),
+            stress=StressEstimate(0.0, 0.0, 0.0, 0.0, 0.0),
+            invariants=[],
+            metadata={},
+        )
+        vr = validate_candidate(op, synthetic, sheet, config)
+        assert vr.accepted
+        print("✓ Validation pipeline OK")
+        print(f"  - validate_candidate(NoOp, synthetic) -> accepted={vr.accepted}")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
