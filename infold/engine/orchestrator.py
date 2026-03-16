@@ -15,6 +15,7 @@ from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
 from infold.operators.exact_repetition import ExactRepetitionOperator
 from infold.operators.symbol_table import SymbolTableOperator
+from infold.operators.dependency_motif import DependencyMotifOperator
 from infold.operators.hierarchy_mirror import HierarchyMirrorOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
 from infold.parsers import parse_project
@@ -41,6 +42,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
         ("symbol_table", SymbolTableOperator),
         ("template_skeleton", TemplateSkeletonOperator),
         ("hierarchy_mirror", HierarchyMirrorOperator),
+        ("dependency_motif", DependencyMotifOperator),
     ]
     result: list[BaseOperator] = []
     for op_id, op_class in order:

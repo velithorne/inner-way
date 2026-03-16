@@ -95,6 +95,7 @@ def main() -> int:
         (fixtures / "config_heavy", "config-heavy"),
         (fixtures / "mixed_project", "mixed-small"),
         (fixtures / "hierarchy_mirror", "hierarchy-mirror"),
+        (fixtures / "dependency_motif", "dependency-motif"),
     ]
 
     results = []

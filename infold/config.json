@@ -45,7 +45,7 @@
     },
     "dependency_motif": {
       "min_motif_node_count": 3,
-      "min_occurrences": 3,
+      "min_occurrences": 2,
       "reject_overlap_ambiguity": true
     }
   },

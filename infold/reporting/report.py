@@ -22,6 +22,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     template_metrics: dict[str, Any] = {}
     symbol_table_metrics: dict[str, Any] = {}
     hierarchy_metrics: dict[str, Any] = {}
+    dependency_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -45,6 +46,16 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             hierarchy_metrics.setdefault("structural_reuse_ratio", []).append(recipe.get("structural_reuse_ratio"))
             hierarchy_metrics.setdefault("path_reconstruction_accuracy", []).append(recipe.get("path_reconstruction_accuracy"))
             hierarchy_metrics.setdefault("file_membership_accuracy", []).append(recipe.get("file_membership_accuracy"))
+        if r.operator_id == "dependency_motif":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            dependency_metrics.setdefault("dependency_motifs_found", 0)
+            dependency_metrics["dependency_motifs_found"] += 1
+            dependency_metrics.setdefault("motif_instances_per_family", []).append(recipe.get("instance_count", 0))
+            dependency_metrics.setdefault("average_motif_size", []).append(recipe.get("motif_size", 0))
+            dependency_metrics.setdefault("net_bytes_saved", 0)
+            dependency_metrics["net_bytes_saved"] = dependency_metrics.get("net_bytes_saved", 0) + r.gain
+            dependency_metrics.setdefault("dependency_recovery_accuracy", []).append(recipe.get("dependency_recovery_accuracy"))
+            dependency_metrics.setdefault("structural_reuse_ratio", []).append(recipe.get("structural_reuse_ratio"))
         if r.operator_id == "template_skeleton":
             recipe = getattr(r, "unfold_recipe", {}) or {}
             template_metrics.setdefault("families_found", 0)
@@ -82,6 +93,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "template_skeleton_metrics": template_metrics if template_metrics else None,
         "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
         "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
+        "dependency_metrics": dependency_metrics if dependency_metrics else None,
     }
 
 
@@ -151,6 +163,16 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append(f"  structural_reuse_ratio: {hm.get('structural_reuse_ratio', [])}")
         lines.append(f"  path_reconstruction_accuracy: {hm.get('path_reconstruction_accuracy', [])}")
         lines.append(f"  file_membership_accuracy: {hm.get('file_membership_accuracy', [])}")
+    if report.get("dependency_metrics"):
+        dm = report["dependency_metrics"]
+        lines.append("")
+        lines.append("Dependency Motif metrics:")
+        lines.append(f"  dependency_motifs_found: {dm.get('dependency_motifs_found', 0)}")
+        lines.append(f"  motif_instances_per_family: {dm.get('motif_instances_per_family', [])}")
+        lines.append(f"  average_motif_size: {dm.get('average_motif_size', [])}")
+        lines.append(f"  net_bytes_saved: {dm.get('net_bytes_saved', 0)}")
+        lines.append(f"  dependency_recovery_accuracy: {dm.get('dependency_recovery_accuracy', [])}")
+        lines.append(f"  structural_reuse_ratio: {dm.get('structural_reuse_ratio', [])}")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")

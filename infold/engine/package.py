@@ -80,6 +80,18 @@ def export_package(
                 }, indent=2),
                 encoding="utf-8",
             )
+        elif record.operator_id == "dependency_motif":
+            recipe = record.unfold_recipe
+            (shared_dir / f"dependency_motif_{i}.json").write_text(
+                json.dumps({
+                    "signature": recipe.get("signature"),
+                    "canonical_imports": recipe.get("canonical_imports"),
+                    "paths": recipe.get("paths"),
+                    "instance_count": recipe.get("instance_count"),
+                    "motif_size": recipe.get("motif_size"),
+                }, indent=2),
+                encoding="utf-8",
+            )
 
     # maps/ - reconstruction mappings
     maps_dir = out / "maps"
