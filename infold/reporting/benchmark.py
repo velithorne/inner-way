@@ -41,18 +41,22 @@ def _gzip_size(sheet: ProjectSheet) -> int:
 def run_benchmark(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     """
     Run baseline comparisons. Returns dict with raw, zip, gzip sizes and folded size.
+    logical_gain = bytes saved by folding. physical_folded_size = raw - logical_gain.
     """
     sheet = result.project_sheet
     ledger = result.ledger
 
     baselines = config.get("benchmark", {}).get("baselines", ["raw", "zip", "gzip"])
     raw = _raw_size(sheet)
-    folded = raw - ledger.total_bytes_saved  # folded representation size (approx)
+    logical_gain = ledger.total_bytes_saved
+    physical_folded_size = raw - logical_gain
 
     out: dict[str, Any] = {
         "raw_bytes": raw,
-        "folded_bytes": folded,
-        "bytes_saved": ledger.total_bytes_saved,
+        "folded_bytes": physical_folded_size,
+        "bytes_saved": logical_gain,
+        "logical_gain_bytes": logical_gain,
+        "physical_folded_size_bytes": physical_folded_size,
         "baselines": {},
     }
 
@@ -70,9 +74,9 @@ def benchmark_to_text(benchmark: dict[str, Any]) -> str:
         "Benchmark",
         "=========",
         "",
-        f"Raw size:     {benchmark['raw_bytes']:,} bytes",
-        f"Folded size:  {benchmark['folded_bytes']:,} bytes",
-        f"Bytes saved:  {benchmark['bytes_saved']:,}",
+        f"Raw size:              {benchmark['raw_bytes']:,} bytes",
+        f"Physical folded size:  {benchmark.get('physical_folded_size_bytes', benchmark['folded_bytes']):,} bytes",
+        f"Logical gain:          {benchmark['bytes_saved']:,} bytes",
         "",
         "Baselines:",
     ]

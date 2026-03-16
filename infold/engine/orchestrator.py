@@ -14,6 +14,7 @@ from infold.intake import scan_project
 from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
 from infold.operators.exact_repetition import ExactRepetitionOperator
+from infold.operators.template_skeleton import TemplateSkeletonOperator
 from infold.parsers import parse_project
 from infold.validation import validate_candidate
 
@@ -26,6 +27,8 @@ class FoldResult:
     ledger: FoldLedger
     folded_state: dict[str, Any] = field(default_factory=dict)  # canonical regions, etc.
     errors: list[str] = field(default_factory=list)
+    candidate_counts: dict[str, int] = field(default_factory=dict)  # operator_id -> count detected
+    exact_reconstruction_ok: bool = True  # verified byte-for-byte recovery
 
 
 def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
@@ -33,7 +36,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
     ops_config = config.get("operators", {})
     order = [
         ("exact_repetition", ExactRepetitionOperator),
-        # Future: Symbol Table, Template Skeleton, Hierarchy Mirror, Dependency Motif
+        ("template_skeleton", TemplateSkeletonOperator),
     ]
     result: list[BaseOperator] = []
     for op_id, op_class in order:
@@ -65,9 +68,11 @@ def run_fold(
     )
     folded_state: dict[str, Any] = {"canonicals": [], "references": []}
     errors: list[str] = []
+    candidate_counts: dict[str, int] = {}
 
     for op in _get_enabled_operators(config):
         candidates = op.detect_candidates(sheet, config)
+        candidate_counts[op.operator_id()] = len(candidates)
         for c in candidates:
             vr = validate_candidate(op, c, sheet, config)
             if not vr.accepted:
@@ -82,9 +87,31 @@ def run_fold(
             except Exception as e:
                 errors.append(f"{op.operator_id()}: apply failed: {e}")
 
+    # Verify exact reconstruction for committed folds
+    exact_reconstruction_ok = True
+    ops_by_id = {op.operator_id(): op for op in _get_enabled_operators(config)}
+    for record in ledger.fold_records:
+        op = ops_by_id.get(record.operator_id)
+        if not op:
+            continue
+        try:
+            unfolded = op.unfold(record, folded_state, config)
+            if unfolded is None:
+                continue
+            for path, content in (unfolded.items() if isinstance(unfolded, dict) else []):
+                p = path if isinstance(path, Path) else Path(path)
+                orig_node = sheet.file_nodes.get(p)
+                if orig_node and content != orig_node.raw_text:
+                    exact_reconstruction_ok = False
+                    errors.append(f"Exact reconstruction failed: {p}")
+        except Exception:
+            exact_reconstruction_ok = False
+
     return FoldResult(
         project_sheet=sheet,
         ledger=ledger,
         folded_state=folded_state,
         errors=errors,
+        candidate_counts=candidate_counts,
+        exact_reconstruction_ok=exact_reconstruction_ok,
     )

@@ -1,0 +1,4 @@
+Project notes
+============
+- Python in src/
+- Config in package.json
