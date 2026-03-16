@@ -43,6 +43,7 @@ htmlcov/
 # Infold outputs
 infold_reports/
 infold_sweep_report/
+infold_package/
 *.infold
 
 # OS

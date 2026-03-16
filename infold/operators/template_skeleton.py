@@ -6,8 +6,10 @@ Template Skeleton Fold v1: token-based extraction of shared scaffold + variable 
 - High structural similarity (min_scaffold_similarity 0.80)
 - Max slot ratio 0.35
 - Line-based alignment for exact reconstruction (conservative v1)
+- Rejects: different logic (low similarity), too many slots, <3 files, syntax-invalid reconstruction
 """
 
+import ast
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +151,13 @@ class TemplateSkeletonOperator(BaseOperator):
                 continue
             gain = GainEstimate(gross, meta_cost, net, 0.7, 0.85)
             stress = StressEstimate(0.2, 0.3, 0.2, 0.1, 0.25)
+            # Family purity: scaffold similarity (higher = purer)
+            family_purity = sim
+            # Slot ambiguity: variance in slot lengths (0 = no ambiguity)
+            slot_lengths = [sum(len(s) for s in sg) for sg in slot_groups]
+            avg_slot = sum(slot_lengths) / len(slot_lengths) if slot_lengths else 0
+            slot_ambiguity = (sum((x - avg_slot) ** 2 for x in slot_lengths) / len(slot_lengths)) ** 0.5 if slot_lengths else 0
+
             candidates.append(CandidateCrease(
                 operator_id=self.operator_id(),
                 targets=paths,
@@ -163,6 +172,9 @@ class TemplateSkeletonOperator(BaseOperator):
                     "slot_ratio": slot_ratio,
                     "scaffold_length": scaffold_size,
                     "slot_count": len(slot_groups),
+                    "family_purity": family_purity,
+                    "slot_ambiguity": round(slot_ambiguity, 2),
+                    "avg_slot_size": int(avg_slot),
                 },
             ))
         return candidates
@@ -209,7 +221,7 @@ class TemplateSkeletonOperator(BaseOperator):
         project_sheet: ProjectSheet,
         config: dict[str, Any],
     ) -> ValidationResult:
-        """Byte-for-byte reconstruction check."""
+        """Byte-for-byte reconstruction + syntax validation where supported."""
         if not simulation_result.success:
             return ValidationResult(False, ["Simulation failed"], [], False, False, False)
         unfold = simulation_result.unfold_attempt
@@ -226,6 +238,19 @@ class TemplateSkeletonOperator(BaseOperator):
                     True,
                     True,
                 )
+            # Syntax validation for Python
+            if node and node.language == "python" and content:
+                try:
+                    ast.parse(content)
+                except SyntaxError as e:
+                    return ValidationResult(
+                        False,
+                        [f"Syntax-invalid reconstruction: {path}: {e.msg}"],
+                        [],
+                        False,
+                        True,
+                        True,
+                    )
         return ValidationResult(True, [], [], True, True, True)
 
     def apply(
@@ -240,6 +265,9 @@ class TemplateSkeletonOperator(BaseOperator):
             "const_blocks": meta["const_blocks"],
             "slot_groups": meta["slot_groups"],
             "paths": meta["paths"],
+            "family_purity": meta.get("family_purity"),
+            "slot_ambiguity": meta.get("slot_ambiguity"),
+            "avg_slot_size": meta.get("avg_slot_size"),
         }
         return FoldRecord(
             operator_id=self.operator_id(),

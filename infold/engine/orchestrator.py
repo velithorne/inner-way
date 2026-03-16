@@ -14,6 +14,7 @@ from infold.intake import scan_project
 from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
 from infold.operators.exact_repetition import ExactRepetitionOperator
+from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
 from infold.parsers import parse_project
 from infold.validation import validate_candidate
@@ -36,6 +37,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
     ops_config = config.get("operators", {})
     order = [
         ("exact_repetition", ExactRepetitionOperator),
+        ("symbol_table", SymbolTableOperator),
         ("template_skeleton", TemplateSkeletonOperator),
     ]
     result: list[BaseOperator] = []
@@ -101,6 +103,11 @@ def run_fold(
             for path, content in (unfolded.items() if isinstance(unfolded, dict) else []):
                 p = path if isinstance(path, Path) else Path(path)
                 orig_node = sheet.file_nodes.get(p)
+                if orig_node is None:
+                    for k, n in sheet.file_nodes.items():
+                        if str(k) == str(p) or k == p:
+                            orig_node = n
+                            break
                 if orig_node and content != orig_node.raw_text:
                     exact_reconstruction_ok = False
                     errors.append(f"Exact reconstruction failed: {p}")

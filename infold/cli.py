@@ -167,6 +167,13 @@ def main() -> int:
         print()
         print("✓ Benchmark OK")
         print(benchmark_to_text(bench))
+        from infold.engine import export_package
+
+        pkg_path = export_package(result, config, "infold_package")
+        print()
+        print("✓ Package export OK")
+        print(f"  - {pkg_path}/")
+        print(f"  - manifest.json, ledger.json, shared/, maps/, reports/, snapshots/")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)

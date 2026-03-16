@@ -20,14 +20,22 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     # Operator breakdown
     op_breakdown: dict[str, dict[str, Any]] = {}
     template_metrics: dict[str, Any] = {}
+    symbol_table_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
         op_breakdown[r.operator_id]["count"] += 1
         op_breakdown[r.operator_id]["gain"] += r.gain
         op_breakdown[r.operator_id]["targets"] += len(r.targets)
-        if r.operator_id == "template_skeleton" and hasattr(r, "unfold_recipe"):
-            recipe = r.unfold_recipe
+        if r.operator_id == "symbol_table":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            symbol_table_metrics.setdefault("shared_symbol_count", 0)
+            symbol_table_metrics["shared_symbol_count"] = symbol_table_metrics.get("shared_symbol_count", 0) + recipe.get("shared_symbol_count", 0)
+            symbol_table_metrics.setdefault("symbol_reuse_ratio", []).append(recipe.get("symbol_reuse_ratio"))
+            symbol_table_metrics.setdefault("net_bytes_saved", 0)
+            symbol_table_metrics["net_bytes_saved"] = symbol_table_metrics.get("net_bytes_saved", 0) + r.gain
+        if r.operator_id == "template_skeleton":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
             template_metrics.setdefault("families_found", 0)
             template_metrics["families_found"] += 1
             template_metrics.setdefault("files_per_family", []).append(len(r.targets))
@@ -35,6 +43,9 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
                 sum(len(b) for b in recipe.get("const_blocks", []))
             )
             template_metrics.setdefault("slot_counts", []).append(len(recipe.get("slot_groups", [])))
+            template_metrics.setdefault("family_purity", []).append(recipe.get("family_purity"))
+            template_metrics.setdefault("slot_ambiguity", []).append(recipe.get("slot_ambiguity"))
+            template_metrics.setdefault("avg_slot_size", []).append(recipe.get("avg_slot_size"))
 
     raw = metrics.get("original_size_bytes", 0)
     logical_gain = ledger.total_bytes_saved  # bytes saved by deduplication
@@ -58,6 +69,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "errors": result.errors,
         "validation_failures": len(result.errors),
         "template_skeleton_metrics": template_metrics if template_metrics else None,
+        "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
     }
 
 
@@ -103,6 +115,20 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
             lines.append(f"  scaffold_lengths: {tm['scaffold_lengths']}")
         if tm.get("slot_counts"):
             lines.append(f"  slot_counts: {tm['slot_counts']}")
+        if tm.get("family_purity"):
+            lines.append(f"  family_purity: {tm['family_purity']}")
+        if tm.get("slot_ambiguity"):
+            lines.append(f"  slot_ambiguity: {tm['slot_ambiguity']}")
+        if tm.get("avg_slot_size"):
+            lines.append(f"  avg_slot_size: {tm['avg_slot_size']}")
+    if report.get("symbol_table_metrics"):
+        stm = report["symbol_table_metrics"]
+        lines.append("")
+        lines.append("Symbol Table metrics:")
+        lines.append(f"  shared_symbol_count: {stm.get('shared_symbol_count', 0)}")
+        lines.append(f"  net_bytes_saved: {stm.get('net_bytes_saved', 0)}")
+        if stm.get("symbol_reuse_ratio"):
+            lines.append(f"  symbol_reuse_ratio: {stm['symbol_reuse_ratio']}")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")
