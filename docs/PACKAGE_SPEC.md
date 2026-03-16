@@ -36,6 +36,7 @@ An Infold package is a directory containing folded project data. It enables dete
 | `shared/hierarchy_*.json` | Structure metadata for hierarchy-mirror folds |
 | `shared/dependency_motif_*.json` | Import motif data for dependency-motif folds |
 | `snapshots/passthrough.json` | Files not in any fold (for full reconstruction) |
+| `integrity.json` | SHA256 checksums for manifest, ledger, shared artifacts, maps (validated by archive validate) |
 
 ## Manifest Structure
 

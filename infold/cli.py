@@ -82,11 +82,15 @@ def archive_inspect(args) -> int:
     """Inspect archive."""
     from infold.archive import inspect_archive
     info = inspect_archive(args.archive)
-    print(f"Archive: {info['path']}")
-    print(f"Source: {info['source_path']}")
-    print(f"Files: {info['file_count']}, Folds: {info['fold_count']}")
-    print(f"Logical gain: {info['logical_gain_bytes']:,} bytes")
-    print(f"Physical folded: {info['physical_folded_size_bytes']:,} bytes")
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(info, indent=2))
+    else:
+        print(f"Archive: {info['path']}")
+        print(f"Source: {info['source_path']}")
+        print(f"Files: {info['file_count']}, Folds: {info['fold_count']}")
+        print(f"Logical gain: {info['logical_gain_bytes']:,} bytes")
+        print(f"Physical folded: {info['physical_folded_size_bytes']:,} bytes")
     return 0
 
 
@@ -116,7 +120,11 @@ def archive_explain(args) -> int:
     from infold.archive import explain_archive
     from infold.archive.operations import explain_to_text
     info = explain_archive(args.archive)
-    print(explain_to_text(info))
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(info, indent=2))
+    else:
+        print(explain_to_text(info))
     return 0
 
 
@@ -125,7 +133,37 @@ def archive_compare(args) -> int:
     from infold.archive import compare_archives
     from infold.archive.operations import compare_to_text
     diff = compare_archives(args.archive_a, args.archive_b)
-    print(compare_to_text(diff))
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(diff, indent=2))
+    else:
+        print(compare_to_text(diff))
+    return 0
+
+
+def archive_list(args) -> int:
+    """List shared artifacts and fold families."""
+    from infold.archive import list_archive
+    from infold.archive.operations import list_to_text
+    info = list_archive(args.archive)
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(info, indent=2))
+    else:
+        print(list_to_text(info))
+    return 0
+
+
+def archive_stats(args) -> int:
+    """Show detailed archive stats."""
+    from infold.archive import stats_archive
+    from infold.archive.operations import stats_to_text
+    stats = stats_archive(args.archive)
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(stats, indent=2))
+    else:
+        print(stats_to_text(stats))
     return 0
 
 
@@ -135,6 +173,7 @@ def main() -> int:
     parser.add_argument("--benchmark-suite", action="store_true", help="Run second-tier benchmark suite")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
+    archive_parser.add_argument("--json", action="store_true", help="Machine-readable JSON output")
     archive_sub = archive_parser.add_subparsers(dest="archive_cmd")
     create_p = archive_sub.add_parser("create", help="Create archive")
     create_p.add_argument("--source", required=True, help="Source path")
@@ -142,6 +181,7 @@ def main() -> int:
     create_p.set_defaults(func=archive_create)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
     inspect_p.add_argument("archive", help="Archive path")
+    inspect_p.add_argument("--json", action="store_true", help="JSON output")
     inspect_p.set_defaults(func=archive_inspect)
     validate_p = archive_sub.add_parser("validate", help="Validate archive")
     validate_p.add_argument("archive", help="Archive path")
@@ -152,10 +192,20 @@ def main() -> int:
     reconstruct_p.set_defaults(func=archive_reconstruct)
     explain_p = archive_sub.add_parser("explain", help="Explain archive contents")
     explain_p.add_argument("archive", help="Archive path")
+    explain_p.add_argument("--json", action="store_true", help="JSON output")
     explain_p.set_defaults(func=archive_explain)
+    list_p = archive_sub.add_parser("list", help="List shared artifacts and fold families")
+    list_p.add_argument("archive", help="Archive path")
+    list_p.add_argument("--json", action="store_true", help="JSON output")
+    list_p.set_defaults(func=archive_list)
+    stats_p = archive_sub.add_parser("stats", help="Detailed archive stats")
+    stats_p.add_argument("archive", help="Archive path")
+    stats_p.add_argument("--json", action="store_true", help="JSON output")
+    stats_p.set_defaults(func=archive_stats)
     compare_p = archive_sub.add_parser("compare", help="Compare two archives")
     compare_p.add_argument("archive_a", help="First archive path")
     compare_p.add_argument("archive_b", help="Second archive path")
+    compare_p.add_argument("--json", action="store_true", help="JSON output")
     compare_p.set_defaults(func=archive_compare)
     args = parser.parse_args()
 

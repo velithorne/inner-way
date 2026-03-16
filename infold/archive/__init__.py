@@ -11,6 +11,8 @@ from infold.archive.operations import (
     reconstruct_archive,
     explain_archive,
     compare_archives,
+    list_archive,
+    stats_archive,
 )
 
 __all__ = [
@@ -20,4 +22,6 @@ __all__ = [
     "reconstruct_archive",
     "explain_archive",
     "compare_archives",
+    "list_archive",
+    "stats_archive",
 ]

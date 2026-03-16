@@ -1,9 +1,10 @@
 """
-Infold Archive v0.1: create, inspect, validate, reconstruct.
+Infold Archive v0.1: create, inspect, validate, reconstruct, list, stats, compare.
 
-Deterministic validation. Preserves exact-mode guarantees.
+Deterministic validation. Integrity hashing. Preserves exact-mode guarantees.
 """
 
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -14,6 +15,15 @@ from infold.engine.package_spec import (
     REQUIRED_DIRS,
     REQUIRED_FILES,
 )
+
+
+def _sha256_file(path: Path) -> str:
+    """Compute SHA256 of file. Deterministic."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def create_archive(
@@ -41,6 +51,7 @@ def create_archive(
     pkg_dir = Path(tempfile.mkdtemp(prefix="infold_pkg_"))
     try:
         export_package(result, config, pkg_dir)
+        _write_integrity_checksums(pkg_dir)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in sorted(pkg_dir.rglob("*")):
                 if f.is_file():
@@ -50,6 +61,29 @@ def create_archive(
         if pkg_dir.exists():
             shutil.rmtree(pkg_dir)
     return out
+
+
+def _write_integrity_checksums(pkg_dir: Path) -> None:
+    """Write integrity.json with SHA256 checksums for key files."""
+    checksums: dict[str, str] = {}
+    for name in ["manifest.json", "ledger.json"]:
+        p = pkg_dir / name
+        if p.exists():
+            checksums[name] = _sha256_file(p)
+    shared_dir = pkg_dir / "shared"
+    if shared_dir.exists():
+        for f in sorted(shared_dir.iterdir()):
+            if f.is_file():
+                checksums[f"shared/{f.name}"] = _sha256_file(f)
+    maps_dir = pkg_dir / "maps"
+    if maps_dir.exists():
+        for f in sorted(maps_dir.iterdir()):
+            if f.is_file():
+                checksums[f"maps/{f.name}"] = _sha256_file(f)
+    (pkg_dir / "integrity.json").write_text(
+        json.dumps({"checksums": checksums}, indent=2),
+        encoding="utf-8",
+    )
 
 
 def _extract_root(tmp: Path) -> Path:
@@ -123,6 +157,125 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "hierarchy_templates": report.get("hierarchy_templates", []),
             "dependency_motifs": report.get("dependency_motifs", []),
         }
+
+
+def list_archive(archive_path: Path | str) -> dict[str, Any]:
+    """
+    List shared artifacts and fold families by operator.
+    Deterministic, readable output.
+    """
+    archive = Path(archive_path).resolve()
+    if not archive.exists():
+        raise FileNotFoundError(f"Archive not found: {archive}")
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+        with zipfile.ZipFile(archive, "r") as zf:
+            zf.extractall(tmp)
+        root = _extract_root(Path(tmp))
+        shared_dir = root / "shared"
+        maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        records = maps_data.get("records", [])
+
+        shared_artifacts: list[dict[str, Any]] = []
+        if shared_dir.exists():
+            for f in sorted(shared_dir.iterdir()):
+                if f.is_file():
+                    shared_artifacts.append({"path": f"shared/{f.name}", "size": f.stat().st_size})
+
+        families_by_op: dict[str, list[dict[str, Any]]] = {}
+        for i, rec in enumerate(records):
+            op = rec.get("operator_id", "unknown")
+            targets = rec.get("targets", [])
+            gain = rec.get("gain", 0)
+            if op not in families_by_op:
+                families_by_op[op] = []
+            fam: dict[str, Any] = {"index": i, "gain": gain, "target_count": len(targets)}
+            if op == "exact_repetition":
+                fam["paths"] = targets[:5]
+                if len(targets) > 5:
+                    fam["paths"].append(f"... +{len(targets) - 5} more")
+            elif op == "template_skeleton":
+                tmpl = root / "shared" / f"template_{i}.json"
+                if tmpl.exists():
+                    data = json.loads(tmpl.read_text(encoding="utf-8"))
+                    fam["paths"] = data.get("paths", targets)[:5]
+                    if len(targets) > 5:
+                        fam["paths"].append(f"... +{len(targets) - 5} more")
+                else:
+                    fam["paths"] = targets[:5]
+            elif op in ("hierarchy_mirror", "dependency_motif"):
+                hj = root / "shared" / (f"hierarchy_{i}.json" if op == "hierarchy_mirror" else f"dependency_motif_{i}.json")
+                if hj.exists():
+                    data = json.loads(hj.read_text(encoding="utf-8"))
+                    roots = data.get("roots", data.get("paths", []))
+                    fam["roots_or_paths"] = roots[:5] if isinstance(roots, list) else list(roots)[:5]
+                else:
+                    fam["paths"] = targets[:5]
+            else:
+                fam["paths"] = targets[:5]
+            families_by_op[op].append(fam)
+
+        return {
+            "path": str(archive),
+            "shared_artifacts": shared_artifacts,
+            "families_by_operator": families_by_op,
+        }
+
+
+def stats_archive(archive_path: Path | str) -> dict[str, Any]:
+    """
+    Detailed archive metrics: logical gain, physical folded size, per-operator contributions,
+    rejection counts, template purity/slot ratios, hierarchy/dependency family metrics.
+    """
+    archive = Path(archive_path).resolve()
+    if not archive.exists():
+        raise FileNotFoundError(f"Archive not found: {archive}")
+    info = explain_archive(archive)
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+        with zipfile.ZipFile(archive, "r") as zf:
+            zf.extractall(tmp)
+        root = _extract_root(Path(tmp))
+        report = {}
+        if (root / "reports" / "report.json").exists():
+            report = json.loads((root / "reports" / "report.json").read_text(encoding="utf-8"))
+
+    stats: dict[str, Any] = {
+        "path": str(archive),
+        "logical_gain_bytes": info["package_summary"]["logical_gain_bytes"],
+        "physical_folded_size_bytes": info["package_summary"]["physical_folded_size_bytes"],
+        "original_size_bytes": info["package_summary"]["original_size_bytes"],
+        "per_operator_contributions": info["gain_by_operator"],
+        "per_operator_gain_share": {},
+        "rejection_count": len(info.get("rejected_candidates_summary", [])),
+    }
+    total = info["package_summary"]["logical_gain_bytes"]
+    for op, g in info["gain_by_operator"].items():
+        stats["per_operator_gain_share"][op] = round(g / total, 4) if total else 0
+
+    tm = report.get("template_skeleton_metrics") or {}
+    stats["template_metrics"] = {
+        "families_found": tm.get("families_found", 0),
+        "family_purity": tm.get("family_purity", []),
+        "slot_ambiguity": tm.get("slot_ambiguity", []),
+        "avg_slot_size": tm.get("avg_slot_size", []),
+    } if tm else None
+
+    hm = report.get("hierarchy_metrics") or {}
+    stats["hierarchy_metrics"] = {
+        "templates_found": hm.get("hierarchy_templates_found", 0),
+        "instances_per_template": hm.get("instances_per_template", []),
+        "structural_reuse_ratio": hm.get("structural_reuse_ratio", []),
+    } if hm else None
+
+    dm = report.get("dependency_metrics") or {}
+    stats["dependency_metrics"] = {
+        "motifs_found": dm.get("dependency_motifs_found", 0),
+        "instances_per_family": dm.get("motif_instances_per_family", []),
+        "average_motif_size": dm.get("average_motif_size", []),
+    } if dm else None
+
+    return stats
 
 
 def inspect_archive(archive_path: Path | str) -> dict[str, Any]:
@@ -267,6 +420,19 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
             if rgain != mgain:
                 errors.append(f"Manifest/report inconsistency: report gain {rgain} != manifest {mgain}")
 
+        integrity_path = root / "integrity.json"
+        if integrity_path.exists():
+            integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
+            stored = integrity.get("checksums", {})
+            for rel_path, expected in stored.items():
+                fp = root / rel_path
+                if not fp.exists():
+                    errors.append(f"Integrity: checksum file missing: {rel_path}")
+                else:
+                    actual = _sha256_file(fp)
+                    if actual != expected:
+                        errors.append(f"Integrity mismatch: {rel_path} (expected {expected[:16]}..., got {actual[:16]}...)")
+
     return len(errors) == 0, errors
 
 
@@ -382,16 +548,53 @@ def reconstruct_archive(
         return result
 
 
+def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str]]]:
+    """Extract family signatures for template, hierarchy, dependency. Returns {op: {sig: set of paths/roots}}."""
+    sigs: dict[str, dict[str, set[str]]] = {
+        "template_skeleton": {},
+        "hierarchy_mirror": {},
+        "dependency_motif": {},
+    }
+    shared = root / "shared"
+    for i, rec in enumerate(records):
+        op = rec.get("operator_id", "")
+        if op not in sigs:
+            continue
+        targets = rec.get("targets", [])
+        if op == "template_skeleton":
+            tmpl = shared / f"template_{i}.json"
+            if tmpl.exists():
+                data = json.loads(tmpl.read_text(encoding="utf-8"))
+                paths = tuple(sorted(data.get("paths", targets)))
+            else:
+                paths = tuple(sorted(str(t) for t in targets))
+            sig = hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
+            sigs[op][sig] = set(paths)
+        elif op == "hierarchy_mirror":
+            hj = shared / f"hierarchy_{i}.json"
+            if hj.exists():
+                data = json.loads(hj.read_text(encoding="utf-8"))
+                roots = tuple(sorted(str(r) for r in data.get("roots", [])))
+                sig = data.get("structure_sig", "") or hashlib.sha256(json.dumps(roots).encode()).hexdigest()[:16]
+                sigs[op][sig] = set(roots)
+        elif op == "dependency_motif":
+            dj = shared / f"dependency_motif_{i}.json"
+            if dj.exists():
+                data = json.loads(dj.read_text(encoding="utf-8"))
+                paths = tuple(sorted(str(p) for p in data.get("paths", targets)))
+                sig = data.get("signature", "") or hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
+                sigs[op][sig] = set(paths)
+    return sigs
+
+
 def compare_archives(
     archive_a_path: Path | str,
     archive_b_path: Path | str,
 ) -> dict[str, Any]:
     """
     Compare two .infold archives. Returns diff summary:
-    - logical_gain diff
-    - physical_folded_size diff
-    - operator fold counts diff
-    - template/symbol/hierarchy/dependency families
+    - logical_gain, physical_folded_size, operator fold counts
+    - which template families, hierarchy templates, dependency motifs changed (added/removed)
     - compatibility metadata
     """
     a = Path(archive_a_path).resolve()
@@ -433,6 +636,9 @@ def compare_archives(
         "duplicate_families": {"a_count": len(info_a["duplicate_families"]), "b_count": len(info_b["duplicate_families"])},
         "hierarchy_templates": {"a_count": len(info_a["hierarchy_templates"]), "b_count": len(info_b["hierarchy_templates"])},
         "dependency_motifs": {"a_count": len(info_a["dependency_motifs"]), "b_count": len(info_b["dependency_motifs"])},
+        "template_families_changed": {"added": [], "removed": []},
+        "hierarchy_templates_changed": {"added": [], "removed": []},
+        "dependency_motifs_changed": {"added": [], "removed": []},
         "compatibility": {
             "a": m_a.get("compatibility", {}),
             "b": m_b.get("compatibility", {}),
@@ -443,6 +649,38 @@ def compare_archives(
         diff["fold_counts_by_operator"]["diff"][op] = info_b["fold_counts_by_operator"].get(op, 0) - info_a["fold_counts_by_operator"].get(op, 0)
     for op in all_ops:
         diff["gain_by_operator"]["diff"][op] = info_b["gain_by_operator"].get(op, 0) - info_a["gain_by_operator"].get(op, 0)
+
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+        with zipfile.ZipFile(a, "r") as zf:
+            zf.extractall(tmp)
+        root_a = _extract_root(Path(tmp))
+        maps_a = json.loads((root_a / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        recs_a = maps_a.get("records", [])
+        sigs_a = _family_signatures(root_a, recs_a)
+    with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+        with zipfile.ZipFile(b, "r") as zf:
+            zf.extractall(tmp)
+        root_b = _extract_root(Path(tmp))
+        maps_b = json.loads((root_b / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        recs_b = maps_b.get("records", [])
+        sigs_b = _family_signatures(root_b, recs_b)
+
+    for op in ["template_skeleton", "hierarchy_mirror", "dependency_motif"]:
+        sa = sigs_a.get(op, {})
+        sb = sigs_b.get(op, {})
+        added = [sig for sig in sb if sig not in sa]
+        removed = [sig for sig in sa if sig not in sb]
+        if op == "template_skeleton":
+            diff["template_families_changed"]["added"] = added
+            diff["template_families_changed"]["removed"] = removed
+        elif op == "hierarchy_mirror":
+            diff["hierarchy_templates_changed"]["added"] = added
+            diff["hierarchy_templates_changed"]["removed"] = removed
+        elif op == "dependency_motif":
+            diff["dependency_motifs_changed"]["added"] = added
+            diff["dependency_motifs_changed"]["removed"] = removed
+
     return diff
 
 
@@ -518,4 +756,100 @@ def compare_to_text(diff: dict[str, Any]) -> str:
     lines.append(f"  duplicate: A={df.get('a_count', 0)} B={df.get('b_count', 0)}")
     lines.append(f"  hierarchy: A={hf.get('a_count', 0)} B={hf.get('b_count', 0)}")
     lines.append(f"  dependency: A={mf.get('a_count', 0)} B={mf.get('b_count', 0)}")
+    tfc = diff.get("template_families_changed", {})
+    htc = diff.get("hierarchy_templates_changed", {})
+    dmc = diff.get("dependency_motifs_changed", {})
+    if tfc.get("added") or tfc.get("removed"):
+        lines.append("")
+        lines.append("Template families changed:")
+        if tfc.get("added"):
+            lines.append(f"  added: {tfc['added']}")
+        if tfc.get("removed"):
+            lines.append(f"  removed: {tfc['removed']}")
+    if htc.get("added") or htc.get("removed"):
+        lines.append("")
+        lines.append("Hierarchy templates changed:")
+        if htc.get("added"):
+            lines.append(f"  added: {htc['added']}")
+        if htc.get("removed"):
+            lines.append(f"  removed: {htc['removed']}")
+    if dmc.get("added") or dmc.get("removed"):
+        lines.append("")
+        lines.append("Dependency motifs changed:")
+        if dmc.get("added"):
+            lines.append(f"  added: {dmc['added']}")
+        if dmc.get("removed"):
+            lines.append(f"  removed: {dmc['removed']}")
+    return "\n".join(lines)
+
+
+def list_to_text(info: dict[str, Any]) -> str:
+    """Format list output for human reading."""
+    lines = [
+        "Archive List",
+        "============",
+        "",
+        f"Path: {info.get('path', '?')}",
+        "",
+        "Shared artifacts:",
+    ]
+    for a in info.get("shared_artifacts", []):
+        lines.append(f"  {a.get('path', '?')} ({a.get('size', 0):,} bytes)")
+    lines.append("")
+    lines.append("Fold families by operator:")
+    for op, fams in info.get("families_by_operator", {}).items():
+        lines.append(f"  {op}:")
+        for f in fams:
+            paths = f.get("paths", f.get("roots_or_paths", []))
+            lines.append(f"    [{f.get('index', '?')}] gain={f.get('gain', 0):,} targets={f.get('target_count', 0)}")
+            if paths:
+                for p in paths[:3]:
+                    lines.append(f"      - {p}")
+                if len(paths) > 3:
+                    lines.append(f"      - ...")
+    return "\n".join(lines)
+
+
+def stats_to_text(stats: dict[str, Any]) -> str:
+    """Format stats output for human reading."""
+    lines = [
+        "Archive Stats",
+        "=============",
+        "",
+        f"Path: {stats.get('path', '?')}",
+        "",
+        "Metrics:",
+        f"  logical_gain_bytes: {stats.get('logical_gain_bytes', 0):,}",
+        f"  physical_folded_size_bytes: {stats.get('physical_folded_size_bytes', 0):,}",
+        f"  original_size_bytes: {stats.get('original_size_bytes', 0):,}",
+        f"  rejection_count: {stats.get('rejection_count', 0)}",
+        "",
+        "Per-operator contributions:",
+    ]
+    for op, g in stats.get("per_operator_contributions", {}).items():
+        share = stats.get("per_operator_gain_share", {}).get(op, 0)
+        lines.append(f"  {op}: {g:,} bytes ({share:.1%})")
+    tm = stats.get("template_metrics")
+    if tm and tm.get("families_found", 0) > 0:
+        lines.append("")
+        lines.append("Template metrics:")
+        lines.append(f"  families_found: {tm.get('families_found', 0)}")
+        if tm.get("family_purity"):
+            lines.append(f"  family_purity: {tm['family_purity']}")
+        if tm.get("slot_ambiguity"):
+            lines.append(f"  slot_ambiguity: {tm['slot_ambiguity']}")
+    hm = stats.get("hierarchy_metrics")
+    if hm and hm.get("templates_found", 0) > 0:
+        lines.append("")
+        lines.append("Hierarchy metrics:")
+        lines.append(f"  templates_found: {hm.get('templates_found', 0)}")
+        if hm.get("instances_per_template"):
+            lines.append(f"  instances_per_template: {hm['instances_per_template']}")
+    dm = stats.get("dependency_metrics")
+    if dm and dm.get("motifs_found", 0) > 0:
+        lines.append("")
+        lines.append("Dependency metrics:")
+        lines.append(f"  motifs_found: {dm.get('motifs_found', 0)}")
+        if dm.get("average_motif_size"):
+            lines.append(f"  average_motif_size: {dm['average_motif_size']}")
     return "\n".join(lines)

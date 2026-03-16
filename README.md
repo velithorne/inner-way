@@ -67,8 +67,17 @@ python3 -m infold.cli archive explain archive.infold
 # Validate package spec (ledger consistency, shared artifacts, manifest/report)
 python3 -m infold.cli archive validate archive.infold
 
-# Compare two archives
+# List shared artifacts and fold families
+python3 -m infold.cli archive list archive.infold
+
+# Detailed stats (per-operator, template purity, rejection counts)
+python3 -m infold.cli archive stats archive.infold
+
+# Compare two archives (includes which families changed)
 python3 -m infold.cli archive compare archive1.infold archive2.infold
+
+# JSON output (inspect, explain, list, stats, compare)
+python3 -m infold.cli archive inspect archive.infold --json
 
 # Reconstruct to directory
 python3 -m infold.cli archive reconstruct archive.infold --output ./restored
