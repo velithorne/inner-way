@@ -78,6 +78,7 @@ def run_fold(
         project_id=config.get("project", {}).get("id"),
         config_snapshot=config,
     )
+    config.setdefault("_run_diagnostics", {})["template_rejected"] = []
     folded_state: dict[str, Any] = {"canonicals": [], "references": []}
     errors: list[str] = []
     candidate_counts: dict[str, int] = {}

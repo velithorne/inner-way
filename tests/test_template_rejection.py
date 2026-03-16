@@ -64,3 +64,17 @@ def test_accept_syntax_valid_template():
     for r in template_folds:
         assert r.unfold_recipe, "Fold record should have unfold recipe"
         assert "const_blocks" in r.unfold_recipe
+
+
+def test_template_rejection_diagnostics():
+    """Template rejected families should have diagnostics (file_count, scaffold_similarity, slot_ratio, reject_reason)."""
+    path = Path(__file__).parent / "fixtures" / "template_reject"
+    if not path.exists():
+        return
+    config = load_config()
+    run_fold(path, config)
+    rejected = config.get("_run_diagnostics", {}).get("template_rejected", [])
+    assert len(rejected) >= 2, "Should have rejected at least 2 families (different_logic, too_many_slots)"
+    for r in rejected:
+        assert "reject_reason" in r
+        assert "file_count" in r

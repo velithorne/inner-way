@@ -109,7 +109,19 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
         "dependency_metrics": dependency_metrics if dependency_metrics else None,
         "duplicate_families": [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families],
-        "template_families": [{"targets": len(r.targets), "gain": r.gain} for r in template_families],
+        "template_families": [
+            {
+                "targets": len(r.targets),
+                "gain": r.gain,
+                "file_count": (r.unfold_recipe or {}).get("file_count", len(r.targets)),
+                "scaffold_similarity": (r.unfold_recipe or {}).get("scaffold_similarity"),
+                "slot_ratio": (r.unfold_recipe or {}).get("slot_ratio"),
+                "family_purity": (r.unfold_recipe or {}).get("family_purity"),
+                "reject_reason": None,
+            }
+            for r in template_families
+        ],
+        "template_rejected_families": config.get("_run_diagnostics", {}).get("template_rejected", []),
         "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
         "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
         "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
@@ -181,6 +193,18 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
             lines.append(f"  slot_ambiguity: {tm['slot_ambiguity']}")
         if tm.get("avg_slot_size"):
             lines.append(f"  avg_slot_size: {tm['avg_slot_size']}")
+    rejected_tm = report.get("template_rejected_families", [])
+    if rejected_tm:
+        lines.append("")
+        lines.append("Template rejected families (diagnostics):")
+        for i, r in enumerate(rejected_tm[:10]):
+            lines.append(
+                f"  [{i}] file_count={r.get('file_count')} "
+                f"scaffold_sim={r.get('scaffold_similarity')} slot_ratio={r.get('slot_ratio')} "
+                f"purity={r.get('family_purity')} -> {r.get('reject_reason', '?')}"
+            )
+        if len(rejected_tm) > 10:
+            lines.append(f"  ... and {len(rejected_tm) - 10} more")
     if report.get("symbol_table_metrics"):
         stm = report["symbol_table_metrics"]
         lines.append("")

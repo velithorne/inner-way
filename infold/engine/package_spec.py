@@ -45,7 +45,7 @@ MANIFEST_REQUIRED_KEYS = [
 
 COMPATIBILITY_METADATA = {
     "spec_version": PACKAGE_SPEC_VERSION,
-    "min_infold_version": "0.1.0",
+    "min_infold_version": "0.2.0",
     "reconstruction_mode": "deterministic",
     "debug_friendly": True,
 }

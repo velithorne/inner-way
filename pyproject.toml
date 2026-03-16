@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "infold"
-version = "0.1.0"
-description = "Infold Core v1 — Structure-aware folding engine for code projects and structured text"
+version = "0.2.0"
+description = "Infold Core — Structure-aware folding engine for code projects and structured text"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
