@@ -14,7 +14,7 @@ from infold.engine.interaction_policy import (
     update_committed_paths,
 )
 from infold.engine.ledger import FoldLedger
-from infold.engine.planner import filter_candidates
+from infold.engine.planner import filter_candidates_v2
 from infold.intake import scan_project
 from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
@@ -37,6 +37,7 @@ class FoldResult:
     errors: list[str] = field(default_factory=list)
     candidate_counts: dict[str, int] = field(default_factory=dict)  # operator_id -> count detected
     rejected_candidates: list[dict[str, Any]] = field(default_factory=list)  # for reporting
+    planner_decisions: list[dict[str, Any]] = field(default_factory=list)  # per-candidate planner outcomes
     exact_reconstruction_ok: bool = True  # verified byte-for-byte recovery
 
 
@@ -85,17 +86,27 @@ def run_fold(
     rejected_candidates: list[dict[str, Any]] = []
     committed_paths: set[str] = set()
 
+    planner_decisions: list[dict[str, Any]] = []
     for op in _get_enabled_operators(config):
         candidates = op.detect_candidates(sheet, config)
         candidate_counts[op.operator_id()] = len(candidates)
-        accepted, planner_rejected = filter_candidates(candidates, config)
-        for c, reason in planner_rejected:
-            rejected_candidates.append({
-                "operator_id": op.operator_id(),
-                "reason": "planner",
-                "detail": reason,
-                "target_count": len(c.targets),
+        accepted, decisions = filter_candidates_v2(candidates, config, committed_paths)
+        for d in decisions:
+            planner_decisions.append({
+                "operator_id": d.candidate.operator_id,
+                "planner_decision": d.planner_decision,
+                "planner_reason": d.planner_reason,
+                "final_net_value": d.final_net_value,
+                "target_count": len(d.candidate.targets),
             })
+            if d.planner_decision != "accept":
+                rejected_candidates.append({
+                    "operator_id": d.candidate.operator_id,
+                    "reason": "planner",
+                    "planner_decision": d.planner_decision,
+                    "detail": d.planner_reason,
+                    "target_count": len(d.candidate.targets),
+                })
         for c in accepted:
             conflict, conflict_reason = conflicts_with_committed(c, committed_paths)
             if conflict:
@@ -164,5 +175,6 @@ def run_fold(
         errors=errors,
         candidate_counts=candidate_counts,
         rejected_candidates=rejected_candidates,
+        planner_decisions=planner_decisions,
         exact_reconstruction_ok=exact_reconstruction_ok,
     )

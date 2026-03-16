@@ -51,10 +51,13 @@
   },
   "planner": {
     "min_net_value": -0.5,
+    "max_stress": 1.0,
     "logical_weight": 0.001,
+    "physical_weight": 0.0005,
     "utility_weight": 1.0,
-    "stress_weight": -2.0,
-    "metadata_penalty_weight": -0.001
+    "reconstruction_confidence_weight": 0.5,
+    "metadata_penalty_weight": -0.001,
+    "stress_weight": -2.0
   },
   "validation": {
     "min_net_gain": 0,

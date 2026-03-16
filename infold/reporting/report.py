@@ -127,6 +127,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
         "per_operator_gain_share": per_operator_gain,
         "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
+        "planner_decisions": getattr(result, "planner_decisions", []),
     }
 
 
@@ -240,9 +241,20 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
     lines.append("")
     lines.append("Rejected candidates summary:")
     for rc in report.get("rejected_candidates_summary", [])[:20]:
-        lines.append(f"  {rc.get('operator_id', '?')}: {rc.get('reason', '?')} - {rc.get('detail', '')[:60]}")
+        decision = rc.get("planner_decision", rc.get("reason", "?"))
+        lines.append(f"  {rc.get('operator_id', '?')}: {decision} - {rc.get('detail', '')[:50]}")
     if len(report.get("rejected_candidates_summary", [])) > 20:
         lines.append(f"  ... and {len(report['rejected_candidates_summary']) - 20} more")
+    planner = report.get("planner_decisions", [])
+    if planner:
+        accept_count = sum(1 for p in planner if p.get("planner_decision") == "accept")
+        lines.append("")
+        lines.append("Planner decisions:")
+        lines.append(f"  total: {len(planner)}, accepted: {accept_count}")
+        for pd in planner[:5]:
+            lines.append(f"  {pd.get('operator_id', '?')}: {pd.get('planner_decision', '?')} net={pd.get('final_net_value', 0):.3f}")
+        if len(planner) > 5:
+            lines.append(f"  ... and {len(planner) - 5} more")
     lines.extend(["", f"Reconstruction: {report['reconstruction_status']}"])
     if report["errors"]:
         lines.append("Errors:")

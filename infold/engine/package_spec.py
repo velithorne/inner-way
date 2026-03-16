@@ -3,6 +3,7 @@ Package spec freeze v1: formalized structure, versioning, compatibility.
 
 Required and optional files in the exported package.
 Deterministic reconstruction, debug-friendly.
+Explicit: logical_gain_bytes vs physical_folded_size_bytes.
 """
 
 PACKAGE_SPEC_VERSION = "1.0"
@@ -43,9 +44,9 @@ MANIFEST_REQUIRED_KEYS = [
     "physical_folded_size_bytes",
 ]
 
-COMPATIBILITY_METADATA = {
-    "spec_version": PACKAGE_SPEC_VERSION,
-    "min_infold_version": "0.2.0",
-    "reconstruction_mode": "deterministic",
-    "debug_friendly": True,
-}
+from infold.engine.package_schema import build_compatibility
+
+COMPATIBILITY_METADATA = build_compatibility(
+    spec_version=PACKAGE_SPEC_VERSION,
+    min_infold_version="0.2.0",
+)

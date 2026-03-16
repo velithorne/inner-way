@@ -1,22 +1,59 @@
 """
-Cross-operator interaction policy: precedence and conflict rules.
+Cross-operator interaction policy: precedence, conflict, ownership, overlap resolution.
 
-- Precedence: operators run in fixed order (exact_repetition, symbol_table, template_skeleton, hierarchy_mirror, dependency_motif)
-- Conflict: prevent double-folding of same file paths
-- Hierarchy and dependency folds are metadata-level only (no file content change)
-- Content-modifying operators (exact, template, symbol_table) claim file paths
+Operator classes:
+- content folds: exact_repetition, template_skeleton, symbol_table (modify file content)
+- structural metadata folds: hierarchy_mirror, dependency_motif (metadata only)
+
+Ownership scopes:
+- file-region: (future) line/byte ranges within a file
+- file: whole file path
+- family: group of files (template family, duplicate family)
+- metadata-family: hierarchy/dependency family (no content change)
+
+Overlap resolution: deterministic rules. Reuse/synergy: later operators can reference
+earlier fold artifacts. Diagnostics: blocked_folds, superseded_folds, reused_artifacts.
 """
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from infold.models.candidate import CandidateCrease
 
-# Operators that modify file content (claim paths)
+# Content operators: modify file content, claim file ownership
 CONTENT_OPERATORS = {"exact_repetition", "template_skeleton", "symbol_table"}
 
-# Operators that are metadata-only (do not claim paths for conflict)
+# Structural metadata operators: no content change, metadata-family ownership
 METADATA_OPERATORS = {"hierarchy_mirror", "dependency_motif"}
+
+# Ownership scope types
+SCOPE_FILE = "file"
+SCOPE_FILE_REGION = "file_region"
+SCOPE_FAMILY = "family"
+SCOPE_METADATA_FAMILY = "metadata_family"
+
+
+@dataclass
+class FoldOwnership:
+    """Ownership claimed by a committed fold."""
+
+    operator_id: str
+    scope_type: str  # file, family, metadata_family
+    paths: set[str] = field(default_factory=set)
+    family_id: str | None = None
+
+
+def get_operator_class(operator_id: str) -> str:
+    """Return 'content' or 'metadata'."""
+    return "content" if operator_id in CONTENT_OPERATORS else "metadata"
+
+
+def get_ownership_scope(operator_id: str) -> str:
+    """Return scope type for operator."""
+    if operator_id in CONTENT_OPERATORS:
+        return SCOPE_FAMILY if operator_id in ("template_skeleton", "exact_repetition") else SCOPE_FILE
+    return SCOPE_METADATA_FAMILY
 
 
 def get_candidate_paths(candidate: CandidateCrease) -> set[str]:
@@ -59,3 +96,49 @@ def update_committed_paths(
         p = str(t).replace("\\", "/") if t else ""
         if p:
             committed_paths.add(p)
+
+
+def resolve_overlap(
+    candidate: CandidateCrease,
+    committed_ownerships: list[FoldOwnership],
+) -> tuple[bool, str | None]:
+    """
+    Deterministic overlap resolution. Returns (has_overlap, reason).
+    Content vs content: reject if paths overlap.
+    Metadata: never overlaps with content.
+    """
+    if candidate.operator_id in METADATA_OPERATORS:
+        return False, None
+    cand_paths = get_candidate_paths(candidate)
+    for own in committed_ownerships:
+        if own.operator_id not in CONTENT_OPERATORS:
+            continue
+        overlap = cand_paths & own.paths
+        if overlap:
+            return True, f"overlap with {own.operator_id}: {sorted(overlap)[:2]}"
+    return False, None
+
+
+def record_ownership(
+    operator_id: str,
+    targets: list[Any],
+) -> FoldOwnership:
+    """Create FoldOwnership for a committed fold."""
+    paths = {str(t).replace("\\", "/") for t in targets if t}
+    scope = get_ownership_scope(operator_id)
+    return FoldOwnership(
+        operator_id=operator_id,
+        scope_type=scope,
+        paths=paths,
+        family_id=None,
+    )
+
+
+# Diagnostics
+@dataclass
+class InteractionDiagnostics:
+    """Diagnostics for blocked, superseded, reused folds."""
+
+    blocked_folds: list[dict[str, Any]] = field(default_factory=list)
+    superseded_folds: list[dict[str, Any]] = field(default_factory=list)
+    reused_artifacts: list[dict[str, Any]] = field(default_factory=list)

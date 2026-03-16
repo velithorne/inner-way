@@ -15,6 +15,10 @@ from infold.engine.package_spec import (
     REQUIRED_DIRS,
     REQUIRED_FILES,
 )
+from infold.engine.package_schema import (
+    check_logical_vs_physical,
+    check_manifest_ledger_consistency,
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -376,6 +380,10 @@ def validate_archive(archive_path: Path | str) -> tuple[bool, list[str]]:
             computed = sum(r.get("gain", 0) for r in lr)
             if computed != lbytes:
                 errors.append(f"Ledger inconsistency: sum(gain) {computed} != total_bytes_saved {lbytes}")
+            consistency_errors = check_manifest_ledger_consistency(manifest, ledger)
+            errors.extend(consistency_errors)
+        logical_physical_errors = check_logical_vs_physical(manifest)
+        errors.extend(logical_physical_errors)
 
         maps_path = root / "maps" / "reconstruction.json"
         if maps_path.exists():

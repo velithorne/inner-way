@@ -38,6 +38,20 @@ An Infold package is a directory containing folded project data. It enables dete
 | `snapshots/passthrough.json` | Files not in any fold (for full reconstruction) |
 | `integrity.json` | SHA256 checksums for manifest, ledger, shared artifacts, maps (validated by archive validate) |
 
+## Compatibility and Versioning
+
+Manifest compatibility block:
+
+| Field | Description |
+|-------|-------------|
+| `spec_version` | Package spec version (e.g. "1.0") |
+| `min_infold_version` | Minimum Infold version to create |
+| `min_reader_version` | Minimum Infold version to read |
+| `compatibility_status` | "ok", "upgrade_available", or "incompatible" |
+| `upgrade_path_available` | Whether upgrade path exists |
+| `reconstruction_mode` | "deterministic" |
+| `debug_friendly` | true |
+
 ## Manifest Structure
 
 `manifest.json` must contain:
