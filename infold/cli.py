@@ -111,6 +111,44 @@ def main() -> int:
         assert vr.accepted
         print("✓ Validation pipeline OK")
         print(f"  - validate_candidate(NoOp, synthetic) -> accepted={vr.accepted}")
+        print()
+        from infold.operators import ExactRepetitionOperator
+        from infold.models import FileNode, ProjectSheet
+        import hashlib
+
+        # Exact Repetition: create sheet with 2 identical files (min 64 bytes)
+        dup_content = ("x = 1\ny = 2\nz = x + y\n" * 5)  # ~90 bytes
+        dup_hash = hashlib.sha256(dup_content.encode("utf-8")).hexdigest()
+        base = Path(__file__).parent.parent
+        dup_sheet = ProjectSheet(source_path=base)
+        for name in ["dup_a.py", "dup_b.py"]:
+            dup_sheet.file_nodes[Path(name)] = FileNode(
+                path=Path(name),
+                language="python",
+                raw_text=dup_content,
+                tokens=[],
+                ast_data=None,
+                symbols=[],
+                imports=[],
+                raw_hash=dup_hash,
+                token_hash=None,
+                parser_confidence=1.0,
+                diagnostics=[],
+            )
+        ex_op = ExactRepetitionOperator()
+        ex_candidates = ex_op.detect_candidates(dup_sheet, config)
+        assert len(ex_candidates) == 1
+        c = ex_candidates[0]
+        vr2 = validate_candidate(ex_op, c, dup_sheet, config)
+        assert vr2.accepted
+        record = ex_op.apply(c, dup_sheet, config)
+        unfolded = ex_op.unfold(record, None, config)
+        assert len(unfolded) == 2
+        assert unfolded[Path("dup_a.py")] == dup_content
+        assert unfolded[Path("dup_b.py")] == dup_content
+        print("✓ Exact Repetition Fold OK")
+        print(f"  - Found {len(ex_candidates)} candidate(s), gain={record.gain} bytes")
+        print(f"  - Unfold restored {len(unfolded)} files correctly")
         return 0
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
