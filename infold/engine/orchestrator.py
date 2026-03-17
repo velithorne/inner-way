@@ -139,6 +139,26 @@ def run_fold(
     else:
         raise ValueError(f"Invalid profile: {fold_profile}. Valid: auto, {sorted(VALID_PROFILES)}")
 
+    # Phase 6D: Creature adaptation (bounded deterministic trait shifts)
+    if config.get("_creature_adaptive", True):
+        from infold.profiles.creatures import run_creature
+
+        pf = config.get("_fold_profile_info", {})
+        species = pf.get("fold_profile", "fox")
+        mode = pf.get("fold_profile_mode", "manual")
+        reason = pf.get("fold_profile_reason", "user_selected")
+        creature = run_creature(species, sheet, source_path, mode, reason)
+        config["_fold_creature_info"] = creature
+        for k, v in creature.get("fold_creature_behavior_overrides", {}).items():
+            if k not in config:
+                config[k] = {}
+            if isinstance(v, dict) and isinstance(config.get(k), dict):
+                _merge(config[k], v)
+            else:
+                config[k] = v
+    else:
+        config["_fold_creature_info"] = None
+
     ledger = FoldLedger(
         project_id=config.get("project", {}).get("id"),
         config_snapshot=config,

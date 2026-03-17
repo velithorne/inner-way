@@ -73,6 +73,13 @@ def export_package(
         "fold_profile_mode": pfi.get("fold_profile_mode"),
         "fold_profile_reason": pfi.get("fold_profile_reason"),
     }
+    ci = config.get("_fold_creature_info")
+    if ci:
+        manifest["fold_species"] = ci.get("fold_species")
+        manifest["fold_species_mode"] = ci.get("fold_species_mode")
+        manifest["fold_species_reason"] = ci.get("fold_species_reason")
+        manifest["fold_creature_traits_final"] = ci.get("fold_creature_traits_final")
+        manifest["fold_creature_adapt_reasons"] = ci.get("fold_creature_adapt_reasons")
     (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 
     # ledger.json

@@ -159,6 +159,30 @@ def run_profile_compare_cmd(args) -> int:
     return 0
 
 
+def run_creature_compare_cmd(args) -> int:
+    """Run creature comparison: static vs adaptive (fox profile)."""
+    from infold.benchmark.creature_comparison import (
+        run_creature_comparison,
+        creature_comparison_to_markdown,
+    )
+
+    config = load_config()
+    base = Path(__file__).parent.parent
+    create_archives = getattr(args, "archives", True)
+    data = run_creature_comparison(config, base, create_archives=create_archives)
+    out = Path(getattr(args, "output", "results/creature_compare"))
+    out.mkdir(parents=True, exist_ok=True)
+    with open(out / "creature_comparison.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    (out / "creature_comparison.md").write_text(creature_comparison_to_markdown(data), encoding="utf-8")
+    print(f"Exported to {out}/creature_comparison.json, creature_comparison.md")
+    s = data.get("summary", {})
+    print(f"Adaptive wins physical: {s.get('adaptive_wins_physical', 0)}")
+    print(f"Static wins physical: {s.get('static_wins_physical', 0)}")
+    print(f"Both reconstruction OK: {s.get('both_reconstruction_ok', 0)}")
+    return 0
+
+
 def archive_showcase_cmd(args) -> int:
     """Full workflow: create, validate, reconstruct, save results."""
     from infold.workflows import real_project_showcase
@@ -225,6 +249,7 @@ def archive_create(args) -> int:
             "inventory_minimal": True,
         }
     profile = getattr(args, "profile", "auto")
+    config["_creature_adaptive"] = getattr(args, "creature", True)
     out = create_archive(args.source, args.output, config, profile=profile)
     print(f"Created: {out}")
     return 0
@@ -681,6 +706,8 @@ def main() -> int:
     parser.add_argument("--no-archives", dest="archives", action="store_false", default=True, help="Skip archive create/validate (with --benchmark-campaign)")
     parser.add_argument("--profile-compare", action="store_true", help="Run profile comparison benchmark (all profiles per dataset)")
     parser.add_argument("--profile-compare-output", dest="profile_compare_output", help="Output dir for profile comparison results")
+    parser.add_argument("--creature-compare", action="store_true", help="Run creature comparison (static vs adaptive)")
+    parser.add_argument("--creature-compare-output", dest="creature_compare_output", help="Output dir for creature comparison results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     analyze_p = subparsers.add_parser("analyze", help="Analyze project: fold + concise summary (no archive)")
@@ -696,6 +723,7 @@ def main() -> int:
     create_p.add_argument("--output", required=True, help="Output .infold path")
     create_p.add_argument("--profile", default="auto", dest="profile", help="Fold profile: auto, sparrow, fox, dragon, golem, serpent")
     create_p.add_argument("--compact", action="store_true", help="Use compact package format (smaller archive)")
+    create_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation (static profile only)")
     create_p.set_defaults(func=archive_create)
     workflow_p = archive_sub.add_parser("workflow", help="Create + validate + summary in one command")
     workflow_p.add_argument("--source", required=True, help="Source path")
@@ -881,6 +909,13 @@ def main() -> int:
         pca.output = getattr(args, "profile_compare_output", None) or "results/profile_compare"
         pca.archives = getattr(args, "archives", True)
         return run_profile_compare_cmd(pca)
+    if getattr(args, "creature_compare", False):
+        class CreatureCompareArgs:
+            pass
+        cca = CreatureCompareArgs()
+        cca.output = getattr(args, "creature_compare_output", None) or "results/creature_compare"
+        cca.archives = getattr(args, "archives", True)
+        return run_creature_compare_cmd(cca)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)

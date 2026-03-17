@@ -15,6 +15,10 @@ from infold.benchmark.profile_comparison import (
     export_comparison_markdown,
     export_auto_vs_best_csv,
 )
+from infold.benchmark.creature_comparison import (
+    run_creature_comparison,
+    creature_comparison_to_markdown,
+)
 
 __all__ = [
     "run_benchmark_campaign",
@@ -30,4 +34,6 @@ __all__ = [
     "BENCHMARK_PACK",
     "get_benchmark_datasets",
     "ensure_stress_datasets",
+    "run_creature_comparison",
+    "creature_comparison_to_markdown",
 ]

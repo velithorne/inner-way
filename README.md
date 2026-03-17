@@ -73,7 +73,23 @@ python3 -m infold.cli archive create --source . --output archive.infold --profil
 
 # Profile comparison benchmark (Phase 6B): run all datasets across all profiles
 python3 -m infold.cli --profile-compare --profile-compare-output results/pc
+
+# Creature comparison (Phase 6D): static vs adaptive behavior
+python3 -m infold.cli --creature-compare --creature-compare-output results/creature_compare
+
+# Disable creature adaptation (static profile only)
+python3 -m infold.cli archive create --source . --output archive.infold --profile fox --no-creature
 ```
+
+## Adaptive Origami Creatures (Phase 6D)
+
+Profiles are extended with a bounded adaptive strategy layer. Each profile becomes a *species* with measurable traits that can shift within a run based on archive signals (opaque ratio, template density, metadata pressure, lineage context, etc.). Adaptation is deterministic and explainable.
+
+- **Traits**: compactness_bias, structure_bias, byte_fold_bias, lineage_bias, analysis_depth, metadata_tolerance, risk_tolerance
+- **Signals**: raw_size, file_count, structured_ratio, opaque_ratio, parser_confidence, duplicate/template/hierarchy density, chunk_reuse_potential, lineage_context
+- **Behavior mapping**: planner min_net_value, compact package preference, metadata table fold aggressiveness
+
+Creature info is recorded in manifest, report, and archive explain. Use `--no-creature` to disable adaptation.
 
 ## Quick Workflows (Phase 8)
 

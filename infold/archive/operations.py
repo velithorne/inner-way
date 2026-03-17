@@ -259,6 +259,11 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "byte_fold_families": report.get("byte_fold_families", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
+            "fold_species": manifest.get("fold_species"),
+            "fold_species_mode": manifest.get("fold_species_mode"),
+            "fold_species_reason": manifest.get("fold_species_reason"),
+            "fold_creature_traits_final": manifest.get("fold_creature_traits_final"),
+            "fold_creature_adapt_reasons": manifest.get("fold_creature_adapt_reasons"),
         }
 
 
@@ -1755,6 +1760,20 @@ def explain_to_text(info: dict[str, Any]) -> str:
             lines.append(f"  Profile scores: {factors.get('scores', {})}")
         if factors.get("selected_score") is not None:
             lines.append(f"  Selected score: {factors.get('selected_score')}")
+        lines.append("")
+    species = info.get("fold_species")
+    if species:
+        mode = info.get("fold_species_mode", "?")
+        reason = info.get("fold_species_reason", "?")
+        lines.append(f"Fold species: {species} ({mode}, reason={reason})")
+        adapt = info.get("fold_creature_adapt_reasons") or []
+        if adapt:
+            lines.append("  Adaptation reasons:")
+            for r in adapt:
+                lines.append(f"    - {r}")
+        traits = info.get("fold_creature_traits_final") or {}
+        if traits:
+            lines.append(f"  Final traits: {traits}")
         lines.append("")
     lines.append("Package summary:")
     pkg = info.get("package_summary", {})

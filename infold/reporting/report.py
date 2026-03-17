@@ -168,6 +168,14 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "fold_profile_mode": config.get("_fold_profile_info", {}).get("fold_profile_mode"),
         "fold_profile_reason": config.get("_fold_profile_info", {}).get("fold_profile_reason"),
         "fold_profile_factors": config.get("_fold_profile_info", {}).get("fold_profile_factors"),
+        "fold_species": config.get("_fold_creature_info", {}).get("fold_species") if config.get("_fold_creature_info") else None,
+        "fold_species_mode": config.get("_fold_creature_info", {}).get("fold_species_mode") if config.get("_fold_creature_info") else None,
+        "fold_species_reason": config.get("_fold_creature_info", {}).get("fold_species_reason") if config.get("_fold_creature_info") else None,
+        "fold_creature_signals": config.get("_fold_creature_info", {}).get("fold_creature_signals") if config.get("_fold_creature_info") else None,
+        "fold_creature_traits_initial": config.get("_fold_creature_info", {}).get("fold_creature_traits_initial") if config.get("_fold_creature_info") else None,
+        "fold_creature_traits_final": config.get("_fold_creature_info", {}).get("fold_creature_traits_final") if config.get("_fold_creature_info") else None,
+        "fold_creature_adapt_reasons": config.get("_fold_creature_info", {}).get("fold_creature_adapt_reasons") if config.get("_fold_creature_info") else None,
+        "fold_creature_behavior_changes": config.get("_fold_creature_info", {}).get("fold_creature_behavior_changes") if config.get("_fold_creature_info") else None,
     }
 
 
@@ -213,6 +221,23 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
             lines.append(f"  Selected score: {factors.get('selected_score')}")
         if factors.get("score_breakdown"):
             lines.append(f"  Score breakdown: {factors.get('score_breakdown')}")
+        lines.append("")
+    ci = report.get("fold_species")
+    if ci:
+        lines.append(f"Fold species: {report.get('fold_species', '?')} ({report.get('fold_species_mode', '?')}, {report.get('fold_species_reason', '?')})")
+        adapt = report.get("fold_creature_adapt_reasons") or []
+        if adapt:
+            lines.append("  Adaptation reasons:")
+            for r in adapt:
+                lines.append(f"    - {r}")
+        traits_f = report.get("fold_creature_traits_final") or {}
+        if traits_f:
+            lines.append(f"  Final traits: {traits_f}")
+        changes = report.get("fold_creature_behavior_changes") or []
+        if changes:
+            lines.append("  Trait shifts:")
+            for c in changes:
+                lines.append(f"    - {c}")
         lines.append("")
     lines.extend([
         f"Folds: {report['fold_count']}",
