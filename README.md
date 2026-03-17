@@ -76,13 +76,15 @@ python3 -m infold.cli archive stats archive.infold
 # Compare two archives (includes which families changed)
 python3 -m infold.cli archive compare archive1.infold archive2.infold
 
-# Search within archive(s) (Infold Search v0.2)
+# Search within archive(s) (Infold Search v0.3)
 # Path: .infold file or directory of .infold archives
 python3 -m infold.cli archive search archive.infold --operator template_skeleton
 python3 -m infold.cli archive search archive.infold --path foo.py
 python3 -m infold.cli archive search archive.infold --family template
-python3 -m infold.cli archive search ./archives_dir --min-gain 100 --sort-by gain
-python3 -m infold.cli archive search ./archives_dir --archive-filter template --json
+python3 -m infold.cli archive search ./archives_dir --min-gain 100 --max-gain 5000 --sort-by gain
+python3 -m infold.cli archive search archive.infold --rejected --planner-decision reject_conflict
+python3 -m infold.cli archive search archive.infold --export csv
+python3 -m infold.cli archive search archive.infold --export markdown
 python3 -m infold.cli archive search archive.infold --json
 
 # JSON output (inspect, explain, list, stats, compare, search)

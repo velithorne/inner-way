@@ -214,3 +214,97 @@ def test_search_json_schema_validity(sample_archive):
     j = json.dumps(r)
     parsed = json.loads(j)
     assert parsed["match_count"] == len(parsed["matches"])
+
+
+# --- Infold Search v0.3 ---
+
+
+def test_search_max_gain_filter(sample_archive):
+    """max_gain filter excludes high-gain matches."""
+    r_all = search_archive(sample_archive)
+    if r_all["match_count"] == 0:
+        pytest.skip("no folds")
+    min_gain = min(m["gain"] for m in r_all["matches"] if m.get("gain") is not None)
+    r = search_archive(sample_archive, max_gain=max(0, min_gain - 1))
+    assert r["match_count"] == 0
+
+
+def test_search_max_target_count_filter(sample_archive):
+    """max_target_count filter excludes large families."""
+    r_all = search_archive(sample_archive)
+    if r_all["match_count"] == 0:
+        pytest.skip("no folds")
+    min_tc = min(m["target_count"] for m in r_all["matches"])
+    r = search_archive(sample_archive, max_target_count=max(0, min_tc - 1))
+    assert r["match_count"] == 0
+
+
+def test_search_summary_has_tops(sample_archive):
+    """Summary includes top_operators and top_families when matches exist."""
+    r = search_archive(sample_archive)
+    if r["match_count"] == 0:
+        pytest.skip("no folds")
+    s = r["summary"]
+    assert "top_operators" in s
+    assert "top_families" in s
+
+
+def test_search_export_csv(sample_archive):
+    """CSV export produces valid CSV with header."""
+    from infold.archive.operations import search_to_csv
+    r = search_archive(sample_archive)
+    csv_str = search_to_csv(r)
+    lines = csv_str.strip().split("\n")
+    assert len(lines) >= 1
+    assert "match_type" in lines[0]
+    assert "operator_id" in lines[0]
+
+
+def test_search_export_markdown(sample_archive):
+    """Markdown export produces valid markdown with summary."""
+    from infold.archive.operations import search_to_markdown
+    r = search_archive(sample_archive)
+    md = search_to_markdown(r)
+    assert "# Infold Search Results" in md
+    assert "Matches:" in md
+    assert "## Summary" in md
+
+
+def test_search_diagnostics_rejected(tmp_path):
+    """Search with --rejected includes rejected candidates when available."""
+    from pathlib import Path
+    ws = Path(__file__).parent.parent  # workspace root
+    if not (ws / "infold").exists():
+        pytest.skip("infold workspace not found")
+    config = load_config()
+    archive_path = tmp_path / "ws.infold"
+    create_archive(ws, archive_path, config)
+    r = search_archive(archive_path, rejected=True)
+    # May have 0 or more rejected; structure should be correct
+    for m in r.get("matches", []):
+        if m.get("match_type") == "rejected":
+            assert "operator_id" in m
+            assert "archive_path" in m
+            break
+
+
+def test_search_combined_filters(sample_archive):
+    """Operator, min_gain, sort_by work together."""
+    r = search_archive(
+        sample_archive,
+        operator="exact_repetition",
+        min_gain=0,
+        max_gain=99999,
+        sort_by="gain",
+    )
+    for m in r["matches"]:
+        assert m["operator_id"] == "exact_repetition"
+    gains = [m["gain"] for m in r["matches"] if m.get("gain") is not None]
+    assert gains == sorted(gains, reverse=True)
+
+
+def test_search_fold_match_has_match_type(sample_archive):
+    """Fold matches include match_type=fold."""
+    r = search_archive(sample_archive)
+    for m in r.get("matches", []):
+        assert m.get("match_type", "fold") == "fold"

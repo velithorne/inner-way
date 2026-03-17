@@ -214,7 +214,7 @@ def archive_stats(args) -> int:
 def archive_search(args) -> int:
     """Search within archive(s). Path can be .infold file or directory of .infold archives."""
     from infold.archive import search_archive, search_archives
-    from infold.archive.operations import search_to_text
+    from infold.archive.operations import search_to_text, search_to_csv, search_to_markdown
 
     target = Path(args.archive)
     if not target.exists():
@@ -222,41 +222,51 @@ def archive_search(args) -> int:
         return 1
 
     min_gain = getattr(args, "min_gain", None)
+    max_gain = getattr(args, "max_gain", None)
     min_targets = getattr(args, "min_targets", None)
+    max_targets = getattr(args, "max_targets", None)
     archive_filter = getattr(args, "archive_filter", None)
     sort_by = getattr(args, "sort_by", None)
+    rejected = getattr(args, "rejected", False)
+    blocked = getattr(args, "blocked", False)
+    superseded = getattr(args, "superseded", False)
+    planner_decision = getattr(args, "planner_decision", None)
+    diagnostics_only = getattr(args, "diagnostics_only", False)
+
+    search_kw = dict(
+        operator=getattr(args, "operator", None),
+        path=getattr(args, "path", None),
+        family=getattr(args, "family", None),
+        family_id=getattr(args, "family_id", None),
+        artifact_id=getattr(args, "artifact_id", None),
+        min_gain=min_gain,
+        max_gain=max_gain,
+        min_target_count=min_targets,
+        max_target_count=max_targets,
+        sort_by=sort_by,
+        rejected=rejected,
+        blocked=blocked,
+        superseded=superseded,
+        planner_decision=planner_decision,
+        diagnostics_only=diagnostics_only,
+    )
 
     if target.is_file():
-        result = search_archive(
-            target,
-            operator=getattr(args, "operator", None),
-            path=getattr(args, "path", None),
-            family=getattr(args, "family", None),
-            family_id=getattr(args, "family_id", None),
-            artifact_id=getattr(args, "artifact_id", None),
-            min_gain=min_gain,
-            min_target_count=min_targets,
-            sort_by=sort_by,
-        )
+        result = search_archive(target, **search_kw)
     else:
         archives = sorted(target.glob("*.infold"))
         if not archives:
             print(f"No .infold archives found in {target}", file=sys.stderr)
             return 1
-        result = search_archives(
-            archives,
-            operator=getattr(args, "operator", None),
-            path=getattr(args, "path", None),
-            family=getattr(args, "family", None),
-            family_id=getattr(args, "family_id", None),
-            artifact_id=getattr(args, "artifact_id", None),
-            min_gain=min_gain,
-            min_target_count=min_targets,
-            archive_filter=archive_filter,
-            sort_by=sort_by,
-        )
+        result = search_archives(archives, archive_filter=archive_filter, **search_kw)
 
-    if getattr(args, "json", False):
+    export = getattr(args, "export", None)
+    use_json = export == "json" or getattr(args, "json", False)
+    if export == "csv":
+        print(search_to_csv(result))
+    elif export == "markdown":
+        print(search_to_markdown(result))
+    elif use_json:
         print(json.dumps(result, indent=2))
     else:
         print(search_to_text(result))
@@ -316,9 +326,17 @@ def main() -> int:
     search_p.add_argument("--family-id", type=int, dest="family_id", help="Filter by family index")
     search_p.add_argument("--artifact-id", type=int, dest="artifact_id", help="Filter by artifact index")
     search_p.add_argument("--min-gain", type=int, dest="min_gain", help="Minimum gain (bytes)")
+    search_p.add_argument("--max-gain", type=int, dest="max_gain", help="Maximum gain (bytes)")
     search_p.add_argument("--min-targets", type=int, dest="min_targets", help="Minimum target count")
+    search_p.add_argument("--max-targets", type=int, dest="max_targets", help="Maximum target count")
     search_p.add_argument("--archive-filter", dest="archive_filter", help="Filter archives by path substring (multi-archive)")
     search_p.add_argument("--sort-by", dest="sort_by", choices=["gain", "operator", "archive", "target_count"], help="Sort results")
+    search_p.add_argument("--rejected", action="store_true", help="Include rejected candidates")
+    search_p.add_argument("--blocked", action="store_true", help="Include blocked folds")
+    search_p.add_argument("--superseded", action="store_true", help="Include superseded folds")
+    search_p.add_argument("--planner-decision", dest="planner_decision", help="Filter by planner decision (e.g. reject_conflict)")
+    search_p.add_argument("--diagnostics-only", dest="diagnostics_only", action="store_true", help="Search only diagnostics (no folds)")
+    search_p.add_argument("--export", choices=["json", "csv", "markdown"], help="Export format (overrides --json)")
     search_p.add_argument("--json", action="store_true", help="JSON output")
     search_p.set_defaults(func=archive_search)
     args = parser.parse_args()

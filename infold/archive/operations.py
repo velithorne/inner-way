@@ -243,18 +243,96 @@ FAMILY_TO_OPERATOR = {
 OPERATOR_TO_FAMILY = {v: k for k, v in FAMILY_TO_OPERATOR.items()}
 
 
+def _load_diagnostics_from_archive(
+    root: Path,
+    archive_path: str,
+    *,
+    rejected: bool = False,
+    blocked: bool = False,
+    superseded: bool = False,
+    planner_decision: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Load diagnostic entries from report.json. Returns match-like dicts with
+    match_type, operator_id, planner_decision, reason, detail, target_count, archive_path.
+    """
+    report_path = root / "reports" / "report.json"
+    if not report_path.exists():
+        return []
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    out: list[dict[str, Any]] = []
+
+    if rejected:
+        for i, rc in enumerate(report.get("rejected_candidates_summary", [])):
+            if planner_decision and rc.get("planner_decision") != planner_decision:
+                continue
+            out.append({
+                "match_type": "rejected",
+                "index": i,
+                "operator_id": rc.get("operator_id", "unknown"),
+                "planner_decision": rc.get("planner_decision"),
+                "reason": rc.get("reason", ""),
+                "detail": rc.get("detail", ""),
+                "target_count": rc.get("target_count", 0),
+                "archive_path": archive_path,
+            })
+
+    if blocked:
+        diag = report.get("interaction_diagnostics") or {}
+        for i, b in enumerate(diag.get("blocked_folds", [])):
+            if planner_decision and b.get("planner_decision") != planner_decision:
+                continue
+            out.append({
+                "match_type": "blocked",
+                "index": i,
+                "operator_id": b.get("operator_id", "unknown"),
+                "planner_decision": b.get("planner_decision"),
+                "reason": b.get("reason", ""),
+                "detail": b.get("detail", ""),
+                "target_count": b.get("target_count", 0),
+                "archive_path": archive_path,
+            })
+
+    if superseded:
+        diag = report.get("interaction_diagnostics") or {}
+        for i, s in enumerate(diag.get("superseded_folds", [])):
+            if planner_decision and s.get("planner_decision") != planner_decision:
+                continue
+            out.append({
+                "match_type": "superseded",
+                "index": i,
+                "operator_id": s.get("operator_id", "unknown"),
+                "planner_decision": s.get("planner_decision"),
+                "reason": s.get("reason", ""),
+                "detail": s.get("detail", ""),
+                "target_count": s.get("target_count", 0),
+                "archive_path": archive_path,
+            })
+
+    return out
+
+
 def _apply_post_filters(
     matches: list[dict[str, Any]],
     *,
     min_gain: int | None = None,
+    max_gain: int | None = None,
     min_target_count: int | None = None,
+    max_target_count: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Apply min_gain and min_target_count filters. Deterministic."""
+    """Apply numeric range filters. Gain filters apply only to matches with gain (folds). Deterministic."""
     out: list[dict[str, Any]] = []
     for m in matches:
-        if min_gain is not None and m.get("gain", 0) < min_gain:
+        gain = m.get("gain")
+        tc = m.get("target_count", 0)
+        has_gain = gain is not None
+        if has_gain and min_gain is not None and gain < min_gain:
             continue
-        if min_target_count is not None and m.get("target_count", 0) < min_target_count:
+        if has_gain and max_gain is not None and gain > max_gain:
+            continue
+        if min_target_count is not None and tc < min_target_count:
+            continue
+        if max_target_count is not None and tc > max_target_count:
             continue
         out.append(m)
     return out
@@ -285,21 +363,43 @@ def _sort_matches(
 def _build_search_summary(
     matches: list[dict[str, Any]],
     archives_searched: int,
+    *,
+    include_tops: bool = True,
 ) -> dict[str, Any]:
-    """Build search summary: total matches, by operator, by family type."""
+    """Build search summary: total matches, by operator, by family, top archives/operators/families."""
     by_op: dict[str, int] = {}
     by_family: dict[str, int] = {}
+    by_archive: dict[str, int] = {}  # gain sum per archive
     for m in matches:
         op = m.get("operator_id", "unknown")
         by_op[op] = by_op.get(op, 0) + 1
         fam = OPERATOR_TO_FAMILY.get(op, op)
         by_family[fam] = by_family.get(fam, 0) + 1
-    return {
+        arch = m.get("archive_path", "")
+        if arch:
+            by_archive[arch] = by_archive.get(arch, 0) + m.get("gain", 0)
+
+    summary: dict[str, Any] = {
         "total_archives_searched": archives_searched,
         "total_matches": len(matches),
         "matches_by_operator": dict(sorted(by_op.items())),
         "matches_by_family": dict(sorted(by_family.items())),
     }
+    if include_tops and matches:
+        if any(m.get("gain") for m in matches):
+            summary["top_archives_by_gain"] = sorted(
+                [{"archive_path": k, "total_gain": v} for k, v in by_archive.items()],
+                key=lambda x: -x["total_gain"],
+            )[:10]
+        summary["top_operators"] = sorted(
+            [{"operator_id": k, "count": v} for k, v in by_op.items()],
+            key=lambda x: -x["count"],
+        )[:10]
+        summary["top_families"] = sorted(
+            [{"family": k, "count": v} for k, v in by_family.items()],
+            key=lambda x: -x["count"],
+        )[:10]
+    return summary
 
 
 def search_archive(
@@ -311,12 +411,20 @@ def search_archive(
     family_id: int | None = None,
     artifact_id: int | None = None,
     min_gain: int | None = None,
+    max_gain: int | None = None,
     min_target_count: int | None = None,
+    max_target_count: int | None = None,
     sort_by: str | None = None,
+    rejected: bool = False,
+    blocked: bool = False,
+    superseded: bool = False,
+    planner_decision: str | None = None,
+    diagnostics_only: bool = False,
 ) -> dict[str, Any]:
     """
     Search within one archive. Deterministic, archive-focused.
-    Filters: operator, path, family, family_id, artifact_id, min_gain, min_target_count.
+    Filters: operator, path, family, family_id, artifact_id, min/max gain, min/max target_count.
+    When rejected/blocked/superseded: include diagnostic entries. diagnostics_only: skip folds.
     Returns matching records with metadata. Each match includes archive_path.
     """
     archive = Path(archive_path).resolve()
@@ -327,8 +435,7 @@ def search_archive(
         with zipfile.ZipFile(archive, "r") as zf:
             zf.extractall(tmp)
         root = _extract_root(Path(tmp))
-        maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
-        records = maps_data.get("records", [])
+        archive_str = str(archive)
 
         # Resolve family -> operator
         op_filter = operator
@@ -337,64 +444,88 @@ def search_archive(
 
         matches: list[dict[str, Any]] = []
         path_lower = (path or "").lower().replace("\\", "/")
-        archive_str = str(archive)
 
-        for i, rec in enumerate(records):
-            op = rec.get("operator_id", "unknown")
-            targets = rec.get("targets", [])
-            gain = rec.get("gain", 0)
+        if not diagnostics_only:
+            maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+            records = maps_data.get("records", [])
 
-            # Apply filters
-            if op_filter and op != op_filter:
-                continue
-            if family_id is not None and i != family_id:
-                continue
-            if artifact_id is not None and i != artifact_id:
-                continue
-            if path_lower:
-                targets_norm = [str(t).replace("\\", "/").lower() for t in targets]
-                if not any(path_lower in t or t in path_lower for t in targets_norm):
-                    if op == "hierarchy_mirror" and (root / "shared" / f"hierarchy_{i}.json").exists():
-                        data = json.loads((root / "shared" / f"hierarchy_{i}.json").read_text(encoding="utf-8"))
-                        roots = data.get("roots", data.get("paths", []))
-                        if isinstance(roots, list):
-                            roots_norm = [str(r).replace("\\", "/").lower() for r in roots]
-                            if not any(path_lower in r or r in path_lower for r in roots_norm):
+            for i, rec in enumerate(records):
+                op = rec.get("operator_id", "unknown")
+                targets = rec.get("targets", [])
+                gain = rec.get("gain", 0)
+
+                # Apply filters
+                if op_filter and op != op_filter:
+                    continue
+                if family_id is not None and i != family_id:
+                    continue
+                if artifact_id is not None and i != artifact_id:
+                    continue
+                if path_lower:
+                    targets_norm = [str(t).replace("\\", "/").lower() for t in targets]
+                    if not any(path_lower in t or t in path_lower for t in targets_norm):
+                        if op == "hierarchy_mirror" and (root / "shared" / f"hierarchy_{i}.json").exists():
+                            data = json.loads((root / "shared" / f"hierarchy_{i}.json").read_text(encoding="utf-8"))
+                            roots = data.get("roots", data.get("paths", []))
+                            if isinstance(roots, list):
+                                roots_norm = [str(r).replace("\\", "/").lower() for r in roots]
+                                if not any(path_lower in r or r in path_lower for r in roots_norm):
+                                    continue
+                            else:
+                                continue
+                        elif op == "dependency_motif" and (root / "shared" / f"dependency_motif_{i}.json").exists():
+                            data = json.loads((root / "shared" / f"dependency_motif_{i}.json").read_text(encoding="utf-8"))
+                            paths = data.get("paths", targets)
+                            paths_norm = [str(p).replace("\\", "/").lower() for p in paths]
+                            if not any(path_lower in p or p in path_lower for p in paths_norm):
                                 continue
                         else:
                             continue
-                    elif op == "dependency_motif" and (root / "shared" / f"dependency_motif_{i}.json").exists():
-                        data = json.loads((root / "shared" / f"dependency_motif_{i}.json").read_text(encoding="utf-8"))
-                        paths = data.get("paths", targets)
-                        paths_norm = [str(p).replace("\\", "/").lower() for p in paths]
-                        if not any(path_lower in p or p in path_lower for p in paths_norm):
-                            continue
-                    else:
-                        continue
 
-            # Build match entry (include archive_path for schema consistency)
-            entry: dict[str, Any] = {
-                "index": i,
-                "operator_id": op,
-                "artifact_id": i,
-                "gain": gain,
-                "target_count": len(targets),
-                "paths": [str(t) for t in targets],
-                "archive_path": archive_str,
-            }
-            if op == "template_skeleton":
-                tmpl = root / "shared" / f"template_{i}.json"
-                if tmpl.exists():
-                    data = json.loads(tmpl.read_text(encoding="utf-8"))
-                    entry["paths"] = data.get("paths", [str(t) for t in targets])
-            elif op in ("hierarchy_mirror", "dependency_motif"):
-                hj = root / "shared" / (f"hierarchy_{i}.json" if op == "hierarchy_mirror" else f"dependency_motif_{i}.json")
-                if hj.exists():
-                    data = json.loads(hj.read_text(encoding="utf-8"))
-                    entry["roots_or_paths"] = data.get("roots", data.get("paths", [str(t) for t in targets]))
-            matches.append(entry)
+                # Build match entry (include archive_path for schema consistency)
+                entry: dict[str, Any] = {
+                    "match_type": "fold",
+                    "index": i,
+                    "operator_id": op,
+                    "artifact_id": i,
+                    "gain": gain,
+                    "target_count": len(targets),
+                    "paths": [str(t) for t in targets],
+                    "archive_path": archive_str,
+                }
+                if op == "template_skeleton":
+                    tmpl = root / "shared" / f"template_{i}.json"
+                    if tmpl.exists():
+                        data = json.loads(tmpl.read_text(encoding="utf-8"))
+                        entry["paths"] = data.get("paths", [str(t) for t in targets])
+                elif op in ("hierarchy_mirror", "dependency_motif"):
+                    hj = root / "shared" / (f"hierarchy_{i}.json" if op == "hierarchy_mirror" else f"dependency_motif_{i}.json")
+                    if hj.exists():
+                        data = json.loads(hj.read_text(encoding="utf-8"))
+                        entry["roots_or_paths"] = data.get("roots", data.get("paths", [str(t) for t in targets]))
+                matches.append(entry)
 
-    matches = _apply_post_filters(matches, min_gain=min_gain, min_target_count=min_target_count)
+        # Add diagnostics when requested
+        if rejected or blocked or superseded:
+            diag_matches = _load_diagnostics_from_archive(
+                root, archive_str,
+                rejected=rejected,
+                blocked=blocked,
+                superseded=superseded,
+                planner_decision=planner_decision,
+            )
+            # Filter diagnostics by operator/family
+            if op_filter:
+                diag_matches = [d for d in diag_matches if d.get("operator_id") == op_filter]
+            matches.extend(diag_matches)
+
+    matches = _apply_post_filters(
+        matches,
+        min_gain=min_gain,
+        max_gain=max_gain,
+        min_target_count=min_target_count,
+        max_target_count=max_target_count,
+    )
     matches = _sort_matches(matches, sort_by)
 
     query = {
@@ -404,8 +535,15 @@ def search_archive(
         "family_id": family_id,
         "artifact_id": artifact_id,
         "min_gain": min_gain,
+        "max_gain": max_gain,
         "min_target_count": min_target_count,
+        "max_target_count": max_target_count,
         "sort_by": sort_by,
+        "rejected": rejected,
+        "blocked": blocked,
+        "superseded": superseded,
+        "planner_decision": planner_decision,
+        "diagnostics_only": diagnostics_only,
     }
     summary = _build_search_summary(matches, archives_searched=1)
 
@@ -427,9 +565,16 @@ def search_archives(
     family_id: int | None = None,
     artifact_id: int | None = None,
     min_gain: int | None = None,
+    max_gain: int | None = None,
     min_target_count: int | None = None,
+    max_target_count: int | None = None,
     archive_filter: str | None = None,
     sort_by: str | None = None,
+    rejected: bool = False,
+    blocked: bool = False,
+    superseded: bool = False,
+    planner_decision: str | None = None,
+    diagnostics_only: bool = False,
 ) -> dict[str, Any]:
     """
     Search across multiple archives. Aggregates matches, deterministic.
@@ -455,8 +600,15 @@ def search_archives(
             family_id=family_id,
             artifact_id=artifact_id,
             min_gain=min_gain,
+            max_gain=max_gain,
             min_target_count=min_target_count,
+            max_target_count=max_target_count,
             sort_by=None,
+            rejected=rejected,
+            blocked=blocked,
+            superseded=superseded,
+            planner_decision=planner_decision,
+            diagnostics_only=diagnostics_only,
         )
         for m in r.get("matches", []):
             m["archive_path"] = str(arch)
@@ -470,9 +622,15 @@ def search_archives(
         "family_id": family_id,
         "artifact_id": artifact_id,
         "min_gain": min_gain,
+        "max_gain": max_gain,
         "min_target_count": min_target_count,
+        "max_target_count": max_target_count,
         "archive_filter": archive_filter,
         "sort_by": sort_by,
+        "rejected": rejected,
+        "blocked": blocked,
+        "superseded": superseded,
+        "planner_decision": planner_decision,
     }
     summary = _build_search_summary(all_matches, archives_searched=len(searched))
 
@@ -507,22 +665,88 @@ def search_to_text(result: dict[str, Any]) -> str:
         lines.append(f"Summary: {summary.get('total_matches', 0)} matches from {summary.get('total_archives_searched', 0)} archives")
         if summary.get("matches_by_operator"):
             lines.append(f"  By operator: {summary['matches_by_operator']}")
+        if summary.get("top_archives_by_gain"):
+            lines.append("  Top archives by gain:")
+            for t in summary["top_archives_by_gain"][:3]:
+                lines.append(f"    {t.get('archive_path', '?')}: {t.get('total_gain', 0)}")
         lines.append("")
     lines.append(f"Query: {result.get('query', {})}")
     lines.append(f"Matches: {result.get('match_count', 0)}")
     lines.append("")
     for m in result.get("matches", []):
+        mt = m.get("match_type", "fold")
         arch = m.get("archive_path", "")
         arch_part = f" [{arch}]" if arch and (result.get("paths") or len(result.get("matches", [])) > 1) else ""
-        lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}{arch_part}")
-        for p in m.get("paths", [])[:5]:
-            lines.append(f"  - {p}")
-        if len(m.get("paths", [])) > 5:
-            lines.append(f"  ... +{len(m['paths']) - 5} more")
-        if m.get("roots_or_paths"):
-            lines.append(f"  roots: {m['roots_or_paths'][:3]}")
+        if mt == "fold":
+            lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}{arch_part}")
+            for p in m.get("paths", [])[:5]:
+                lines.append(f"  - {p}")
+            if len(m.get("paths", [])) > 5:
+                lines.append(f"  ... +{len(m['paths']) - 5} more")
+            if m.get("roots_or_paths"):
+                lines.append(f"  roots: {m['roots_or_paths'][:3]}")
+        else:
+            lines.append(f"[{mt}] {m.get('operator_id', '?')} {m.get('planner_decision', m.get('reason', ''))} targets={m.get('target_count', 0)}{arch_part}")
+            if m.get("detail"):
+                lines.append(f"  detail: {str(m['detail'])[:80]}")
         lines.append("")
     return "\n".join(lines).rstrip()
+
+
+def search_to_csv(result: dict[str, Any]) -> str:
+    """Export search results as CSV. Deterministic."""
+    import csv
+    import io
+    matches = result.get("matches", [])
+    keys = ["match_type", "operator_id", "gain", "target_count", "archive_path", "paths", "planner_decision", "reason", "detail"]
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(keys)
+    for m in matches:
+        row = []
+        for k in keys:
+            v = m.get(k)
+            if isinstance(v, list):
+                v = ";".join(str(x) for x in v[:10])
+            row.append(str(v) if v is not None else "")
+        w.writerow(row)
+    return out.getvalue()
+
+
+def search_to_markdown(result: dict[str, Any]) -> str:
+    """Export search results as Markdown summary. Deterministic."""
+    lines = [
+        "# Infold Search Results",
+        "",
+        f"**Matches:** {result.get('match_count', 0)}",
+        f"**Archives searched:** {result.get('summary', {}).get('total_archives_searched', 0)}",
+        "",
+        "## Summary",
+        "",
+    ]
+    s = result.get("summary", {})
+    if s.get("matches_by_operator"):
+        lines.append("### By operator")
+        for op, cnt in s["matches_by_operator"].items():
+            lines.append(f"- {op}: {cnt}")
+        lines.append("")
+    if s.get("top_archives_by_gain"):
+        lines.append("### Top archives by gain")
+        for t in s["top_archives_by_gain"][:10]:
+            lines.append(f"- `{t.get('archive_path', '')}`: {t.get('total_gain', 0)} bytes")
+        lines.append("")
+    lines.append("## Matches")
+    lines.append("")
+    for m in result.get("matches", [])[:50]:
+        mt = m.get("match_type", "fold")
+        op = m.get("operator_id", "?")
+        gain = m.get("gain", "-")
+        tc = m.get("target_count", 0)
+        arch = m.get("archive_path", "")
+        lines.append(f"- **{mt}** {op} | gain={gain} targets={tc} | {arch}")
+    if len(result.get("matches", [])) > 50:
+        lines.append(f"- ... and {len(result['matches']) - 50} more")
+    return "\n".join(lines)
 
 
 def stats_archive(archive_path: Path | str) -> dict[str, Any]:
