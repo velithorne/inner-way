@@ -70,6 +70,9 @@ python3 -m infold.cli archive create --source . --output archive.infold
 
 # Manual profile
 python3 -m infold.cli archive create --source . --output archive.infold --profile dragon
+
+# Profile comparison benchmark (Phase 6B): run all datasets across all profiles
+python3 -m infold.cli --profile-compare --profile-compare-output results/pc
 ```
 
 ## Infold Archive

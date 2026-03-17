@@ -152,6 +152,8 @@ def export_campaign_csv(results: list[dict[str, Any]], out_path: Path) -> None:
         flat: dict[str, Any] = {
             "dataset_id": r.get("dataset_id", ""),
             "category": r.get("category", ""),
+            "fold_profile": r.get("fold_profile", ""),
+            "fold_profile_reason": r.get("fold_profile_reason", ""),
             "raw_bytes": r.get("raw_bytes", 0),
             "zip_bytes": r.get("zip_bytes", 0),
             "gzip_bytes": r.get("gzip_bytes", 0),

@@ -106,6 +106,42 @@ def run_benchmark_campaign_cmd(args) -> int:
     return 0
 
 
+def run_profile_compare_cmd(args) -> int:
+    """Run profile comparison benchmark: each dataset across all profiles."""
+    from infold.benchmark import (
+        run_profile_comparison,
+        build_comparison_summary,
+        export_comparison_csv,
+        export_comparison_markdown,
+        export_auto_vs_best_csv,
+        get_benchmark_datasets,
+    )
+    from infold.benchmark.pack import ensure_stress_datasets
+
+    config = load_config()
+    base = Path(__file__).parent.parent
+    ensure_stress_datasets(base)
+    datasets = get_benchmark_datasets(base)
+    if not datasets:
+        print("No benchmark datasets found")
+        return 1
+    create_archives = getattr(args, "archives", True)
+    comparison = run_profile_comparison(datasets, config, base, create_archives=create_archives)
+    summary = build_comparison_summary(comparison)
+    out = Path(getattr(args, "output", "results/profile_compare"))
+    out.mkdir(parents=True, exist_ok=True)
+    export_comparison_csv(summary, out / "profile_comparison.csv")
+    export_auto_vs_best_csv(summary, out / "auto_vs_best.csv")
+    export_comparison_markdown(summary, out / "profile_comparison.md")
+    with open(out / "profile_comparison.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2)
+    print(f"Exported to {out}/")
+    s = summary.get("summary", {})
+    print(f"Auto matched best physical: {s.get('auto_matched_best_physical_count', 0)}/{s.get('total_datasets', 0)} ({s.get('auto_matched_physical_pct', 0)}%)")
+    print(f"Auto matched best gain: {s.get('auto_matched_best_gain_count', 0)}/{s.get('total_datasets', 0)} ({s.get('auto_matched_gain_pct', 0)}%)")
+    return 0
+
+
 def archive_create(args) -> int:
     """Create Infold archive."""
     from infold.archive import create_archive
@@ -511,6 +547,8 @@ def main() -> int:
     parser.add_argument("--benchmark-campaign", action="store_true", help="Run full benchmark campaign")
     parser.add_argument("--campaign-output", dest="campaign_output", help="Output dir for campaign csv/json/md")
     parser.add_argument("--no-archives", dest="archives", action="store_false", default=True, help="Skip archive create/validate (with --benchmark-campaign)")
+    parser.add_argument("--profile-compare", action="store_true", help="Run profile comparison benchmark (all profiles per dataset)")
+    parser.add_argument("--profile-compare-output", dest="profile_compare_output", help="Output dir for profile comparison results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
@@ -668,6 +706,13 @@ def main() -> int:
         ca.archives = getattr(args, "archives", True)
         ca.profile = getattr(args, "profile", "auto")
         return run_benchmark_campaign_cmd(ca)
+    if getattr(args, "profile_compare", False):
+        class ProfileCompareArgs:
+            pass
+        pca = ProfileCompareArgs()
+        pca.output = getattr(args, "profile_compare_output", None) or "results/profile_compare"
+        pca.archives = getattr(args, "archives", True)
+        return run_profile_compare_cmd(pca)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)
