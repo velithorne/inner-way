@@ -75,6 +75,23 @@ python3 -m infold.cli archive create --source . --output archive.infold --profil
 python3 -m infold.cli --profile-compare --profile-compare-output results/pc
 ```
 
+## Quick Workflows (Phase 8)
+
+```bash
+# Analyze project (no archive): fold + concise summary
+python3 -m infold.cli analyze --source .
+
+# Archive workflow: create + validate + summary in one
+python3 -m infold.cli archive workflow --source . --output archive.infold
+
+# Sync capture: add snapshot + timeline summary
+python3 -m infold.cli archive sync init --dir .infold-sync --source .
+python3 -m infold.cli archive sync capture --dir .infold-sync --source .
+
+# Real-project showcase: create, validate, reconstruct, save results
+python3 -m infold.cli archive showcase --source . --output-dir results/showcase
+```
+
 ## Infold Archive
 
 Create, inspect, validate, explain, compare, and reconstruct folded archives:
@@ -82,6 +99,12 @@ Create, inspect, validate, explain, compare, and reconstruct folded archives:
 ```bash
 # Create archive (fold + export + zip)
 python3 -m infold.cli archive create --source . --output archive.infold
+
+# Workflow: create + validate + summary in one command
+python3 -m infold.cli archive workflow --source . --output archive.infold
+
+# Showcase: full workflow, save to directory (archive, restored, summary.md)
+python3 -m infold.cli archive showcase --source . --output-dir results/showcase
 
 # Inspect archive contents
 python3 -m infold.cli archive inspect archive.infold
@@ -188,6 +211,58 @@ python3 -m infold.cli archive reconstruct demo.infold --output ./restored
 diff -rq tests/fixtures/duplicate_python ./restored
 # (no output = identical)
 ```
+
+### Search workflow examples
+
+```bash
+# Find template families
+python3 -m infold.cli archive search archive.infold --operator template_skeleton
+
+# Find folds involving a path
+python3 -m infold.cli archive search archive.infold --path foo.py --explain
+
+# Search across lineage with lineage metadata
+python3 -m infold.cli archive sync search --dir .infold-sync --with-lineage --operator exact_repetition
+
+# Export to file
+python3 -m infold.cli archive search archive.infold --output results.json --export json
+```
+
+### Sync / timeline workflow examples
+
+```bash
+# Initialize and capture snapshots
+python3 -m infold.cli archive sync init --dir .infold-sync --source .
+python3 -m infold.cli archive sync capture --dir .infold-sync --source .   # add + timeline
+
+# Trace family lifecycle
+python3 -m infold.cli archive sync trace --dir .infold-sync --family template
+
+# Change-focused report
+python3 -m infold.cli archive sync lineage-report --dir .infold-sync
+```
+
+### Profile usage guidance
+
+| When to use | Profile |
+|-------------|---------|
+| Default (let Infold choose) | `auto` |
+| Tiny project, minimize overhead | `sparrow` or `golem` |
+| Balanced codebase | `fox` |
+| Large, structure-rich | `dragon` |
+| Binary/opaque-heavy | `golem` |
+| Versioned/sync workflow | `serpent` |
+
+### Real-project case study
+
+Run a full showcase on your project:
+
+```bash
+python3 -m infold.cli archive showcase --source . --output-dir results/my_project_showcase
+```
+
+Output: `archive.infold`, `restored/`, `summary.md`, `summary.json`, `explain.txt`, `stats.txt`.
+Compare raw vs ZIP vs gzip vs Infold in `summary.md`.
 
 ## License
 

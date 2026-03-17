@@ -504,22 +504,32 @@ def sync_timeline(sync_dir: Path | str) -> dict[str, Any]:
 
 
 def sync_timeline_to_text(data: dict[str, Any]) -> str:
-    """Human-readable timeline."""
+    """Human-readable timeline with highlights."""
     lines = [
         "Sync Timeline",
         "=============",
         "",
         f"Sync dir: {data.get('sync_dir', '?')}",
+        f"Source: {data.get('source_path', '?')}",
         f"Snapshots: {data.get('total_snapshots', 0)}",
         f"Total logical gain: {data.get('total_logical_gain_bytes', 0):,} bytes",
         f"Avg physical size: {data.get('avg_physical_folded_size_bytes', 0):,.0f} bytes",
         "",
-        "Fold count over time:",
     ]
-    for row in data.get("fold_over_time", [])[:15]:
+    fold_over = data.get("fold_over_time", [])
+    if fold_over:
+        newest = fold_over[-1]
+        oldest = fold_over[0]
+        lines.append("Highlights:")
+        lines.append(f"  Newest: [{newest.get('id','?')}] {newest.get('created','?')[:19]} folds={newest.get('fold_count',0)} gain={newest.get('logical_gain_bytes',0):,}")
+        if len(fold_over) > 1:
+            lines.append(f"  Oldest: [{oldest.get('id','?')}] {oldest.get('created','?')[:19]} folds={oldest.get('fold_count',0)} gain={oldest.get('logical_gain_bytes',0):,}")
+        lines.append("")
+    lines.append("Fold count over time:")
+    for row in fold_over[:15]:
         lines.append(f"  [{row.get('id','?')}] {row.get('created','?')[:19]} folds={row.get('fold_count',0)} gain={row.get('logical_gain_bytes',0):,}")
-    if len(data.get("fold_over_time", [])) > 15:
-        lines.append(f"  ... +{len(data['fold_over_time']) - 15} more")
+    if len(fold_over) > 15:
+        lines.append(f"  ... +{len(fold_over) - 15} more")
     return "\n".join(lines)
 
 

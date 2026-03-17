@@ -69,6 +69,23 @@ def run_benchmark_suite_cmd(config: dict) -> int:
     return 0
 
 
+def analyze_cmd(args) -> int:
+    """Analyze project: fold + concise summary (no archive)."""
+    from infold.workflows import analyze_project, analyze_to_text
+    config = load_config()
+    config["_fold_profile"] = getattr(args, "profile", "auto")
+    try:
+        data = analyze_project(getattr(args, "source", "."), config)
+        if getattr(args, "json", False):
+            print(json.dumps(data, indent=2))
+        else:
+            print(analyze_to_text(data))
+        return 0
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
 def run_benchmark_campaign_cmd(args) -> int:
     """Run full benchmark campaign with pack, profiling, export."""
     from infold.benchmark import (
@@ -140,6 +157,59 @@ def run_profile_compare_cmd(args) -> int:
     print(f"Auto matched best physical: {s.get('auto_matched_best_physical_count', 0)}/{s.get('total_datasets', 0)} ({s.get('auto_matched_physical_pct', 0)}%)")
     print(f"Auto matched best gain: {s.get('auto_matched_best_gain_count', 0)}/{s.get('total_datasets', 0)} ({s.get('auto_matched_gain_pct', 0)}%)")
     return 0
+
+
+def archive_showcase_cmd(args) -> int:
+    """Full workflow: create, validate, reconstruct, save results."""
+    from infold.workflows import real_project_showcase
+    config = load_config()
+    try:
+        r = real_project_showcase(
+            getattr(args, "source", "."),
+            getattr(args, "output_dir", "showcase_out"),
+            config=config,
+            profile=getattr(args, "profile", "auto"),
+        )
+        print(f"Showcase saved to {r.get('output_dir', '?')}")
+        print(f"  archive: {r.get('archive_path', '?')}")
+        print(f"  restored: {r.get('output_dir', '?')}/restored/")
+        print(f"  summary: {r.get('output_dir', '?')}/summary.md")
+        print(f"  Validation: {'OK' if r.get('validation_ok') else 'FAILED'}")
+        print(f"  Exact reconstruction: {'OK' if r.get('exact_reconstruction_ok') else 'FAILED'}")
+        return 0 if r.get("validation_ok") and r.get("exact_reconstruction_ok") else 1
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def archive_workflow_cmd(args) -> int:
+    """Create + validate + summary in one command."""
+    from infold.workflows import archive_workflow
+    config = load_config()
+    try:
+        r = archive_workflow(
+            getattr(args, "source", "."),
+            getattr(args, "output", "out.infold"),
+            config=config,
+            profile=getattr(args, "profile", "auto"),
+        )
+        if getattr(args, "json", False):
+            out = {k: v for k, v in r.items() if k != "summary"}
+            out["validation_ok"] = r.get("validation_ok")
+            out["explain"] = r.get("explain")
+            print(json.dumps(out, indent=2))
+        else:
+            print(f"Created: {r.get('archive_path', '?')}")
+            print(f"Validation: {'OK' if r.get('validation_ok') else 'FAILED'}")
+            if r.get("validation_errors"):
+                for e in r["validation_errors"]:
+                    print(f"  Error: {e}")
+            print("")
+            print(r.get("summary", ""))
+        return 0 if r.get("validation_ok") else 1
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 def archive_create(args) -> int:
@@ -251,6 +321,30 @@ def archive_stats(args) -> int:
     else:
         print(stats_to_text(stats))
     return 0
+
+
+def sync_capture_cmd(args) -> int:
+    """Add snapshot + timeline summary in one command."""
+    from infold.workflows import sync_capture
+    config = load_config()
+    try:
+        r = sync_capture(
+            getattr(args, "sync_dir", ".infold-sync"),
+            getattr(args, "source", "."),
+            config=config,
+        )
+        snap = r.get("snapshot", {})
+        if getattr(args, "json", False):
+            print(json.dumps({"snapshot": snap, "timeline": r.get("timeline", {})}, indent=2))
+        else:
+            print(f"Added snapshot {snap.get('id', '?')}: {snap.get('path', '?')}")
+            print(f"  gain={snap.get('logical_gain_bytes', 0)} folds={snap.get('fold_count', 0)}")
+            print("")
+            print(r.get("timeline_text", ""))
+        return 0
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 def sync_init_cmd(args) -> int:
@@ -589,6 +683,11 @@ def main() -> int:
     parser.add_argument("--profile-compare-output", dest="profile_compare_output", help="Output dir for profile comparison results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
+    analyze_p = subparsers.add_parser("analyze", help="Analyze project: fold + concise summary (no archive)")
+    analyze_p.add_argument("--source", required=True, help="Source project path")
+    analyze_p.add_argument("--profile", default="auto", help="Fold profile")
+    analyze_p.add_argument("--json", action="store_true", help="JSON output")
+    analyze_p.set_defaults(func=analyze_cmd)
     archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
     archive_parser.add_argument("--json", action="store_true", help="Machine-readable JSON output")
     archive_sub = archive_parser.add_subparsers(dest="archive_cmd")
@@ -598,6 +697,17 @@ def main() -> int:
     create_p.add_argument("--profile", default="auto", dest="profile", help="Fold profile: auto, sparrow, fox, dragon, golem, serpent")
     create_p.add_argument("--compact", action="store_true", help="Use compact package format (smaller archive)")
     create_p.set_defaults(func=archive_create)
+    workflow_p = archive_sub.add_parser("workflow", help="Create + validate + summary in one command")
+    workflow_p.add_argument("--source", required=True, help="Source path")
+    workflow_p.add_argument("--output", required=True, help="Output .infold path")
+    workflow_p.add_argument("--profile", default="auto", help="Fold profile")
+    workflow_p.add_argument("--json", action="store_true", help="JSON output")
+    workflow_p.set_defaults(func=archive_workflow_cmd)
+    showcase_p = archive_sub.add_parser("showcase", help="Full workflow: create, validate, reconstruct, save results")
+    showcase_p.add_argument("--source", required=True, help="Source path")
+    showcase_p.add_argument("--output-dir", dest="output_dir", required=True, help="Output directory for archive, restored, summary")
+    showcase_p.add_argument("--profile", default="auto", help="Fold profile")
+    showcase_p.set_defaults(func=archive_showcase_cmd)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
     inspect_p.add_argument("archive", help="Archive path")
     inspect_p.add_argument("--json", action="store_true", help="JSON output")
@@ -673,6 +783,11 @@ def main() -> int:
     search_p.set_defaults(func=archive_search)
     sync_p = archive_sub.add_parser("sync", help="Infold Sync: versioned snapshots, lineage, compare, report")
     sync_sub = sync_p.add_subparsers(dest="sync_cmd")
+    sync_capture_p = sync_sub.add_parser("capture", help="Add snapshot + timeline summary in one command")
+    sync_capture_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_capture_p.add_argument("--source", required=True, help="Source path")
+    sync_capture_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_capture_p.set_defaults(func=sync_capture_cmd)
     sync_init_p = sync_sub.add_parser("init", help="Initialize sync directory with lineage manifest")
     sync_init_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory (default: .infold-sync)")
     sync_init_p.add_argument("--source", required=True, help="Source project path")
@@ -770,6 +885,10 @@ def main() -> int:
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)
         archive_parser.print_help()
+        return 1
+    if args.command == "analyze":
+        if hasattr(args, "func") and args.func is not None:
+            return args.func(args)
         return 1
 
     print(f"Infold Core v{__version__}")
