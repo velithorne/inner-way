@@ -82,6 +82,7 @@ python3 -m infold.cli archive search archive.infold --operator template_skeleton
 python3 -m infold.cli archive search archive.infold --path foo.py --explain
 python3 -m infold.cli archive search ./archives_dir --group-by operator
 python3 -m infold.cli archive search ./archives_dir --source-path template --min-logical-gain 50
+python3 -m infold.cli archive search ./archives_dir --debug-friendly true --created-after 2024-01-01
 python3 -m infold.cli archive search archive.infold --rejected --planner-decision reject_conflict
 python3 -m infold.cli archive search archive.infold --output results.json --export json
 python3 -m infold.cli archive search archive.infold --export csv
@@ -92,6 +93,14 @@ python3 -m infold.cli archive inspect archive.infold --json
 
 # Reconstruct to directory
 python3 -m infold.cli archive reconstruct archive.infold --output ./restored
+
+# Infold Sync v0.1 — versioned snapshots, lineage, compare, report
+python3 -m infold.cli archive sync init --dir .infold-sync --source .
+python3 -m infold.cli archive sync add --dir .infold-sync --source .
+python3 -m infold.cli archive sync list --dir .infold-sync
+python3 -m infold.cli archive sync compare v1.infold v2.infold
+python3 -m infold.cli archive sync report v1.infold v2.infold
+python3 -m infold.cli archive sync reconstruct v2.infold --output ./restored
 ```
 
 ### Demo workflow

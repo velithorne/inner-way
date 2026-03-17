@@ -48,6 +48,7 @@ infold_package_test/
 tests/fixtures/sweep_summary.json
 tests/fixtures/**/test_report/
 *.infold
+.infold-sync/
 results/
 campaign_results/
 experiment_results/

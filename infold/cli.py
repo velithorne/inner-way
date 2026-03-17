@@ -211,6 +211,77 @@ def archive_stats(args) -> int:
     return 0
 
 
+def sync_init_cmd(args) -> int:
+    """Initialize sync directory."""
+    from infold.sync import init_sync
+    r = init_sync(
+        getattr(args, "sync_dir", ".infold-sync"),
+        source_path=Path(args.source),
+    )
+    print(f"Initialized: {r['sync_dir']}")
+    return 0
+
+
+def sync_add_cmd(args) -> int:
+    """Create snapshot and add to lineage."""
+    from infold.sync import create_and_add_snapshot
+    config = load_config()
+    r = create_and_add_snapshot(
+        getattr(args, "sync_dir", ".infold-sync"),
+        args.source,
+        snapshot_id=getattr(args, "snapshot_id", None),
+        config=config,
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        s = r["snapshot"]
+        print(f"Added snapshot {s['id']}: {s['path']}")
+        print(f"  gain={s['logical_gain_bytes']} folds={s['fold_count']}")
+    return 0
+
+
+def sync_list_cmd(args) -> int:
+    """List snapshots."""
+    from infold.sync import list_snapshots, sync_list_to_text
+    r = list_snapshots(getattr(args, "sync_dir", ".infold-sync"))
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_list_to_text(r))
+    return 0
+
+
+def sync_compare_cmd(args) -> int:
+    """Compare two snapshots."""
+    from infold.archive.operations import compare_archives, compare_to_text
+    r = compare_archives(args.archive_a, args.archive_b)
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(compare_to_text(r))
+    return 0
+
+
+def sync_report_cmd(args) -> int:
+    """Report added/removed/changed fold families."""
+    from infold.sync import sync_report, sync_report_to_text
+    r = sync_report(args.archive_a, args.archive_b)
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_report_to_text(r))
+    return 0
+
+
+def sync_reconstruct_cmd(args) -> int:
+    """Reconstruct snapshot (delegates to archive reconstruct)."""
+    from infold.archive import reconstruct_archive
+    reconstruct_archive(args.archive, args.output)
+    print(f"Reconstructed to {args.output}")
+    return 0
+
+
 def archive_search(args) -> int:
     """Search within archive(s). Path can be .infold file or directory of .infold archives."""
     from infold.archive import search_archive, search_archives
@@ -240,10 +311,15 @@ def archive_search(args) -> int:
         group_by=getattr(args, "group_by", None),
         explain=getattr(args, "explain", False),
     )
+    _df = getattr(args, "debug_friendly", None)
+    _df_val = None if _df is None else (_df == "true")
     archives_extra = dict(
         spec_version=getattr(args, "spec_version", None),
         reconstruction_mode=getattr(args, "reconstruction_mode", None),
         source_path=getattr(args, "source_path", None),
+        debug_friendly=_df_val,
+        created_after=getattr(args, "created_after", None),
+        created_before=getattr(args, "created_before", None),
         min_logical_gain=getattr(args, "min_logical_gain", None),
         max_logical_gain=getattr(args, "max_logical_gain", None),
         min_physical_size=getattr(args, "min_physical_size", None),
@@ -361,6 +437,9 @@ def main() -> int:
     search_p.add_argument("--spec-version", dest="spec_version", help="Filter archives by spec_version (multi-archive)")
     search_p.add_argument("--reconstruction-mode", dest="reconstruction_mode", help="Filter by reconstruction_mode")
     search_p.add_argument("--source-path", dest="source_path", help="Filter by source_path substring")
+    search_p.add_argument("--debug-friendly", dest="debug_friendly", choices=["true", "false"], help="Filter archives by debug_friendly (multi-archive)")
+    search_p.add_argument("--created-after", dest="created_after", help="Filter archives created after ISO timestamp (multi-archive)")
+    search_p.add_argument("--created-before", dest="created_before", help="Filter archives created before ISO timestamp (multi-archive)")
     search_p.add_argument("--min-logical-gain", type=int, dest="min_logical_gain", help="Filter archives by min logical gain")
     search_p.add_argument("--max-logical-gain", type=int, dest="max_logical_gain", help="Filter archives by max logical gain")
     search_p.add_argument("--min-physical-size", type=int, dest="min_physical_size", help="Filter archives by min physical size")
@@ -373,6 +452,36 @@ def main() -> int:
     search_p.add_argument("--export", choices=["json", "csv", "markdown"], help="Export format (overrides --json)")
     search_p.add_argument("--json", action="store_true", help="JSON output")
     search_p.set_defaults(func=archive_search)
+    sync_p = archive_sub.add_parser("sync", help="Infold Sync: versioned snapshots, lineage, compare, report")
+    sync_sub = sync_p.add_subparsers(dest="sync_cmd")
+    sync_init_p = sync_sub.add_parser("init", help="Initialize sync directory with lineage manifest")
+    sync_init_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory (default: .infold-sync)")
+    sync_init_p.add_argument("--source", required=True, help="Source project path")
+    sync_init_p.set_defaults(func=sync_init_cmd)
+    sync_add_p = sync_sub.add_parser("add", help="Create snapshot from source and add to lineage")
+    sync_add_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_add_p.add_argument("--source", required=True, help="Source project path")
+    sync_add_p.add_argument("--id", dest="snapshot_id", help="Snapshot ID (default: v1, v2, ...)")
+    sync_add_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_add_p.set_defaults(func=sync_add_cmd)
+    sync_list_p = sync_sub.add_parser("list", help="List snapshots in lineage")
+    sync_list_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_list_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_list_p.set_defaults(func=sync_list_cmd)
+    sync_compare_p = sync_sub.add_parser("compare", help="Compare two snapshots structurally")
+    sync_compare_p.add_argument("archive_a", help="First snapshot (archive path)")
+    sync_compare_p.add_argument("archive_b", help="Second snapshot (archive path)")
+    sync_compare_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_compare_p.set_defaults(func=sync_compare_cmd)
+    sync_report_p = sync_sub.add_parser("report", help="Report added/removed/changed fold families")
+    sync_report_p.add_argument("archive_a", help="First snapshot")
+    sync_report_p.add_argument("archive_b", help="Second snapshot")
+    sync_report_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_report_p.set_defaults(func=sync_report_cmd)
+    sync_reconstruct_p = sync_sub.add_parser("reconstruct", help="Reconstruct chosen snapshot")
+    sync_reconstruct_p.add_argument("archive", help="Snapshot (archive path)")
+    sync_reconstruct_p.add_argument("--output", "-o", required=True, help="Output directory")
+    sync_reconstruct_p.set_defaults(func=sync_reconstruct_cmd)
     args = parser.parse_args()
 
     if args.benchmark_suite:
