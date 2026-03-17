@@ -1,7 +1,8 @@
 """
-Infold Archive v0.1: create, inspect, validate, reconstruct, list, stats, compare.
+Infold Archive v0.1: create, inspect, validate, reconstruct, list, stats, compare, search.
 
 Deterministic validation. Integrity hashing. Preserves exact-mode guarantees.
+Infold Search v0.1: archive-first search within .infold packages.
 """
 
 import hashlib
@@ -228,6 +229,140 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
             "shared_artifacts": shared_artifacts,
             "families_by_operator": families_by_op,
         }
+
+
+# Family type -> operator_id mapping for search
+FAMILY_TO_OPERATOR = {
+    "duplicate": "exact_repetition",
+    "template": "template_skeleton",
+    "symbol": "symbol_table",
+    "hierarchy": "hierarchy_mirror",
+    "dependency": "dependency_motif",
+}
+
+
+def search_archive(
+    archive_path: Path | str,
+    *,
+    operator: str | None = None,
+    path: str | None = None,
+    family: str | None = None,
+    family_id: int | None = None,
+    artifact_id: int | None = None,
+) -> dict[str, Any]:
+    """
+    Search within one archive. Deterministic, archive-focused.
+    Filters: operator, path, family, family_id, artifact_id.
+    Returns matching records with metadata.
+    """
+    archive = Path(archive_path).resolve()
+    if not archive.exists():
+        raise FileNotFoundError(f"Archive not found: {archive}")
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+        with zipfile.ZipFile(archive, "r") as zf:
+            zf.extractall(tmp)
+        root = _extract_root(Path(tmp))
+        maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        records = maps_data.get("records", [])
+
+        # Resolve family -> operator
+        op_filter = operator
+        if family:
+            op_filter = FAMILY_TO_OPERATOR.get(family.lower(), family)
+
+        matches: list[dict[str, Any]] = []
+        path_lower = (path or "").lower().replace("\\", "/")
+
+        for i, rec in enumerate(records):
+            op = rec.get("operator_id", "unknown")
+            targets = rec.get("targets", [])
+            gain = rec.get("gain", 0)
+
+            # Apply filters
+            if op_filter and op != op_filter:
+                continue
+            if family_id is not None and i != family_id:
+                continue
+            if artifact_id is not None and i != artifact_id:
+                continue
+            if path_lower:
+                targets_norm = [str(t).replace("\\", "/").lower() for t in targets]
+                if not any(path_lower in t or t in path_lower for t in targets_norm):
+                    if op == "hierarchy_mirror" and (root / "shared" / f"hierarchy_{i}.json").exists():
+                        data = json.loads((root / "shared" / f"hierarchy_{i}.json").read_text(encoding="utf-8"))
+                        roots = data.get("roots", data.get("paths", []))
+                        if isinstance(roots, list):
+                            roots_norm = [str(r).replace("\\", "/").lower() for r in roots]
+                            if not any(path_lower in r or r in path_lower for r in roots_norm):
+                                continue
+                        else:
+                            continue
+                    elif op == "dependency_motif" and (root / "shared" / f"dependency_motif_{i}.json").exists():
+                        data = json.loads((root / "shared" / f"dependency_motif_{i}.json").read_text(encoding="utf-8"))
+                        paths = data.get("paths", targets)
+                        paths_norm = [str(p).replace("\\", "/").lower() for p in paths]
+                        if not any(path_lower in p or p in path_lower for p in paths_norm):
+                            continue
+                    else:
+                        continue
+
+            # Build match entry
+            entry: dict[str, Any] = {
+                "index": i,
+                "operator_id": op,
+                "artifact_id": i,
+                "gain": gain,
+                "target_count": len(targets),
+                "paths": [str(t) for t in targets],
+            }
+            if op == "template_skeleton":
+                tmpl = root / "shared" / f"template_{i}.json"
+                if tmpl.exists():
+                    data = json.loads(tmpl.read_text(encoding="utf-8"))
+                    entry["paths"] = data.get("paths", [str(t) for t in targets])
+            elif op in ("hierarchy_mirror", "dependency_motif"):
+                hj = root / "shared" / (f"hierarchy_{i}.json" if op == "hierarchy_mirror" else f"dependency_motif_{i}.json")
+                if hj.exists():
+                    data = json.loads(hj.read_text(encoding="utf-8"))
+                    entry["roots_or_paths"] = data.get("roots", data.get("paths", [str(t) for t in targets]))
+            matches.append(entry)
+
+    return {
+        "path": str(archive),
+        "query": {
+            "operator": operator,
+            "path": path,
+            "family": family,
+            "family_id": family_id,
+            "artifact_id": artifact_id,
+        },
+        "match_count": len(matches),
+        "matches": matches,
+    }
+
+
+def search_to_text(result: dict[str, Any]) -> str:
+    """Human-readable search output."""
+    lines = [
+        "Archive Search",
+        "==============",
+        "",
+        f"Archive: {result.get('path', '?')}",
+        f"Query: {result.get('query', {})}",
+        f"Matches: {result.get('match_count', 0)}",
+        "",
+    ]
+    for m in result.get("matches", []):
+        lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}")
+        for p in m.get("paths", [])[:5]:
+            lines.append(f"  - {p}")
+        if len(m.get("paths", [])) > 5:
+            lines.append(f"  ... +{len(m['paths']) - 5} more")
+        if m.get("roots_or_paths"):
+            lines.append(f"  roots: {m['roots_or_paths'][:3]}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def stats_archive(archive_path: Path | str) -> dict[str, Any]:

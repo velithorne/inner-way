@@ -211,6 +211,26 @@ def archive_stats(args) -> int:
     return 0
 
 
+def archive_search(args) -> int:
+    """Search within archive."""
+    from infold.archive import search_archive
+    from infold.archive.operations import search_to_text
+    result = search_archive(
+        args.archive,
+        operator=getattr(args, "operator", None),
+        path=getattr(args, "path", None),
+        family=getattr(args, "family", None),
+        family_id=getattr(args, "family_id", None),
+        artifact_id=getattr(args, "artifact_id", None),
+    )
+    if getattr(args, "json", False):
+        import json
+        print(json.dumps(result, indent=2))
+    else:
+        print(search_to_text(result))
+    return 0
+
+
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="Infold Core — structure-aware folding engine")
@@ -256,6 +276,15 @@ def main() -> int:
     compare_p.add_argument("archive_b", help="Second archive path")
     compare_p.add_argument("--json", action="store_true", help="JSON output")
     compare_p.set_defaults(func=archive_compare)
+    search_p = archive_sub.add_parser("search", help="Search within archive")
+    search_p.add_argument("archive", help="Archive path")
+    search_p.add_argument("--operator", help="Filter by operator (exact_repetition, template_skeleton, etc.)")
+    search_p.add_argument("--path", help="Filter by path (contains match)")
+    search_p.add_argument("--family", help="Filter by family type (duplicate, template, symbol, hierarchy, dependency)")
+    search_p.add_argument("--family-id", type=int, dest="family_id", help="Filter by family index")
+    search_p.add_argument("--artifact-id", type=int, dest="artifact_id", help="Filter by artifact index")
+    search_p.add_argument("--json", action="store_true", help="JSON output")
+    search_p.set_defaults(func=archive_search)
     args = parser.parse_args()
 
     if args.benchmark_suite:

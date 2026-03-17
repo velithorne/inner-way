@@ -76,7 +76,13 @@ python3 -m infold.cli archive stats archive.infold
 # Compare two archives (includes which families changed)
 python3 -m infold.cli archive compare archive1.infold archive2.infold
 
-# JSON output (inspect, explain, list, stats, compare)
+# Search within archive (Infold Search v0.1)
+python3 -m infold.cli archive search archive.infold --operator template_skeleton
+python3 -m infold.cli archive search archive.infold --path foo.py
+python3 -m infold.cli archive search archive.infold --family template
+python3 -m infold.cli archive search archive.infold --json
+
+# JSON output (inspect, explain, list, stats, compare, search)
 python3 -m infold.cli archive inspect archive.infold --json
 
 # Reconstruct to directory
