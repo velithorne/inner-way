@@ -23,6 +23,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     symbol_table_metrics: dict[str, Any] = {}
     hierarchy_metrics: dict[str, Any] = {}
     dependency_metrics: dict[str, Any] = {}
+    byte_fold_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -68,6 +69,20 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             template_metrics.setdefault("family_purity", []).append(recipe.get("family_purity"))
             template_metrics.setdefault("slot_ambiguity", []).append(recipe.get("slot_ambiguity"))
             template_metrics.setdefault("avg_slot_size", []).append(recipe.get("avg_slot_size"))
+        if r.operator_id == "byte_fold":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            chunk_dict = recipe.get("chunk_dict_b64", {})
+            reconstruction = recipe.get("reconstruction", {})
+            byte_fold_metrics.setdefault("files_chunk_folded", 0)
+            byte_fold_metrics["files_chunk_folded"] += len(reconstruction)
+            byte_fold_metrics.setdefault("unique_chunk_count", 0)
+            byte_fold_metrics["unique_chunk_count"] += len(chunk_dict)
+            total_refs = sum(len(ids) for ids in reconstruction.values())
+            byte_fold_metrics.setdefault("chunk_reuse_ratio", []).append(
+                total_refs / len(chunk_dict) if chunk_dict else 0
+            )
+            byte_fold_metrics.setdefault("net_bytes_saved", 0)
+            byte_fold_metrics["net_bytes_saved"] = byte_fold_metrics.get("net_bytes_saved", 0) + r.gain
 
     raw = metrics.get("original_size_bytes", 0)
     logical_gain = ledger.total_bytes_saved  # bytes saved by deduplication
@@ -86,6 +101,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     shared_symbol_families = [r for r in ledger.fold_records if r.operator_id == "symbol_table"]
     hierarchy_templates = [r for r in ledger.fold_records if r.operator_id == "hierarchy_mirror"]
     dependency_motifs = [r for r in ledger.fold_records if r.operator_id == "dependency_motif"]
+    byte_fold_families = [r for r in ledger.fold_records if r.operator_id == "byte_fold"]
 
     return {
         "project_id": config.get("project", {}).get("id"),
@@ -108,6 +124,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
         "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
         "dependency_metrics": dependency_metrics if dependency_metrics else None,
+        "byte_fold_metrics": byte_fold_metrics if byte_fold_metrics else None,
         "duplicate_families": [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families],
         "template_families": [
             {
@@ -126,6 +143,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
         "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
         "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
+        "byte_fold_families": [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families],
         "per_operator_gain_share": per_operator_gain,
         "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
         "symbol_table_conflict_blocked": [
@@ -190,6 +208,7 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         ("shared_symbol_families", report.get("shared_symbol_families", [])),
         ("hierarchy_templates", report.get("hierarchy_templates", [])),
         ("dependency_motifs", report.get("dependency_motifs", [])),
+        ("byte_fold_families", report.get("byte_fold_families", [])),
     ]:
         if fams:
             lines.append(f"  {name}: {len(fams)} families")
@@ -259,6 +278,15 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append(f"  net_bytes_saved: {dm.get('net_bytes_saved', 0)}")
         lines.append(f"  dependency_recovery_accuracy: {dm.get('dependency_recovery_accuracy', [])}")
         lines.append(f"  structural_reuse_ratio: {dm.get('structural_reuse_ratio', [])}")
+    if report.get("byte_fold_metrics"):
+        bfm = report["byte_fold_metrics"]
+        lines.append("")
+        lines.append("Byte Fold metrics:")
+        lines.append(f"  files_chunk_folded: {bfm.get('files_chunk_folded', 0)}")
+        lines.append(f"  unique_chunk_count: {bfm.get('unique_chunk_count', 0)}")
+        lines.append(f"  net_bytes_saved: {bfm.get('net_bytes_saved', 0)}")
+        if bfm.get("chunk_reuse_ratio"):
+            lines.append(f"  chunk_reuse_ratio: {bfm['chunk_reuse_ratio']}")
     lines.append("")
     lines.append("Per-operator gain share:")
     for op_id, share in report.get("per_operator_gain_share", {}).items():

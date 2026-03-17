@@ -21,6 +21,7 @@ from infold.engine.planner import filter_candidates_v2
 from infold.intake import scan_project
 from infold.models.project_sheet import ProjectSheet
 from infold.operators.base import BaseOperator
+from infold.operators.byte_fold import ByteFoldOperator
 from infold.operators.exact_repetition import ExactRepetitionOperator
 from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.dependency_motif import DependencyMotifOperator
@@ -54,6 +55,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
         ("template_skeleton", TemplateSkeletonOperator),
         ("hierarchy_mirror", HierarchyMirrorOperator),
         ("dependency_motif", DependencyMotifOperator),
+        ("byte_fold", ByteFoldOperator),
     ]
     result: list[BaseOperator] = []
     for op_id, op_class in order:
@@ -107,6 +109,7 @@ def run_fold(
     op_times: dict[str, dict[str, float]] = {}
     for op in _get_enabled_operators(config):
         op_id = op.operator_id()
+        config["_committed_paths"] = committed_paths
         sim_apply_s = 0.0
         t0 = time.perf_counter()
         candidates = op.detect_candidates(sheet, config)

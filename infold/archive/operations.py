@@ -81,6 +81,11 @@ def _write_integrity_checksums(pkg_dir: Path, config: dict[str, Any] | None = No
         for f in sorted(shared_dir.iterdir()):
             if f.is_file():
                 checksums[f"shared/{f.name}"] = _sha256_file(f)
+        chunks_dir = shared_dir / "chunks"
+        if chunks_dir.exists():
+            for cf in sorted(chunks_dir.iterdir()):
+                if cf.is_file():
+                    checksums[f"shared/chunks/{cf.name}"] = _sha256_file(cf)
     maps_dir = pkg_dir / "maps"
     if maps_dir.exists():
         for f in sorted(maps_dir.iterdir()):
@@ -236,6 +241,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "duplicate_families": report.get("duplicate_families", []),
             "hierarchy_templates": report.get("hierarchy_templates", []),
             "dependency_motifs": report.get("dependency_motifs", []),
+            "byte_fold_families": report.get("byte_fold_families", []),
         }
 
 
@@ -261,6 +267,11 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
             for f in sorted(shared_dir.iterdir()):
                 if f.is_file():
                     shared_artifacts.append({"path": f"shared/{f.name}", "size": f.stat().st_size})
+            chunks_dir = shared_dir / "chunks"
+            if chunks_dir.exists():
+                for cf in sorted(chunks_dir.iterdir()):
+                    if cf.is_file():
+                        shared_artifacts.append({"path": f"shared/chunks/{cf.name}", "size": cf.stat().st_size})
 
         families_by_op: dict[str, list[dict[str, Any]]] = {}
         for i, rec in enumerate(records):
@@ -309,6 +320,7 @@ FAMILY_TO_OPERATOR = {
     "symbol": "symbol_table",
     "hierarchy": "hierarchy_mirror",
     "dependency": "dependency_motif",
+    "byte_fold": "byte_fold",
 }
 
 OPERATOR_TO_FAMILY = {v: k for k, v in FAMILY_TO_OPERATOR.items()}
@@ -1326,6 +1338,26 @@ def reconstruct_archive(
                     for path_str, content in file_contents.items():
                         if path_str in result:
                             continue
+                        p = out_root / path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(content, encoding="utf-8")
+                        result[path_str] = content
+            elif op_id == "byte_fold":
+                chunk_recon_path = root / "maps" / "chunk_reconstruction.json"
+                chunks_dir = shared_dir / "chunks"
+                if chunk_recon_path.exists() and chunks_dir.exists():
+                    recon_data = json.loads(chunk_recon_path.read_text(encoding="utf-8"))
+                    recs = recon_data.get("records", [])
+                    path_to_ids = recs[idx].get("path_to_chunk_ids", {}) if idx < len(recs) else {}
+                    for path_str, chunk_ids in path_to_ids.items():
+                        if path_str in result:
+                            continue
+                        parts = []
+                        for ch_id in chunk_ids:
+                            bin_path = chunks_dir / f"{ch_id}.bin"
+                            if bin_path.exists():
+                                parts.append(bin_path.read_bytes())
+                        content = b"".join(parts).decode("utf-8")
                         p = out_root / path_str
                         p.parent.mkdir(parents=True, exist_ok=True)
                         p.write_text(content, encoding="utf-8")

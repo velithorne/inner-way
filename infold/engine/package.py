@@ -77,6 +77,7 @@ def export_package(
     # shared/ - canonical content from fold records (always create, even when empty)
     shared_dir = out / "shared"
     shared_dir.mkdir(exist_ok=True)
+    chunk_reconstruction_records: list[dict[str, Any]] = []
     for i, record in enumerate(ledger.fold_records):
         if record.operator_id == "exact_repetition":
             content = record.shared_representation
@@ -125,6 +126,24 @@ def export_package(
                 }, compact),
                 encoding="utf-8",
             )
+        elif record.operator_id == "byte_fold":
+            import base64
+            recipe = record.unfold_recipe
+            chunk_dict_b64 = recipe.get("chunk_dict_b64", {})
+            reconstruction = recipe.get("reconstruction", {})
+            chunks_dir = shared_dir / "chunks"
+            chunks_dir.mkdir(exist_ok=True)
+            chunk_ids = []
+            for ch_id, b64 in chunk_dict_b64.items():
+                chunk_ids.append(ch_id)
+                (chunks_dir / f"{ch_id}.bin").write_bytes(base64.b64decode(b64))
+            (shared_dir / "chunk_index.json").write_text(
+                _json_dump({"chunk_ids": chunk_ids, "record_index": i}, compact),
+                encoding="utf-8",
+            )
+            while len(chunk_reconstruction_records) <= i:
+                chunk_reconstruction_records.append({})
+            chunk_reconstruction_records[i] = {"path_to_chunk_ids": reconstruction}
 
     # Ensure shared/ has at least one file when empty (0 folds) so ZIP/validation sees the dir
     if not any(shared_dir.iterdir()):
@@ -142,6 +161,11 @@ def export_package(
             "gain": record.gain,
         })
     (maps_dir / "reconstruction.json").write_text(_json_dump(maps_data, compact), encoding="utf-8")
+    if chunk_reconstruction_records:
+        (maps_dir / "chunk_reconstruction.json").write_text(
+            _json_dump({"records": chunk_reconstruction_records}, compact),
+            encoding="utf-8",
+        )
 
     # reports/
     reports_dir = out / "reports"
@@ -167,6 +191,8 @@ def export_package(
         for p in recipe.get("file_contents", {}).keys():
             folded_paths.add(str(p).replace("\\", "/"))
         for p in recipe.get("folded_files", {}).keys():
+            folded_paths.add(str(p).replace("\\", "/"))
+        for p in recipe.get("reconstruction", {}).keys():
             folded_paths.add(str(p).replace("\\", "/"))
     inventory = {
         "files": [

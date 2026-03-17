@@ -22,7 +22,7 @@ from typing import Any
 from infold.models.candidate import CandidateCrease
 
 # Content operators: modify file content, claim file ownership
-CONTENT_OPERATORS = {"exact_repetition", "template_skeleton", "symbol_table"}
+CONTENT_OPERATORS = {"exact_repetition", "template_skeleton", "symbol_table", "byte_fold"}
 
 # Structural metadata operators: no content change, metadata-family ownership
 METADATA_OPERATORS = {"hierarchy_mirror", "dependency_motif"}
@@ -52,7 +52,11 @@ def get_operator_class(operator_id: str) -> str:
 def get_ownership_scope(operator_id: str) -> str:
     """Return scope type for operator."""
     if operator_id in CONTENT_OPERATORS:
-        return SCOPE_FAMILY if operator_id in ("template_skeleton", "exact_repetition") else SCOPE_FILE
+        if operator_id in ("template_skeleton", "exact_repetition"):
+            return SCOPE_FAMILY
+        if operator_id == "byte_fold":
+            return SCOPE_FAMILY  # one candidate covers multiple files
+        return SCOPE_FILE
     return SCOPE_METADATA_FAMILY
 
 

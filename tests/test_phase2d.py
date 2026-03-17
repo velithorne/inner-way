@@ -91,6 +91,7 @@ def test_operator_classes():
     assert get_operator_class("exact_repetition") == "content"
     assert get_operator_class("hierarchy_mirror") == "metadata"
     assert "exact_repetition" in CONTENT_OPERATORS
+    assert "byte_fold" in CONTENT_OPERATORS
     assert "hierarchy_mirror" in METADATA_OPERATORS
 
 

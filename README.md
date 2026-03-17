@@ -9,10 +9,11 @@ Structure-aware platform for folding data, patterns, relationships, and behavior
 ### v0.2.0 (Core freeze)
 
 - **Package spec v1** formalized: required manifest, ledger, shared/, maps/, reports/, snapshots/
-- **Operators**: exact_repetition, symbol_table, template_skeleton, hierarchy_mirror, dependency_motif
+- **Operators**: exact_repetition, symbol_table, template_skeleton, hierarchy_mirror, dependency_motif, byte_fold
 - **Exact-mode guarantees**: byte-for-byte reconstruction, deterministic unfold
 - **Template reliability**: fixed slot_ratio (slot lines not blocks), rejection diagnostics
 - **Infold Archive v0.1**: create, inspect, validate, reconstruct commands
+- **Byte Fold v0.1**: chunk-based folding for mixed/binary-like content (shared/chunks/, maps/chunk_reconstruction.json)
 
 See [docs/PACKAGE_SPEC.md](docs/PACKAGE_SPEC.md) for full package spec and limitations.
 
