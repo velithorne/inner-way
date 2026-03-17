@@ -63,7 +63,7 @@ def export_package(
     # ledger.json
     (out / "ledger.json").write_text(json.dumps(ledger.to_dict(), indent=2), encoding="utf-8")
 
-    # shared/ - canonical content from fold records
+    # shared/ - canonical content from fold records (always create, even when empty)
     shared_dir = out / "shared"
     shared_dir.mkdir(exist_ok=True)
     for i, record in enumerate(ledger.fold_records):
@@ -114,6 +114,10 @@ def export_package(
                 }, indent=2),
                 encoding="utf-8",
             )
+
+    # Ensure shared/ has at least one file when empty (0 folds) so ZIP/validation sees the dir
+    if not any(shared_dir.iterdir()):
+        (shared_dir / ".gitkeep").write_text("", encoding="utf-8")
 
     # maps/ - reconstruction mappings
     maps_dir = out / "maps"

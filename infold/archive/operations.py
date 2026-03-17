@@ -155,6 +155,9 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "gain_by_operator": gain_by_op,
             "biggest_gain_contributors": gain_contributors,
             "rejected_candidates_summary": report.get("rejected_candidates_summary", []),
+            "template_rejected_families": report.get("template_rejected_families", []),
+            "template_thresholds": report.get("template_thresholds", {}),
+            "symbol_table_conflict_blocked": report.get("symbol_table_conflict_blocked", []),
             "reconstruction_guarantees": reconstruction_guarantees,
             "template_families": report.get("template_families", []),
             "duplicate_families": report.get("duplicate_families", []),
@@ -751,6 +754,14 @@ def explain_to_text(info: dict[str, Any]) -> str:
             lines.append(f"  {r.get('operator_id', '?')}: {r.get('reason', '?')} - {r.get('detail', '')[:50]}")
         if len(rejected) > 10:
             lines.append(f"  ... and {len(rejected) - 10} more")
+    sym_blocked = info.get("symbol_table_conflict_blocked", [])
+    if sym_blocked:
+        lines.append("")
+        lines.append("Symbol table blocked (conflict with earlier content folds):")
+        lines.append("  symbol_table targets project-wide files; paths already folded by exact_repetition/template_skeleton are excluded.")
+        lines.append("  Blocking is correct: content operators cannot double-fold the same file.")
+        for sb in sym_blocked[:2]:
+            lines.append(f"  Detail: {sb.get('detail', '')[:60]}")
     lines.append("")
     lines.append("Reconstruction guarantees:")
     for g in info.get("reconstruction_guarantees", []):

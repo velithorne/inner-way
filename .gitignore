@@ -49,6 +49,7 @@ tests/fixtures/sweep_summary.json
 tests/fixtures/**/test_report/
 *.infold
 results/
+campaign_results/
 benchmark/synthetic/
 
 # OS

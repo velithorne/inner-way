@@ -82,6 +82,56 @@ def test_benchmark_pack_datasets():
     assert "duplicate-heavy-python" in ids or "infold-workspace" in ids
 
 
+def test_0fold_archive_validation(tmp_path):
+    """0-fold archives pass strict validation (shared/ has .gitkeep when empty)."""
+    from infold.engine import run_fold
+    from infold.engine import export_package
+    from infold.cli import load_config
+
+    base = Path(__file__).parent.parent
+    mixed = base / "tests" / "fixtures" / "mixed_project"
+    if not mixed.exists():
+        pytest.skip("mixed_project fixture not found")
+    config = load_config()
+    config["project"] = {**config.get("project", {}), "id": "mixed", "source_path": str(mixed)}
+    result = run_fold(mixed, config)
+    assert result.ledger.total_folds == 0
+    pkg_dir = tmp_path / "pkg"
+    export_package(result, config, pkg_dir)
+    assert (pkg_dir / "shared").exists()
+    assert (pkg_dir / "shared" / ".gitkeep").exists()
+    # Create archive and validate
+    import zipfile
+    archive = tmp_path / "0fold.infold"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(pkg_dir.rglob("*")):
+            if f.is_file():
+                zf.write(f, f.relative_to(pkg_dir))
+    ok, errors = validate_archive(archive, mode="strict")
+    assert ok, errors
+
+
+def test_template_stress_diagnostics():
+    """template_stress produces diagnostics explaining 0 folds (files < 5 lines)."""
+    from pathlib import Path
+    from infold.engine import run_fold
+    from infold.cli import load_config
+
+    base = Path(__file__).parent.parent
+    stress = base / "benchmark" / "synthetic" / "template_stress"
+    if not stress.exists():
+        pytest.skip("template_stress not found")
+    config = load_config()
+    config["project"] = {**config.get("project", {}), "id": "template-stress"}
+    config.setdefault("_run_diagnostics", {})["template_rejected"] = []
+    result = run_fold(stress, config)
+    rejected = config["_run_diagnostics"].get("template_rejected", [])
+    assert len(rejected) >= 1
+    r0 = rejected[0]
+    assert "reject_reason" in r0
+    assert "5 lines" in r0["reject_reason"] or "file_count" in r0["reject_reason"]
+
+
 def test_benchmark_campaign_no_archives():
     """Campaign runs without archive creation."""
     base = Path(__file__).parent.parent

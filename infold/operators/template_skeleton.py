@@ -34,17 +34,28 @@ def _find_template_families(
     Returns accepted families: (paths, const_blocks, slot_groups, similarity, slot_ratio).
     If diagnostics list provided, appends rejected-family diagnostics to it.
     """
+    MIN_LINES = 5
     by_lang: dict[str, list[tuple[Path, list[str]]]] = {}
+    skipped_few_lines = 0
     for path, node in project_sheet.file_nodes.items():
         if node.diagnostics:
             continue
         lines = node.raw_text.splitlines(keepends=True)
-        if len(lines) < 5:
+        if len(lines) < MIN_LINES:
+            skipped_few_lines += 1
             continue
         by_lang.setdefault(node.language, []).append((path, lines))
 
     families: list[tuple[list[Path], list[str], list[list[str]], float, float]] = []
     diag = diagnostics if diagnostics is not None else []
+    if skipped_few_lines and diag is not None:
+        diag.append({
+            "file_count": skipped_few_lines,
+            "scaffold_similarity": None,
+            "slot_ratio": None,
+            "family_purity": None,
+            "reject_reason": f"files skipped: {skipped_few_lines} with < {MIN_LINES} lines (min for template analysis)",
+        })
 
     for lang, files in by_lang.items():
         by_line_count: dict[int, list[tuple[Path, list[str]]]] = {}
@@ -185,6 +196,13 @@ class TemplateSkeletonOperator(BaseOperator):
             meta_cost = 80 + len(paths) * 30
             net = max(0, gross - meta_cost)
             if net <= 0:
+                diag_list.append({
+                    "file_count": len(paths),
+                    "scaffold_similarity": round(sim, 4),
+                    "slot_ratio": round(slot_ratio, 4),
+                    "family_purity": round(sim, 4),
+                    "reject_reason": f"net_gain {net} <= 0 (gross={gross}, meta_cost={meta_cost})",
+                })
                 continue
             gain = GainEstimate(gross, meta_cost, net, 0.7, 0.85)
             stress = StressEstimate(0.2, 0.3, 0.2, 0.1, 0.25)

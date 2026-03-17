@@ -122,11 +122,17 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             for r in template_families
         ],
         "template_rejected_families": config.get("_run_diagnostics", {}).get("template_rejected", []),
+        "template_thresholds": config.get("thresholds", {}).get("template_skeleton", {}),
         "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
         "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
         "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
         "per_operator_gain_share": per_operator_gain,
         "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
+        "symbol_table_conflict_blocked": [
+            rc for rc in getattr(result, "rejected_candidates", [])
+            if rc.get("operator_id") == "symbol_table"
+            and (rc.get("reason") == "conflict" or rc.get("planner_decision") == "reject_conflict")
+        ],
         "planner_decisions": getattr(result, "planner_decisions", []),
         "interaction_diagnostics": _interaction_diagnostics_to_dict(
             getattr(result, "interaction_diagnostics", None)
@@ -209,17 +215,22 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         if tm.get("avg_slot_size"):
             lines.append(f"  avg_slot_size: {tm['avg_slot_size']}")
     rejected_tm = report.get("template_rejected_families", [])
-    if rejected_tm:
+    tm_thresh = report.get("template_thresholds", {})
+    if rejected_tm or tm_thresh:
         lines.append("")
-        lines.append("Template rejected families (diagnostics):")
-        for i, r in enumerate(rejected_tm[:10]):
-            lines.append(
-                f"  [{i}] file_count={r.get('file_count')} "
-                f"scaffold_sim={r.get('scaffold_similarity')} slot_ratio={r.get('slot_ratio')} "
-                f"purity={r.get('family_purity')} -> {r.get('reject_reason', '?')}"
-            )
-        if len(rejected_tm) > 10:
-            lines.append(f"  ... and {len(rejected_tm) - 10} more")
+        if tm_thresh:
+            lines.append("Template thresholds (min_family_size, min_scaffold_similarity, max_slot_ratio):")
+            lines.append(f"  {tm_thresh.get('min_family_size', '?')}, {tm_thresh.get('min_scaffold_similarity', '?')}, {tm_thresh.get('max_slot_ratio', '?')}")
+        if rejected_tm:
+            lines.append("Template rejected families (diagnostics):")
+            for i, r in enumerate(rejected_tm[:10]):
+                lines.append(
+                    f"  [{i}] file_count={r.get('file_count')} "
+                    f"scaffold_sim={r.get('scaffold_similarity')} slot_ratio={r.get('slot_ratio')} "
+                    f"purity={r.get('family_purity')} -> {r.get('reject_reason', '?')}"
+                )
+            if len(rejected_tm) > 10:
+                lines.append(f"  ... and {len(rejected_tm) - 10} more")
     if report.get("symbol_table_metrics"):
         stm = report["symbol_table_metrics"]
         lines.append("")
@@ -254,9 +265,19 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append(f"  {op_id}: {share:.1%}")
     lines.append("")
     lines.append("Rejected candidates summary:")
+    conflict_blocked: list[dict] = []
     for rc in report.get("rejected_candidates_summary", [])[:20]:
         decision = rc.get("planner_decision", rc.get("reason", "?"))
         lines.append(f"  {rc.get('operator_id', '?')}: {decision} - {rc.get('detail', '')[:50]}")
+        if rc.get("reason") == "conflict" and rc.get("operator_id") == "symbol_table":
+            conflict_blocked.append(rc)
+    if conflict_blocked:
+        lines.append("")
+        lines.append("Symbol table conflict (blocked by earlier content folds):")
+        lines.append("  symbol_table targets whole-project files; paths already folded by exact_repetition/template_skeleton are excluded.")
+        lines.append("  Blocking is correct: content operators cannot double-fold the same file content.")
+        for cb in conflict_blocked[:3]:
+            lines.append(f"  Blocked paths (sample): {cb.get('detail', '')[:70]}")
     if len(report.get("rejected_candidates_summary", [])) > 20:
         lines.append(f"  ... and {len(report['rejected_candidates_summary']) - 20} more")
     planner = report.get("planner_decisions", [])
