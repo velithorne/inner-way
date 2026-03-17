@@ -15,6 +15,7 @@ from infold.archive.operations import (
     stats_archive,
     search_archive,
     search_archives,
+    write_search_results,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "stats_archive",
     "search_archive",
     "search_archives",
+    "write_search_results",
 ]

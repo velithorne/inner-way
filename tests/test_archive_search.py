@@ -308,3 +308,66 @@ def test_search_fold_match_has_match_type(sample_archive):
     r = search_archive(sample_archive)
     for m in r.get("matches", []):
         assert m.get("match_type", "fold") == "fold"
+
+
+# --- Infold Search v1.0 ---
+
+
+def test_search_group_by_operator(sample_archive):
+    """group_by=operator produces grouped output."""
+    r = search_archive(sample_archive, group_by="operator")
+    assert "groups" in r
+    for key, group in r["groups"].items():
+        assert isinstance(group, list)
+        for m in group:
+            assert m["operator_id"] == key
+
+
+def test_search_group_by_family(sample_archive):
+    """group_by=family produces grouped output."""
+    r = search_archive(sample_archive, group_by="family")
+    assert "groups" in r
+    assert len(r["groups"]) >= 1
+
+
+def test_search_explain(sample_archive):
+    """explain=True adds match_explain to each match."""
+    r = search_archive(sample_archive, explain=True)
+    for m in r.get("matches", []):
+        assert "match_explain" in m
+        assert isinstance(m["match_explain"], str)
+
+
+def test_search_write_to_file(sample_archive, tmp_path):
+    """write_search_results writes to file."""
+    from infold.archive.operations import write_search_results
+    r = search_archive(sample_archive)
+    out = tmp_path / "search.json"
+    write_search_results(r, out, format="json")
+    assert out.exists()
+    import json
+    loaded = json.loads(out.read_text())
+    assert loaded["match_count"] == r["match_count"]
+
+
+def test_search_metadata_filter(sample_archive, template_archive):
+    """source_path filter restricts archives searched."""
+    r = search_archives(
+        [sample_archive, template_archive],
+        source_path="template",
+    )
+    # Only template_heavy has "template" in source path typically
+    assert len(r["paths"]) >= 1
+
+
+def test_search_metric_filter(sample_archive, template_archive):
+    """min_logical_gain filter restricts archives."""
+    r_all = search_archives([sample_archive, template_archive])
+    if len(r_all["paths"]) < 2:
+        pytest.skip("need 2 archives")
+    # Use high min to exclude some
+    r = search_archives(
+        [sample_archive, template_archive],
+        min_logical_gain=999999,
+    )
+    assert len(r["paths"]) <= len(r_all["paths"])

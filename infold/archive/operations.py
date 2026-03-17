@@ -101,6 +101,77 @@ def _extract_root(tmp: Path) -> Path:
     return found[0].parent if found else tmp
 
 
+def _load_archive_metadata(root: Path) -> dict[str, Any]:
+    """
+    Load archive metadata and package metrics from package root.
+    Used for archive-level filters in search.
+    """
+    manifest = {}
+    if (root / "manifest.json").exists():
+        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    compat = manifest.get("compatibility", {})
+    report = {}
+    if (root / "reports" / "report.json").exists():
+        report = json.loads((root / "reports" / "report.json").read_text(encoding="utf-8"))
+    rejection_count = len(report.get("rejected_candidates_summary", []))
+    return {
+        "spec_version": compat.get("spec_version", manifest.get("package_spec", "?")),
+        "reconstruction_mode": compat.get("reconstruction_mode", "?"),
+        "source_path": manifest.get("source_path", ""),
+        "debug_friendly": compat.get("debug_friendly", False),
+        "created": manifest.get("created", ""),
+        "logical_gain_bytes": manifest.get("logical_gain_bytes", 0),
+        "physical_folded_size_bytes": manifest.get("physical_folded_size_bytes", 0),
+        "original_size_bytes": manifest.get("original_size_bytes", 0),
+        "fold_count": manifest.get("fold_count", 0),
+        "rejection_count": rejection_count,
+    }
+
+
+def _archive_passes_metadata_filters(meta: dict[str, Any], filters: dict[str, Any]) -> bool:
+    """Check if archive metadata passes filters. Deterministic."""
+    if filters.get("spec_version") and str(meta.get("spec_version", "")) != str(filters["spec_version"]):
+        return False
+    if filters.get("reconstruction_mode") and (meta.get("reconstruction_mode") or "").lower() != (filters["reconstruction_mode"] or "").lower():
+        return False
+    if filters.get("source_path"):
+        sp = (meta.get("source_path") or "").lower()
+        if (filters["source_path"] or "").lower() not in sp:
+            return False
+    if filters.get("debug_friendly") is not None and meta.get("debug_friendly") != filters["debug_friendly"]:
+        return False
+    if filters.get("created_after") and (meta.get("created") or "") < str(filters["created_after"]):
+        return False
+    if filters.get("created_before") and (meta.get("created") or "") > str(filters["created_before"]):
+        return False
+    return True
+
+
+def _archive_passes_metric_filters(meta: dict[str, Any], filters: dict[str, Any]) -> bool:
+    """Check if archive package metrics pass filters. Deterministic."""
+    lg = meta.get("logical_gain_bytes", 0)
+    pf = meta.get("physical_folded_size_bytes", 0)
+    rc = meta.get("rejection_count", 0)
+    fc = meta.get("fold_count", 0)
+    if filters.get("min_logical_gain") is not None and lg < filters["min_logical_gain"]:
+        return False
+    if filters.get("max_logical_gain") is not None and lg > filters["max_logical_gain"]:
+        return False
+    if filters.get("min_physical_size") is not None and pf < filters["min_physical_size"]:
+        return False
+    if filters.get("max_physical_size") is not None and pf > filters["max_physical_size"]:
+        return False
+    if filters.get("min_rejection_count") is not None and rc < filters["min_rejection_count"]:
+        return False
+    if filters.get("max_rejection_count") is not None and rc > filters["max_rejection_count"]:
+        return False
+    if filters.get("min_fold_count") is not None and fc < filters["min_fold_count"]:
+        return False
+    if filters.get("max_fold_count") is not None and fc > filters["max_fold_count"]:
+        return False
+    return True
+
+
 def explain_archive(archive_path: Path | str) -> dict[str, Any]:
     """
     Explain archive: summarize package contents, fold counts by operator,
@@ -241,6 +312,55 @@ FAMILY_TO_OPERATOR = {
 }
 
 OPERATOR_TO_FAMILY = {v: k for k, v in FAMILY_TO_OPERATOR.items()}
+
+
+def _add_match_explain(m: dict[str, Any], query: dict[str, Any]) -> str:
+    """Build human-readable explanation of why a match was included. Deterministic."""
+    parts: list[str] = []
+    mt = m.get("match_type", "fold")
+    if mt == "fold":
+        parts.append("fold match")
+        if query.get("operator"):
+            parts.append(f"operator={m.get('operator_id', '?')}")
+        if query.get("path"):
+            parts.append("path filter matched")
+        if query.get("min_gain") is not None and m.get("gain") is not None:
+            parts.append(f"gain={m.get('gain')}>=min")
+        if query.get("max_gain") is not None and m.get("gain") is not None:
+            parts.append(f"gain={m.get('gain')}<=max")
+        if query.get("min_target_count") is not None:
+            parts.append(f"targets={m.get('target_count')}>=min")
+        if query.get("max_target_count") is not None:
+            parts.append(f"targets={m.get('target_count')}<=max")
+    else:
+        parts.append(f"{mt} diagnostic")
+        parts.append(f"operator={m.get('operator_id', '?')}")
+        if m.get("planner_decision"):
+            parts.append(f"planner_decision={m['planner_decision']}")
+        if m.get("reason"):
+            parts.append(f"reason={m['reason']}")
+    return "; ".join(parts)
+
+
+def _group_matches(matches: list[dict[str, Any]], group_by: str) -> dict[str, Any]:
+    """Group matches by archive, operator, or family. Deterministic."""
+    if not group_by or not matches:
+        return {}
+    key = (group_by or "").lower()
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for m in matches:
+        if key == "archive":
+            k = m.get("archive_path", "?")
+        elif key == "operator":
+            k = m.get("operator_id", "?")
+        elif key == "family":
+            k = OPERATOR_TO_FAMILY.get(m.get("operator_id", ""), m.get("operator_id", "?"))
+        else:
+            k = "?"
+        if k not in groups:
+            groups[k] = []
+        groups[k].append(m)
+    return dict(sorted(groups.items()))
 
 
 def _load_diagnostics_from_archive(
@@ -420,6 +540,8 @@ def search_archive(
     superseded: bool = False,
     planner_decision: str | None = None,
     diagnostics_only: bool = False,
+    group_by: str | None = None,
+    explain: bool = False,
 ) -> dict[str, Any]:
     """
     Search within one archive. Deterministic, archive-focused.
@@ -544,16 +666,23 @@ def search_archive(
         "superseded": superseded,
         "planner_decision": planner_decision,
         "diagnostics_only": diagnostics_only,
+        "group_by": group_by,
+        "explain": explain,
     }
+    if explain:
+        for m in matches:
+            m["match_explain"] = _add_match_explain(m, query)
     summary = _build_search_summary(matches, archives_searched=1)
-
-    return {
+    out: dict[str, Any] = {
         "path": archive_str,
         "query": query,
         "match_count": len(matches),
         "matches": matches,
         "summary": summary,
     }
+    if group_by:
+        out["groups"] = _group_matches(matches, group_by)
+    return out
 
 
 def search_archives(
@@ -575,13 +704,49 @@ def search_archives(
     superseded: bool = False,
     planner_decision: str | None = None,
     diagnostics_only: bool = False,
+    spec_version: str | None = None,
+    reconstruction_mode: str | None = None,
+    source_path: str | None = None,
+    debug_friendly: bool | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    min_logical_gain: int | None = None,
+    max_logical_gain: int | None = None,
+    min_physical_size: int | None = None,
+    max_physical_size: int | None = None,
+    min_rejection_count: int | None = None,
+    max_rejection_count: int | None = None,
+    min_fold_count: int | None = None,
+    max_fold_count: int | None = None,
+    group_by: str | None = None,
+    explain: bool = False,
 ) -> dict[str, Any]:
     """
     Search across multiple archives. Aggregates matches, deterministic.
     archive_filter: substring match in archive path (case-insensitive).
+    Metadata/metric filters apply to archive-level before searching.
     Each match includes archive_path.
     """
+    import tempfile
     archive_filter_lower = (archive_filter or "").lower()
+    meta_filters = {
+        "spec_version": spec_version,
+        "reconstruction_mode": reconstruction_mode,
+        "source_path": source_path,
+        "debug_friendly": debug_friendly,
+        "created_after": created_after,
+        "created_before": created_before,
+    }
+    metric_filters = {
+        "min_logical_gain": min_logical_gain,
+        "max_logical_gain": max_logical_gain,
+        "min_physical_size": min_physical_size,
+        "max_physical_size": max_physical_size,
+        "min_rejection_count": min_rejection_count,
+        "max_rejection_count": max_rejection_count,
+        "min_fold_count": min_fold_count,
+        "max_fold_count": max_fold_count,
+    }
     all_matches: list[dict[str, Any]] = []
     searched: list[str] = []
 
@@ -591,6 +756,17 @@ def search_archives(
             continue
         if archive_filter_lower and archive_filter_lower not in str(arch).lower():
             continue
+        # Apply metadata/metric filters (need to peek inside archive)
+        if meta_filters.get("spec_version") or meta_filters.get("reconstruction_mode") or meta_filters.get("source_path") or meta_filters.get("debug_friendly") is not None or meta_filters.get("created_after") or meta_filters.get("created_before") or any(v is not None for v in metric_filters.values()):
+            with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
+                with zipfile.ZipFile(arch, "r") as zf:
+                    zf.extractall(tmp)
+                root = _extract_root(Path(tmp))
+                meta = _load_archive_metadata(root)
+                if not _archive_passes_metadata_filters(meta, meta_filters):
+                    continue
+                if not _archive_passes_metric_filters(meta, metric_filters):
+                    continue
         searched.append(str(arch))
         r = search_archive(
             arch,
@@ -631,16 +807,34 @@ def search_archives(
         "blocked": blocked,
         "superseded": superseded,
         "planner_decision": planner_decision,
+        "spec_version": spec_version,
+        "reconstruction_mode": reconstruction_mode,
+        "source_path": source_path,
+        "min_logical_gain": min_logical_gain,
+        "max_logical_gain": max_logical_gain,
+        "min_physical_size": min_physical_size,
+        "max_physical_size": max_physical_size,
+        "min_rejection_count": min_rejection_count,
+        "max_rejection_count": max_rejection_count,
+        "min_fold_count": min_fold_count,
+        "max_fold_count": max_fold_count,
+        "group_by": group_by,
+        "explain": explain,
     }
+    if explain:
+        for m in all_matches:
+            m["match_explain"] = _add_match_explain(m, query)
     summary = _build_search_summary(all_matches, archives_searched=len(searched))
-
-    return {
+    out: dict[str, Any] = {
         "paths": searched,
         "query": query,
         "match_count": len(all_matches),
         "matches": all_matches,
         "summary": summary,
     }
+    if group_by:
+        out["groups"] = _group_matches(all_matches, group_by)
+    return out
 
 
 def search_to_text(result: dict[str, Any]) -> str:
@@ -673,24 +867,43 @@ def search_to_text(result: dict[str, Any]) -> str:
     lines.append(f"Query: {result.get('query', {})}")
     lines.append(f"Matches: {result.get('match_count', 0)}")
     lines.append("")
-    for m in result.get("matches", []):
-        mt = m.get("match_type", "fold")
-        arch = m.get("archive_path", "")
-        arch_part = f" [{arch}]" if arch and (result.get("paths") or len(result.get("matches", [])) > 1) else ""
-        if mt == "fold":
-            lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}{arch_part}")
-            for p in m.get("paths", [])[:5]:
-                lines.append(f"  - {p}")
-            if len(m.get("paths", [])) > 5:
-                lines.append(f"  ... +{len(m['paths']) - 5} more")
-            if m.get("roots_or_paths"):
-                lines.append(f"  roots: {m['roots_or_paths'][:3]}")
-        else:
-            lines.append(f"[{mt}] {m.get('operator_id', '?')} {m.get('planner_decision', m.get('reason', ''))} targets={m.get('target_count', 0)}{arch_part}")
-            if m.get("detail"):
-                lines.append(f"  detail: {str(m['detail'])[:80]}")
-        lines.append("")
+    # Grouped output
+    groups = result.get("groups", {})
+    group_by = result.get("query", {}).get("group_by", "")
+    if groups:
+        for group_key, group_matches in groups.items():
+            lines.append(f"--- {group_by or '?'} = {group_key} ({len(group_matches)} matches) ---")
+            for m in group_matches[:10]:
+                _append_match_line(lines, m, result)
+            if len(group_matches) > 10:
+                lines.append(f"  ... +{len(group_matches) - 10} more")
+            lines.append("")
+    else:
+        for m in result.get("matches", []):
+            _append_match_line(lines, m, result)
     return "\n".join(lines).rstrip()
+
+
+def _append_match_line(lines: list[str], m: dict[str, Any], result: dict[str, Any]) -> None:
+    """Append one match to text output lines."""
+    mt = m.get("match_type", "fold")
+    arch = m.get("archive_path", "")
+    arch_part = f" [{arch}]" if arch and (result.get("paths") or len(result.get("matches", [])) > 1) else ""
+    if mt == "fold":
+        lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}{arch_part}")
+        for p in m.get("paths", [])[:5]:
+            lines.append(f"  - {p}")
+        if len(m.get("paths", [])) > 5:
+            lines.append(f"  ... +{len(m['paths']) - 5} more")
+        if m.get("roots_or_paths"):
+            lines.append(f"  roots: {m['roots_or_paths'][:3]}")
+    else:
+        lines.append(f"[{mt}] {m.get('operator_id', '?')} {m.get('planner_decision', m.get('reason', ''))} targets={m.get('target_count', 0)}{arch_part}")
+        if m.get("detail"):
+            lines.append(f"  detail: {str(m['detail'])[:80]}")
+    if m.get("match_explain"):
+        lines.append(f"  explain: {m['match_explain']}")
+    lines.append("")
 
 
 def search_to_csv(result: dict[str, Any]) -> str:
@@ -711,6 +924,29 @@ def search_to_csv(result: dict[str, Any]) -> str:
             row.append(str(v) if v is not None else "")
         w.writerow(row)
     return out.getvalue()
+
+
+def write_search_results(
+    result: dict[str, Any],
+    path: Path | str,
+    *,
+    format: str = "json",
+) -> Path:
+    """
+    Write search results to file. format: json, csv, markdown.
+    Returns the path written.
+    """
+    p = Path(path).resolve()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fmt = (format or "json").lower()
+    if fmt == "csv":
+        p.write_text(search_to_csv(result), encoding="utf-8")
+    elif fmt == "markdown":
+        p.write_text(search_to_markdown(result), encoding="utf-8")
+    else:
+        import json
+        p.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return p
 
 
 def search_to_markdown(result: dict[str, Any]) -> str:
