@@ -206,6 +206,13 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         mode = report.get("fold_profile_mode", "?")
         reason = report.get("fold_profile_reason", "?")
         lines.append(f"Fold profile: {fp} ({mode}, reason={reason})")
+        factors = report.get("fold_profile_factors", {})
+        if factors.get("scores"):
+            lines.append(f"  Profile scores: {factors.get('scores', {})}")
+        if factors.get("selected_score") is not None:
+            lines.append(f"  Selected score: {factors.get('selected_score')}")
+        if factors.get("score_breakdown"):
+            lines.append(f"  Score breakdown: {factors.get('score_breakdown')}")
         lines.append("")
     lines.extend([
         f"Folds: {report['fold_count']}",

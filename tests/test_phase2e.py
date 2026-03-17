@@ -174,13 +174,17 @@ def test_package_compact_mode(tmp_path):
         pytest.skip("duplicate_python fixture not found")
     config = load_config()
     config["project"] = {**config.get("project", {}), "id": "dup"}
-    # Default
+    # Use fox profile to avoid auto (golem) overwriting package_export
+    config["_fold_profile"] = "fox"
+    # Default (non-compact)
     config_def = {**config, "package_export": {"compact": False, "report_text": True}}
+    config_def["_fold_profile"] = "fox"
     out_def = tmp_path / "default"
     export_package(run_fold(dup, config_def), config_def, out_def)
     size_def = sum(f.stat().st_size for f in out_def.rglob("*") if f.is_file())
     # Compact
     config_compact = {**config, "package_export": {"compact": True, "report_text": False, "inventory_minimal": True}}
+    config_compact["_fold_profile"] = "fox"
     out_compact = tmp_path / "compact"
     export_package(run_fold(dup, config_compact), config_compact, out_compact)
     size_compact = sum(f.stat().st_size for f in out_compact.rglob("*") if f.is_file())

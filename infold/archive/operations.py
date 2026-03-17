@@ -234,6 +234,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "fold_profile": manifest.get("fold_profile"),
             "fold_profile_mode": manifest.get("fold_profile_mode"),
             "fold_profile_reason": manifest.get("fold_profile_reason"),
+            "fold_profile_factors": report.get("fold_profile_factors"),
             "package_summary": {
                 "file_count": manifest.get("file_count", 0),
                 "fold_count": manifest.get("fold_count", 0),
@@ -1727,6 +1728,11 @@ def explain_to_text(info: dict[str, Any]) -> str:
         mode = info.get("fold_profile_mode", "?")
         reason = info.get("fold_profile_reason", "?")
         lines.append(f"Fold profile: {fp} ({mode}, reason={reason})")
+        factors = info.get("fold_profile_factors") or {}
+        if factors.get("scores"):
+            lines.append(f"  Profile scores: {factors.get('scores', {})}")
+        if factors.get("selected_score") is not None:
+            lines.append(f"  Selected score: {factors.get('selected_score')}")
         lines.append("")
     lines.append("Package summary:")
     pkg = info.get("package_summary", {})

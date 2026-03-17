@@ -345,9 +345,20 @@ def export_comparison_markdown(summary: dict[str, Any], out_path: Path) -> None:
     mis = s.get("misclassified_by_category", {})
     if mis:
         lines.append("")
-        lines.append("## Misclassified by Category")
-        for cat, ids in mis.items():
-            lines.append(f"- {cat}: {ids}")
+        lines.append("## Misclassification Analysis")
+        lines.append("")
+        lines.append("Datasets where Auto did not match best physical profile:")
+        for cat in sorted(mis.keys()):
+            ids = mis[cat]
+            lines.append(f"- **{cat}** ({len(ids)}): {', '.join(ids)}")
+        lines.append("")
+        lines.append("Failure patterns:")
+        for cat in sorted(mis.keys()):
+            avb_for_cat = [x for x in summary.get("auto_vs_best", {}).get("auto_vs_best", []) if x.get("profile_category") == cat]
+            if avb_for_cat:
+                auto_picks = [x.get("auto_selected") for x in avb_for_cat]
+                best_phys = avb_for_cat[0].get("best_physical_profile", "")
+                lines.append(f"- {cat}: Auto chose {auto_picks}, best physical={best_phys}")
 
     best_by_cat = summary.get("best_by_category", {})
     lines.extend([

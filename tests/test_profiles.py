@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from infold.profiles.definitions import VALID_PROFILES, get_profile_config, apply_profile
-from infold.profiles.selector import select_profile_auto, _compute_metrics
+from infold.profiles.selector import select_profile_auto, _compute_metrics, _compute_profile_scores
 from infold.archive import create_archive, validate_archive, reconstruct_archive
 from infold.intake import scan_project
 from infold.parsers import parse_project
@@ -46,27 +46,51 @@ def test_apply_profile_merges():
     assert out["x"] == 1
 
 
-def test_auto_select_sparrow_tiny(tmp_path):
-    """Auto selects sparrow for tiny archive."""
+def test_auto_select_golem_tiny(tmp_path):
+    """Auto selects golem for tiny archive (Phase 6C: physical-optimized)."""
     (tmp_path / "a.py").write_text("x" * 100)
     (tmp_path / "b.py").write_text("y" * 100)
     sheet = scan_project(tmp_path)
     parse_project(sheet)
     name, reason, factors = select_profile_auto(sheet, {}, tmp_path)
-    assert name == "sparrow"
-    assert reason == "tiny_archive"
+    assert name == "golem"
+    assert "scores" in factors
+    assert factors.get("scores", {}).get("golem", 0) >= 100
 
 
-def test_auto_select_fox_balanced():
-    """Auto selects fox for balanced project."""
+def test_auto_select_golem_balanced():
+    """Auto selects golem for balanced project (Phase 6C: physical-optimized)."""
     dup = Path(__file__).parent.parent / "tests" / "fixtures" / "duplicate_python"
     if not dup.exists():
         pytest.skip("duplicate_python fixture not found")
     sheet = scan_project(dup)
     parse_project(sheet)
     name, reason, factors = select_profile_auto(sheet, {}, dup)
-    assert name == "fox"
-    assert reason == "balanced"
+    assert name == "golem"
+    assert "scores" in factors
+
+
+def test_auto_select_serpent_with_lineage(tmp_path):
+    """Auto selects serpent when lineage context exists."""
+    (tmp_path / "a.py").write_text("x" * 100)
+    sync_dir = tmp_path / ".infold-sync"
+    sync_dir.mkdir()
+    (sync_dir / "lineage.json").write_text("{}")
+    sheet = scan_project(tmp_path)
+    parse_project(sheet)
+    name, reason, factors = select_profile_auto(sheet, {}, tmp_path)
+    assert name == "serpent"
+    assert factors.get("lineage_context") is True
+
+
+def test_compute_profile_scores_deterministic():
+    """Profile scores are deterministic for same inputs."""
+    metrics = {"raw_size": 5000, "file_count": 10, "structured_ratio": 0.8, "opaque_ratio": 0.1}
+    scores1, _ = _compute_profile_scores(metrics, lineage=False)
+    scores2, _ = _compute_profile_scores(metrics, lineage=False)
+    assert scores1 == scores2
+    assert scores1["golem"] >= 100
+    assert scores1["serpent"] < 60  # no lineage
 
 
 def test_manual_profile_in_manifest(tmp_path):
