@@ -73,13 +73,16 @@ def test_validate_missing_required(tmp_path):
 
 
 def test_benchmark_pack_datasets():
-    """Benchmark pack returns datasets."""
+    """Benchmark pack returns datasets including byte_fold category."""
     base = Path(__file__).parent.parent
     ensure_stress_datasets(base)
     datasets = get_benchmark_datasets(base)
     assert len(datasets) >= 6
     ids = [d[1] for d in datasets]
+    categories = [d[2] for d in datasets]
     assert "duplicate-heavy-python" in ids or "infold-workspace" in ids
+    if (base / "tests" / "fixtures" / "byte_fold").exists():
+        assert "byte_fold" in categories
 
 
 def test_0fold_archive_validation(tmp_path):

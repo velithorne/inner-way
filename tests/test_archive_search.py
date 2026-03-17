@@ -371,3 +371,56 @@ def test_search_metric_filter(sample_archive, template_archive):
         min_logical_gain=999999,
     )
     assert len(r["paths"]) <= len(r_all["paths"])
+
+
+# Phase 5C: Byte Fold search visibility
+
+
+def test_search_by_operator_byte_fold(template_archive):
+    """Search by operator byte_fold (may be empty if no byte_fold in archive)."""
+    r = search_archive(template_archive, operator="byte_fold")
+    assert "match_count" in r
+    assert "matches" in r
+    for m in r["matches"]:
+        assert m["operator_id"] == "byte_fold"
+
+
+def test_search_by_family_byte_fold(template_archive):
+    """Search by family byte_fold."""
+    r = search_archive(template_archive, family="byte_fold")
+    assert "match_count" in r
+    for m in r["matches"]:
+        assert m["operator_id"] == "byte_fold"
+
+
+def test_search_byte_fold_chunk_filters(template_archive):
+    """Byte Fold chunk filters work without error."""
+    r = search_archive(
+        template_archive,
+        operator="byte_fold",
+        min_chunk_reused_bytes=0,
+        max_files_chunk_folded=100,
+    )
+    assert "match_count" in r
+    assert "matches" in r
+
+
+def test_search_byte_fold_explain_when_present(tmp_path):
+    """When byte_fold match exists with chunk_metrics, explain includes chunk info."""
+    from infold.archive import create_archive
+    config = load_config()
+    bf = Path(__file__).parent / "fixtures" / "byte_fold"
+    if not bf.exists():
+        pytest.skip("byte_fold fixture not found")
+    archive_path = tmp_path / "bf.infold"
+    create_archive(bf, archive_path, config)
+    r = search_archive(archive_path, operator="template_skeleton", explain=True)
+    if r["match_count"] > 0:
+        for m in r["matches"]:
+            assert "match_explain" in m
+    r2 = search_archive(archive_path, operator="byte_fold", explain=True)
+    assert "match_count" in r2
+    for m in r2.get("matches", []):
+        assert "match_explain" in m
+        if m.get("operator_id") == "byte_fold" and m.get("chunk_metrics"):
+            assert "chunk" in m["match_explain"].lower() or "gain" in m["match_explain"].lower()

@@ -1,6 +1,10 @@
 """
 Byte Fold: chunk-based folding for mixed, weakly structured, and binary-like content.
 
+Part of the byte-operator family (exact chunk fold is the active implementation).
+Future byte operators (e.g. delta, semantic) can coexist; naming and reporting
+are structured to support multiple byte operators.
+
 v0.1: content-defined chunking, chunk dictionary, per-file reconstruction.
 Runs after structural operators; targets files not yet committed.
 """

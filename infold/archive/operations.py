@@ -326,6 +326,28 @@ FAMILY_TO_OPERATOR = {
 OPERATOR_TO_FAMILY = {v: k for k, v in FAMILY_TO_OPERATOR.items()}
 
 
+def _load_byte_fold_metrics_from_archive(root: Path) -> dict[str, Any]:
+    """Load byte_fold metrics from report.json. Returns dict with chunk metrics or empty."""
+    report_path = root / "reports" / "report.json"
+    if not report_path.exists():
+        return {}
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    bfm = report.get("byte_fold_metrics") or {}
+    if not bfm:
+        return {}
+    crr = bfm.get("chunk_reuse_ratio")
+    avg_crr = sum(crr) / len(crr) if isinstance(crr, list) and len(crr) > 0 else (crr if isinstance(crr, (int, float)) else None)
+    return {
+        "files_chunk_folded": bfm.get("files_chunk_folded"),
+        "unique_chunk_count": bfm.get("unique_chunk_count"),
+        "reused_chunk_count": bfm.get("reused_chunk_count"),
+        "chunk_reused_bytes": bfm.get("chunk_reused_bytes"),
+        "chunk_reuse_ratio": avg_crr,
+        "chunk_dictionary_size_bytes": bfm.get("chunk_dictionary_size_bytes"),
+        "net_bytes_saved": bfm.get("net_bytes_saved"),
+    }
+
+
 def _add_match_explain(m: dict[str, Any], query: dict[str, Any]) -> str:
     """Build human-readable explanation of why a match was included. Deterministic."""
     parts: list[str] = []
@@ -344,6 +366,14 @@ def _add_match_explain(m: dict[str, Any], query: dict[str, Any]) -> str:
             parts.append(f"targets={m.get('target_count')}>=min")
         if query.get("max_target_count") is not None:
             parts.append(f"targets={m.get('target_count')}<=max")
+        if m.get("operator_id") == "byte_fold":
+            cm = m.get("chunk_metrics") or {}
+            if cm:
+                parts.append(f"chunk_reused={cm.get('chunk_reused_bytes', '?')} unique={cm.get('unique_chunk_count', '?')}")
+                if cm.get("chunk_reuse_ratio") is not None:
+                    parts.append(f"reuse_ratio={cm['chunk_reuse_ratio']:.2f}")
+                if cm.get("chunk_dictionary_size_bytes") is not None:
+                    parts.append(f"dict_overhead={cm['chunk_dictionary_size_bytes']} net={cm.get('net_bytes_saved', '?')}")
     else:
         parts.append(f"{mt} diagnostic")
         parts.append(f"operator={m.get('operator_id', '?')}")
@@ -451,6 +481,12 @@ def _apply_post_filters(
     max_gain: int | None = None,
     min_target_count: int | None = None,
     max_target_count: int | None = None,
+    min_chunk_reused_bytes: int | None = None,
+    max_chunk_reused_bytes: int | None = None,
+    min_chunk_reuse_ratio: float | None = None,
+    max_chunk_reuse_ratio: float | None = None,
+    min_files_chunk_folded: int | None = None,
+    max_files_chunk_folded: int | None = None,
 ) -> list[dict[str, Any]]:
     """Apply numeric range filters. Gain filters apply only to matches with gain (folds). Deterministic."""
     out: list[dict[str, Any]] = []
@@ -466,6 +502,25 @@ def _apply_post_filters(
             continue
         if max_target_count is not None and tc > max_target_count:
             continue
+        if m.get("operator_id") == "byte_fold":
+            cm = m.get("chunk_metrics") or {}
+            crb = cm.get("chunk_reused_bytes")
+            if crb is not None:
+                if min_chunk_reused_bytes is not None and crb < min_chunk_reused_bytes:
+                    continue
+                if max_chunk_reused_bytes is not None and crb > max_chunk_reused_bytes:
+                    continue
+            crr = cm.get("chunk_reuse_ratio")
+            if crr is not None:
+                if min_chunk_reuse_ratio is not None and crr < min_chunk_reuse_ratio:
+                    continue
+                if max_chunk_reuse_ratio is not None and crr > max_chunk_reuse_ratio:
+                    continue
+            fcf = cm.get("files_chunk_folded") or tc
+            if min_files_chunk_folded is not None and fcf < min_files_chunk_folded:
+                continue
+            if max_files_chunk_folded is not None and fcf > max_files_chunk_folded:
+                continue
         out.append(m)
     return out
 
@@ -546,6 +601,12 @@ def search_archive(
     max_gain: int | None = None,
     min_target_count: int | None = None,
     max_target_count: int | None = None,
+    min_chunk_reused_bytes: int | None = None,
+    max_chunk_reused_bytes: int | None = None,
+    min_chunk_reuse_ratio: float | None = None,
+    max_chunk_reuse_ratio: float | None = None,
+    min_files_chunk_folded: int | None = None,
+    max_files_chunk_folded: int | None = None,
     sort_by: str | None = None,
     rejected: bool = False,
     blocked: bool = False,
@@ -653,12 +714,26 @@ def search_archive(
                 diag_matches = [d for d in diag_matches if d.get("operator_id") == op_filter]
             matches.extend(diag_matches)
 
+        # Enrich byte_fold matches with chunk metrics from report
+        bfm = _load_byte_fold_metrics_from_archive(root)
+        if bfm:
+            for m in matches:
+                if m.get("operator_id") == "byte_fold":
+                    m["chunk_metrics"] = dict(bfm)
+                    m["chunk_metrics"]["files_chunk_folded"] = m.get("target_count", bfm.get("files_chunk_folded"))
+
     matches = _apply_post_filters(
         matches,
         min_gain=min_gain,
         max_gain=max_gain,
         min_target_count=min_target_count,
         max_target_count=max_target_count,
+        min_chunk_reused_bytes=min_chunk_reused_bytes,
+        max_chunk_reused_bytes=max_chunk_reused_bytes,
+        min_chunk_reuse_ratio=min_chunk_reuse_ratio,
+        max_chunk_reuse_ratio=max_chunk_reuse_ratio,
+        min_files_chunk_folded=min_files_chunk_folded,
+        max_files_chunk_folded=max_files_chunk_folded,
     )
     matches = _sort_matches(matches, sort_by)
 
@@ -672,6 +747,12 @@ def search_archive(
         "max_gain": max_gain,
         "min_target_count": min_target_count,
         "max_target_count": max_target_count,
+        "min_chunk_reused_bytes": min_chunk_reused_bytes,
+        "max_chunk_reused_bytes": max_chunk_reused_bytes,
+        "min_chunk_reuse_ratio": min_chunk_reuse_ratio,
+        "max_chunk_reuse_ratio": max_chunk_reuse_ratio,
+        "min_files_chunk_folded": min_files_chunk_folded,
+        "max_files_chunk_folded": max_files_chunk_folded,
         "sort_by": sort_by,
         "rejected": rejected,
         "blocked": blocked,
@@ -730,6 +811,12 @@ def search_archives(
     max_rejection_count: int | None = None,
     min_fold_count: int | None = None,
     max_fold_count: int | None = None,
+    min_chunk_reused_bytes: int | None = None,
+    max_chunk_reused_bytes: int | None = None,
+    min_chunk_reuse_ratio: float | None = None,
+    max_chunk_reuse_ratio: float | None = None,
+    min_files_chunk_folded: int | None = None,
+    max_files_chunk_folded: int | None = None,
     group_by: str | None = None,
     explain: bool = False,
 ) -> dict[str, Any]:
@@ -791,12 +878,19 @@ def search_archives(
             max_gain=max_gain,
             min_target_count=min_target_count,
             max_target_count=max_target_count,
+            min_chunk_reused_bytes=min_chunk_reused_bytes,
+            max_chunk_reused_bytes=max_chunk_reused_bytes,
+            min_chunk_reuse_ratio=min_chunk_reuse_ratio,
+            max_chunk_reuse_ratio=max_chunk_reuse_ratio,
+            min_files_chunk_folded=min_files_chunk_folded,
+            max_files_chunk_folded=max_files_chunk_folded,
             sort_by=None,
             rejected=rejected,
             blocked=blocked,
             superseded=superseded,
             planner_decision=planner_decision,
             diagnostics_only=diagnostics_only,
+            explain=explain,
         )
         for m in r.get("matches", []):
             m["archive_path"] = str(arch)
@@ -830,6 +924,12 @@ def search_archives(
         "max_rejection_count": max_rejection_count,
         "min_fold_count": min_fold_count,
         "max_fold_count": max_fold_count,
+        "min_chunk_reused_bytes": min_chunk_reused_bytes,
+        "max_chunk_reused_bytes": max_chunk_reused_bytes,
+        "min_chunk_reuse_ratio": min_chunk_reuse_ratio,
+        "max_chunk_reuse_ratio": max_chunk_reuse_ratio,
+        "min_files_chunk_folded": min_files_chunk_folded,
+        "max_files_chunk_folded": max_files_chunk_folded,
         "group_by": group_by,
         "explain": explain,
     }

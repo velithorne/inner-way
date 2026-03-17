@@ -425,6 +425,12 @@ def archive_search(args) -> int:
         max_gain=getattr(args, "max_gain", None),
         min_target_count=getattr(args, "min_targets", None),
         max_target_count=getattr(args, "max_targets", None),
+        min_chunk_reused_bytes=getattr(args, "min_chunk_reused_bytes", None),
+        max_chunk_reused_bytes=getattr(args, "max_chunk_reused_bytes", None),
+        min_chunk_reuse_ratio=getattr(args, "min_chunk_reuse_ratio", None),
+        max_chunk_reuse_ratio=getattr(args, "max_chunk_reuse_ratio", None),
+        min_files_chunk_folded=getattr(args, "min_files_chunk_folded", None),
+        max_files_chunk_folded=getattr(args, "max_files_chunk_folded", None),
         sort_by=getattr(args, "sort_by", None),
         rejected=getattr(args, "rejected", False),
         blocked=getattr(args, "blocked", False),
@@ -541,13 +547,19 @@ def main() -> int:
     search_p.add_argument("archive", help="Archive path or directory containing .infold files")
     search_p.add_argument("--operator", help="Filter by operator (exact_repetition, template_skeleton, etc.)")
     search_p.add_argument("--path", help="Filter by path substring (contains match)")
-    search_p.add_argument("--family", help="Filter by family type (duplicate, template, symbol, hierarchy, dependency)")
+    search_p.add_argument("--family", help="Filter by family type (duplicate, template, symbol, hierarchy, dependency, byte_fold)")
     search_p.add_argument("--family-id", type=int, dest="family_id", help="Filter by family index")
     search_p.add_argument("--artifact-id", type=int, dest="artifact_id", help="Filter by artifact index")
     search_p.add_argument("--min-gain", type=int, dest="min_gain", help="Minimum gain (bytes)")
     search_p.add_argument("--max-gain", type=int, dest="max_gain", help="Maximum gain (bytes)")
     search_p.add_argument("--min-targets", type=int, dest="min_targets", help="Minimum target count")
     search_p.add_argument("--max-targets", type=int, dest="max_targets", help="Maximum target count")
+    search_p.add_argument("--min-chunk-reused-bytes", type=int, dest="min_chunk_reused_bytes", help="Byte Fold: min chunk_reused_bytes")
+    search_p.add_argument("--max-chunk-reused-bytes", type=int, dest="max_chunk_reused_bytes", help="Byte Fold: max chunk_reused_bytes")
+    search_p.add_argument("--min-chunk-reuse-ratio", type=float, dest="min_chunk_reuse_ratio", help="Byte Fold: min chunk_reuse_ratio")
+    search_p.add_argument("--max-chunk-reuse-ratio", type=float, dest="max_chunk_reuse_ratio", help="Byte Fold: max chunk_reuse_ratio")
+    search_p.add_argument("--min-files-chunk-folded", type=int, dest="min_files_chunk_folded", help="Byte Fold: min files_chunk_folded")
+    search_p.add_argument("--max-files-chunk-folded", type=int, dest="max_files_chunk_folded", help="Byte Fold: max files_chunk_folded")
     search_p.add_argument("--archive-filter", dest="archive_filter", help="Filter archives by path substring (multi-archive)")
     search_p.add_argument("--sort-by", dest="sort_by", choices=["gain", "operator", "archive", "target_count"], help="Sort results")
     search_p.add_argument("--rejected", action="store_true", help="Include rejected candidates")

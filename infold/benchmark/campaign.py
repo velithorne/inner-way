@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from infold.reporting.benchmark import _gzip_size, _raw_size, _zip_size
+from infold.reporting.report import build_report
 from infold.benchmark.tuning_report import build_tuning_report, tuning_report_to_text
 
 
@@ -83,6 +84,9 @@ def run_benchmark_campaign(
         row["reconstruction_time_s"] = None
         row["package_overhead"] = None
         row["tuning_report"] = build_tuning_report(result, cfg, None)
+        report = build_report(result, cfg)
+        bfm = report.get("byte_fold_metrics") or {}
+        row["byte_fold_metrics"] = bfm if bfm else None
 
         if create_archives:
             with tempfile.TemporaryDirectory(prefix="infold_campaign_") as tmp:
@@ -224,5 +228,31 @@ def export_campaign_markdown(results: list[dict[str, Any]], out_path: Path) -> N
         ct_s = f"{ct:.2f}" if ct is not None else "-"
         rt_s = f"{rt:.2f}" if rt is not None else "-"
         lines.append(f"- **{r.get('dataset_id', '')}**: fold={ft_s}, create={ct_s}, recon={rt_s}")
+
+    bf_results = [r for r in results if r.get("byte_fold_metrics")]
+    if bf_results:
+        lines.extend([
+            "",
+            "## Byte Fold Metrics",
+            "",
+            "| Dataset | Category | files_chunk_folded | unique_chunk_count | reused_chunk_count | chunk_reused_bytes | chunk_reuse_ratio | chunk_dict_bytes |",
+            "|---------|----------|-------------------|-------------------|--------------------|--------------------|-------------------|------------------|",
+        ])
+        for r in bf_results:
+            bfm = r.get("byte_fold_metrics") or {}
+            fcf = bfm.get("files_chunk_folded", 0)
+            ucc = bfm.get("unique_chunk_count", 0)
+            rcc = bfm.get("reused_chunk_count", 0)
+            crb = bfm.get("chunk_reused_bytes", 0)
+            crr = bfm.get("chunk_reuse_ratio")
+            crr_s = f"{sum(crr)/len(crr):.2f}" if isinstance(crr, list) and crr else (f"{crr:.2f}" if isinstance(crr, (int, float)) else "-")
+            cds = bfm.get("chunk_dictionary_size_bytes", 0)
+            lines.append(f"| {r.get('dataset_id', '')} | {r.get('category', '')} | {fcf} | {ucc} | {rcc} | {crb:,} | {crr_s} | {cds:,} |")
+        top_bf = sorted(bf_results, key=lambda x: (x.get("byte_fold_metrics") or {}).get("chunk_reused_bytes", 0), reverse=True)[:5]
+        lines.extend(["", "Top Byte Fold contributing datasets (by chunk_reused_bytes):"])
+        for r in top_bf:
+            crb = (r.get("byte_fold_metrics") or {}).get("chunk_reused_bytes", 0)
+            lines.append(f"  - {r.get('dataset_id', '')}: {crb:,} bytes")
+
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))

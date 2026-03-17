@@ -196,6 +196,17 @@ def sync_report(
         if items:
             by_operator[op_id]["removed"] = items
 
+    bf_added = diff.get("byte_fold_families_changed", {}).get("added", [])
+    bf_removed = diff.get("byte_fold_families_changed", {}).get("removed", [])
+    bf_counts = diff.get("byte_fold_families", {})
+    byte_fold_summary = {
+        "added_count": len(bf_added),
+        "removed_count": len(bf_removed),
+        "a_count": bf_counts.get("a_count", 0),
+        "b_count": bf_counts.get("b_count", 0),
+        "fold_count_diff": fold_diff.get("byte_fold", 0),
+    }
+
     return {
         "archive_a": diff["archive_a"],
         "archive_b": diff["archive_b"],
@@ -209,6 +220,7 @@ def sync_report(
             "dependency_motifs": diff.get("dependency_motifs", {}),
             "byte_fold_families": diff.get("byte_fold_families", {}),
         },
+        "byte_fold_summary": byte_fold_summary,
         "logical_gain_diff": diff.get("logical_gain", {}).get("diff", 0),
         "fold_counts_diff": fold_diff,
     }
@@ -226,6 +238,13 @@ def sync_report_to_text(report: dict[str, Any]) -> str:
         f"Logical gain diff: {report.get('logical_gain_diff', 0):+,} bytes",
         "",
     ]
+    bf_sum = report.get("byte_fold_summary", {})
+    if bf_sum and (bf_sum.get("added_count", 0) or bf_sum.get("removed_count", 0) or bf_sum.get("fold_count_diff", 0)):
+        lines.append("Byte Fold changes:")
+        lines.append(f"  added: {bf_sum.get('added_count', 0)} removed: {bf_sum.get('removed_count', 0)}")
+        if bf_sum.get("fold_count_diff"):
+            lines.append(f"  fold count diff: {bf_sum['fold_count_diff']:+,}")
+        lines.append("")
     fold_diff = report.get("fold_counts_diff", {})
     if fold_diff:
         lines.append("Fold count changes by operator:")
@@ -431,6 +450,7 @@ def sync_summary(sync_dir: Path | str) -> dict[str, Any]:
     newest = sorted_snaps[-1] if sorted_snaps else None
     oldest = sorted_snaps[0] if sorted_snaps else None
 
+    byte_fold_total = op_totals.get("byte_fold", 0)
     return {
         "sync_dir": str(sync),
         "source_path": lineage.get("source_path", ""),
@@ -438,6 +458,7 @@ def sync_summary(sync_dir: Path | str) -> dict[str, Any]:
         "total_logical_gain_bytes": total_gain,
         "fold_counts_over_time": [{"id": s.get("id"), "created": s.get("created"), "fold_count": s.get("fold_count"), "logical_gain_bytes": s.get("logical_gain_bytes")} for s in sorted_snaps],
         "top_operators": sorted([{"operator_id": k, "total": v} for k, v in op_totals.items()], key=lambda x: -x["total"])[:10],
+        "byte_fold_total": byte_fold_total,
         "newest_snapshot": newest,
         "oldest_snapshot": oldest,
     }

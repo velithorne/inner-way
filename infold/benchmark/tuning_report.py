@@ -68,6 +68,27 @@ def build_tuning_report(
         op = b.get("operator_id", "unknown")
         blocked_by_op[op] = blocked_by_op.get(op, 0) + 1
 
+    byte_fold_metrics: dict[str, Any] = {}
+    byte_fold_routing: dict[str, int] = {}
+    for r in ledger.fold_records:
+        if r.operator_id == "byte_fold":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            byte_fold_metrics["files_chunk_folded"] = byte_fold_metrics.get("files_chunk_folded", 0) + len(recipe.get("reconstruction", {}))
+            byte_fold_metrics["unique_chunk_count"] = byte_fold_metrics.get("unique_chunk_count", 0) + len(recipe.get("chunk_dict_b64", {}))
+            byte_fold_metrics["reused_chunk_count"] = byte_fold_metrics.get("reused_chunk_count", 0) + recipe.get("reused_chunk_count", 0)
+            byte_fold_metrics["chunk_reused_bytes"] = byte_fold_metrics.get("chunk_reused_bytes", 0) + recipe.get("chunk_reused_bytes", 0)
+            byte_fold_metrics["chunk_dictionary_size_bytes"] = byte_fold_metrics.get("chunk_dictionary_size_bytes", 0) + recipe.get("chunk_dictionary_size_bytes", 0)
+    run_diag = config.get("_run_diagnostics", {})
+    bf_routing = run_diag.get("byte_fold_routing") or {}
+    for path, route_result in bf_routing.items():
+        if isinstance(route_result, dict):
+            route = route_result.get("route", "unknown")
+        elif hasattr(route_result, "route"):
+            route = route_result.route
+        else:
+            route = "unknown"
+        byte_fold_routing[route] = byte_fold_routing.get(route, 0) + 1
+
     report: dict[str, Any] = {
         "logical_gain_bytes": logical_gain,
         "physical_folded_size_bytes": physical_folded,
@@ -75,6 +96,8 @@ def build_tuning_report(
         "gain_by_operator": gain_by_op,
         "fold_count": ledger.total_folds,
         "fold_count_by_operator": {},
+        "byte_fold_metrics": byte_fold_metrics if byte_fold_metrics else None,
+        "byte_fold_routing": byte_fold_routing if byte_fold_routing else None,
         "low_value_folds": low_value_folds,
         "low_value_threshold_bytes": low_value_threshold,
         "rejected_by_reason": rejected_by_reason,
@@ -147,4 +170,21 @@ def tuning_report_to_text(report: dict[str, Any], dataset_id: str = "") -> str:
         rej = report.get("rejected_by_operator", {}).get(op, 0)
         blk = report.get("blocked_by_operator", {}).get(op, 0)
         lines.append(f"  {op}: rejected={rej} blocked={blk}")
+    bfm = report.get("byte_fold_metrics")
+    if bfm:
+        lines.extend([
+            "",
+            "## Byte Fold metrics",
+            f"  files_chunk_folded: {bfm.get('files_chunk_folded', 0)}",
+            f"  unique_chunk_count: {bfm.get('unique_chunk_count', 0)}",
+            f"  reused_chunk_count: {bfm.get('reused_chunk_count', 0)}",
+            f"  chunk_reused_bytes: {bfm.get('chunk_reused_bytes', 0):,}",
+            f"  chunk_dictionary_size_bytes: {bfm.get('chunk_dictionary_size_bytes', 0):,}",
+        ])
+    bfr = report.get("byte_fold_routing")
+    if bfr:
+        lines.append("")
+        lines.append("## Byte Fold routing distribution")
+        for route, cnt in sorted(bfr.items()):
+            lines.append(f"  {route}: {cnt}")
     return "\n".join(lines)

@@ -81,12 +81,17 @@ def test_sync_compare(sync_with_snapshots):
 
 
 def test_sync_report(sync_with_snapshots):
-    """sync_report returns added/removed/changed."""
+    """sync_report returns added/removed/changed and byte_fold_summary."""
     snaps = list_snapshots(sync_with_snapshots)["snapshots"]
     r = sync_report(snaps[0]["path"], snaps[1]["path"])
     assert "added" in r
     assert "removed" in r
     assert "template_families" in r["added"]
+    assert "byte_fold_summary" in r
+    bf = r["byte_fold_summary"]
+    assert "added_count" in bf
+    assert "removed_count" in bf
+    assert "fold_count_diff" in bf
     text = sync_report_to_text(r)
     assert "Sync Report" in text
     assert "Added:" in text

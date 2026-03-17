@@ -22,6 +22,13 @@ REALISTIC_FIXTURES = [
     (".", "infold-workspace"),
 ]
 
+# Byte Fold focused datasets (repeated opaque, large text, version-like, mixed low-structure)
+BYTE_FOLD_FIXTURES = [
+    ("tests/fixtures/byte_fold", "byte-fold-opaque"),
+    ("tests/fixtures/byte_fold_large_text", "byte-fold-large-text"),
+    ("tests/fixtures/byte_fold_version_like", "byte-fold-version-like"),
+]
+
 # Synthetic stress datasets (generated if missing)
 SyntheticStressConfig = dict[str, Any]
 STRESS_DATASETS: list[tuple[str, str, SyntheticStressConfig]] = [
@@ -33,7 +40,7 @@ STRESS_DATASETS: list[tuple[str, str, SyntheticStressConfig]] = [
 def get_benchmark_datasets(base_path: Path) -> list[tuple[Path, str, str]]:
     """
     Return list of (path, dataset_id, category) for benchmark pack.
-    category: correctness | realistic | stress
+    category: correctness | realistic | stress | byte_fold
     """
     datasets: list[tuple[Path, str, str]] = []
     for rel, did in CORRECTNESS_FIXTURES:
@@ -44,6 +51,10 @@ def get_benchmark_datasets(base_path: Path) -> list[tuple[Path, str, str]]:
         p = base_path / rel
         if p.exists():
             datasets.append((p, did, "realistic"))
+    for rel, did in BYTE_FOLD_FIXTURES:
+        p = base_path / rel
+        if p.exists():
+            datasets.append((p, did, "byte_fold"))
     for rel, did, _ in STRESS_DATASETS:
         p = base_path / rel
         if p.exists():
@@ -98,5 +109,6 @@ def _create_template_stress(path: Path, cfg: dict) -> None:
 BENCHMARK_PACK = {
     "correctness": CORRECTNESS_FIXTURES,
     "realistic": REALISTIC_FIXTURES,
+    "byte_fold": BYTE_FOLD_FIXTURES,
     "stress": STRESS_DATASETS,
 }
