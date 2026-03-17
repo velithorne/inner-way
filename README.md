@@ -126,6 +126,12 @@ python3 -m infold.cli archive sync list --dir .infold-sync
 python3 -m infold.cli archive sync validate --dir .infold-sync
 python3 -m infold.cli archive sync summary --dir .infold-sync
 python3 -m infold.cli archive sync search --dir .infold-sync --operator template_skeleton
+
+# Phase 7 — Lineage insights
+python3 -m infold.cli archive sync timeline --dir .infold-sync
+python3 -m infold.cli archive sync trace --dir .infold-sync --family template
+python3 -m infold.cli archive sync lineage-report --dir .infold-sync
+python3 -m infold.cli archive sync search --dir .infold-sync --with-lineage
 python3 -m infold.cli archive sync compare v1.infold v2.infold
 python3 -m infold.cli archive sync compare latest previous --dir .infold-sync
 python3 -m infold.cli archive sync report v1.infold v2.infold

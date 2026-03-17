@@ -1558,20 +1558,39 @@ def reconstruct_archive(
 
 
 def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str]]]:
-    """Extract family signatures for template, hierarchy, dependency, byte_fold. Returns {op: {sig: set of paths/roots}}."""
+    """Extract family signatures for exact_repetition, template, hierarchy, dependency, byte_fold. Returns {op: {sig: set of paths/roots}}."""
+    from infold.engine.metadata_table_fold import load_path_table as _load_pt
+    maps_path = root / "maps" / "reconstruction.json"
+    path_table = None
+    if maps_path.exists():
+        maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
+        if maps_data.get("path_table_ref"):
+            path_table = _load_pt(root)
     sigs: dict[str, dict[str, set[str]]] = {
+        "exact_repetition": {},
         "template_skeleton": {},
         "hierarchy_mirror": {},
         "dependency_motif": {},
         "byte_fold": {},
     }
     shared = root / "shared"
+
+    def _resolve_targets(rec: dict) -> list:
+        if path_table is not None and "targets_refs" in rec:
+            return [path_table[r] for r in rec["targets_refs"] if r < len(path_table)]
+        return rec.get("targets", [])
+
     for i, rec in enumerate(records):
         op = rec.get("operator_id", "")
         if op not in sigs:
             continue
-        targets = rec.get("targets", [])
-        if op == "template_skeleton":
+        targets = _resolve_targets(rec)
+        if op == "exact_repetition":
+            paths = tuple(sorted(str(t) for t in targets))
+            if paths:
+                sig = hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
+                sigs[op][sig] = set(paths)
+        elif op == "template_skeleton":
             tmpl = shared / f"template_{i}.json"
             if tmpl.exists():
                 data = json.loads(tmpl.read_text(encoding="utf-8"))
@@ -1666,6 +1685,7 @@ def compare_archives(
         "hierarchy_templates_changed": {"added": [], "removed": []},
         "dependency_motifs_changed": {"added": [], "removed": []},
         "byte_fold_families_changed": {"added": [], "removed": []},
+        "duplicate_families_changed": {"added": [], "removed": []},
         "compatibility": {
             "a": m_a.get("compatibility", {}),
             "b": m_b.get("compatibility", {}),
@@ -1693,12 +1713,14 @@ def compare_archives(
         recs_b = maps_b.get("records", [])
         sigs_b = _family_signatures(root_b, recs_b)
 
-    for op in ["template_skeleton", "hierarchy_mirror", "dependency_motif", "byte_fold"]:
+    for op in ["exact_repetition", "template_skeleton", "hierarchy_mirror", "dependency_motif", "byte_fold"]:
         sa = sigs_a.get(op, {})
         sb = sigs_b.get(op, {})
         added = [sig for sig in sb if sig not in sa]
         removed = [sig for sig in sa if sig not in sb]
-        if op == "template_skeleton":
+        if op == "exact_repetition":
+            diff["duplicate_families_changed"] = {"added": added, "removed": removed}
+        elif op == "template_skeleton":
             diff["template_families_changed"]["added"] = added
             diff["template_families_changed"]["removed"] = removed
         elif op == "hierarchy_mirror":

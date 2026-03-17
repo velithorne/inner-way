@@ -163,12 +163,14 @@ def sync_report(
     """
     diff = sync_compare(archive_a, archive_b)
     added = {
+        "duplicate_families": diff.get("duplicate_families_changed", {}).get("added", []),
         "template_families": diff.get("template_families_changed", {}).get("added", []),
         "hierarchy_templates": diff.get("hierarchy_templates_changed", {}).get("added", []),
         "dependency_motifs": diff.get("dependency_motifs_changed", {}).get("added", []),
         "byte_fold_families": diff.get("byte_fold_families_changed", {}).get("added", []),
     }
     removed = {
+        "duplicate_families": diff.get("duplicate_families_changed", {}).get("removed", []),
         "template_families": diff.get("template_families_changed", {}).get("removed", []),
         "hierarchy_templates": diff.get("hierarchy_templates_changed", {}).get("removed", []),
         "dependency_motifs": diff.get("dependency_motifs_changed", {}).get("removed", []),
@@ -181,7 +183,7 @@ def sync_report(
             by_operator[op] = {"fold_count_diff": delta}
     for kind, items in added.items():
         op = kind.replace("_families", "").replace("_templates", "").replace("_motifs", "")
-        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
+        op_map = {"duplicate": "exact_repetition", "template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
         op_id = op_map.get(op, op)
         if op_id not in by_operator:
             by_operator[op_id] = {}
@@ -189,7 +191,7 @@ def sync_report(
             by_operator[op_id]["added"] = items
     for kind, items in removed.items():
         op = kind.replace("_families", "").replace("_templates", "").replace("_motifs", "")
-        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
+        op_map = {"duplicate": "exact_repetition", "template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
         op_id = op_map.get(op, op)
         if op_id not in by_operator:
             by_operator[op_id] = {}
@@ -385,18 +387,21 @@ def sync_search(
     snapshot_path: str | None = None,
     created_after: str | None = None,
     created_before: str | None = None,
+    with_lineage: bool = False,
     **search_kw: Any,
 ) -> dict[str, Any]:
     """
     Search across all snapshots in lineage. Reuses search_archives.
     Filters: snapshot_id, snapshot_path (substring), created_after, created_before.
     Pass-through search_kw to search_archives (operator, path, family, etc.).
+    When with_lineage=True, adds lineage_tracking and snapshot_id to each match.
     """
     from infold.archive import search_archives
 
     sync = Path(sync_dir).resolve()
     lineage = _load_lineage(sync)
     snapshots = lineage.get("snapshots", [])
+    path_to_snap: dict[str, dict] = {}
     paths: list[Path] = []
     for s in snapshots:
         if not isinstance(s, dict):
@@ -414,17 +419,242 @@ def sync_search(
         if created_before and created > created_before:
             continue
         paths.append(Path(path))
+        path_to_snap[str(Path(path).resolve())] = s
 
     if not paths:
         return {
             "paths": [],
-            "query": {"snapshot_id": snapshot_id, "snapshot_path": snapshot_path, **search_kw},
+            "query": {"snapshot_id": snapshot_id, "snapshot_path": snapshot_path, "with_lineage": with_lineage, **search_kw},
             "match_count": 0,
             "matches": [],
             "summary": {"total_archives_searched": 0, "total_matches": 0, "matches_by_operator": {}, "matches_by_family": {}},
         }
 
-    return search_archives(paths, **search_kw)
+    result = search_archives(paths, **search_kw)
+    sorted_snaps = sorted(
+        [s for s in lineage.get("snapshots", []) if isinstance(s, dict) and s.get("created")],
+        key=lambda x: x.get("created", ""),
+    )
+    latest_id = sorted_snaps[-1].get("id") if sorted_snaps else None
+    for m in result.get("matches", []):
+        ap = m.get("archive_path", "")
+        snap = path_to_snap.get(str(Path(ap).resolve())) if ap else None
+        if snap:
+            m["snapshot_id"] = snap.get("id")
+            m["snapshot_created"] = snap.get("created")
+            m["present_in_latest"] = snap.get("id") == latest_id
+    if with_lineage:
+        from infold.sync.lineage_insights import compute_lineage_tracking
+        tracking = compute_lineage_tracking(sync)
+        result["lineage_tracking"] = tracking
+        # Enrich each match with first_seen, last_seen when we can compute signature
+        import hashlib
+        ops = tracking.get("operators", {})
+        for m in result.get("matches", []):
+            if m.get("match_type") != "fold":
+                continue
+            op = m.get("operator_id", "")
+            paths = m.get("paths") or m.get("roots_or_paths") or []
+            if not paths or op not in ops:
+                continue
+            paths_tuple = tuple(sorted(str(p) for p in paths))
+            sig = hashlib.sha256(json.dumps(paths_tuple).encode()).hexdigest()[:16]
+            entry = ops.get(op, {}).get(sig)
+            if entry:
+                m["first_seen"] = entry.get("first_seen_snapshot")
+                m["last_seen"] = entry.get("last_seen_snapshot")
+                m["snapshots_seen_in"] = sorted(entry.get("snapshots_seen_in", []))
+                m["snapshot_count"] = entry.get("snapshot_count", 0)
+    return result
+
+
+def sync_timeline(sync_dir: Path | str) -> dict[str, Any]:
+    """
+    Lineage timeline: total snapshots, gain/size/fold over time, operator usage over time.
+    Phase 7: timeline intelligence.
+    """
+    sync = Path(sync_dir).resolve()
+    lineage = _load_lineage(sync)
+    snapshots = lineage.get("snapshots", [])
+    sorted_snaps = sorted(
+        [s for s in snapshots if isinstance(s, dict) and s.get("created")],
+        key=lambda x: x.get("created", ""),
+    )
+    total_gain = sum(s.get("logical_gain_bytes", 0) for s in sorted_snaps)
+    phys_sizes = [s.get("physical_folded_size_bytes", 0) for s in sorted_snaps]
+    avg_phys = sum(phys_sizes) / len(phys_sizes) if phys_sizes else 0
+    fold_over_time = [{"id": s.get("id"), "created": s.get("created"), "fold_count": s.get("fold_count"), "logical_gain_bytes": s.get("logical_gain_bytes"), "physical_folded_size_bytes": s.get("physical_folded_size_bytes")} for s in sorted_snaps]
+    op_over_time: dict[str, list[dict[str, Any]]] = {}
+    for s in sorted_snaps:
+        for op, cnt in (s.get("fold_counts_by_operator") or {}).items():
+            if op not in op_over_time:
+                op_over_time[op] = []
+            op_over_time[op].append({"id": s.get("id"), "created": s.get("created"), "count": cnt})
+    return {
+        "sync_dir": str(sync),
+        "source_path": lineage.get("source_path", ""),
+        "total_snapshots": len(snapshots),
+        "total_logical_gain_bytes": total_gain,
+        "avg_physical_folded_size_bytes": round(avg_phys, 0),
+        "fold_over_time": fold_over_time,
+        "logical_gain_over_time": [{"id": s.get("id"), "created": s.get("created"), "logical_gain_bytes": s.get("logical_gain_bytes")} for s in sorted_snaps],
+        "physical_size_over_time": [{"id": s.get("id"), "created": s.get("created"), "physical_folded_size_bytes": s.get("physical_folded_size_bytes")} for s in sorted_snaps],
+        "operator_usage_over_time": op_over_time,
+    }
+
+
+def sync_timeline_to_text(data: dict[str, Any]) -> str:
+    """Human-readable timeline."""
+    lines = [
+        "Sync Timeline",
+        "=============",
+        "",
+        f"Sync dir: {data.get('sync_dir', '?')}",
+        f"Snapshots: {data.get('total_snapshots', 0)}",
+        f"Total logical gain: {data.get('total_logical_gain_bytes', 0):,} bytes",
+        f"Avg physical size: {data.get('avg_physical_folded_size_bytes', 0):,.0f} bytes",
+        "",
+        "Fold count over time:",
+    ]
+    for row in data.get("fold_over_time", [])[:15]:
+        lines.append(f"  [{row.get('id','?')}] {row.get('created','?')[:19]} folds={row.get('fold_count',0)} gain={row.get('logical_gain_bytes',0):,}")
+    if len(data.get("fold_over_time", [])) > 15:
+        lines.append(f"  ... +{len(data['fold_over_time']) - 15} more")
+    return "\n".join(lines)
+
+
+def sync_trace(
+    sync_dir: Path | str,
+    *,
+    family: str | None = None,
+    operator: str | None = None,
+) -> dict[str, Any]:
+    """
+    Trace family lifecycle: first_seen, last_seen, present_in_latest, snapshots_seen_in.
+    Filter by family type (duplicate, template, hierarchy, dependency, byte_fold) or operator.
+    """
+    from infold.sync.lineage_insights import compute_lineage_tracking
+
+    sync = Path(sync_dir).resolve()
+    tracking = compute_lineage_tracking(sync)
+    ops = tracking.get("operators", {})
+    op_map = {"duplicate": "exact_repetition", "template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
+    target_op = None
+    if family:
+        target_op = op_map.get(family, family)
+    elif operator:
+        target_op = operator
+    items: list[dict[str, Any]] = []
+    for op, sig_map in ops.items():
+        if target_op and op != target_op:
+            continue
+        for sig, entry in sig_map.items():
+            items.append({
+                "operator": op,
+                "signature": sig,
+                "first_seen_snapshot": entry.get("first_seen_snapshot"),
+                "last_seen_snapshot": entry.get("last_seen_snapshot"),
+                "snapshot_count": entry.get("snapshot_count", 0),
+                "present_in_latest": entry.get("present_in_latest", False),
+                "snapshots_seen_in": sorted(entry.get("snapshots_seen_in", [])),
+            })
+    items.sort(key=lambda x: (x["operator"], x["signature"]))
+    return {
+        "sync_dir": str(sync),
+        "filter_family": family,
+        "filter_operator": operator,
+        "items": items,
+        "latest_snapshot_id": tracking.get("latest_snapshot_id", ""),
+    }
+
+
+def sync_trace_to_text(data: dict[str, Any]) -> str:
+    """Human-readable trace."""
+    lines = [
+        "Sync Trace",
+        "==========",
+        "",
+        f"Sync dir: {data.get('sync_dir', '?')}",
+        f"Filter: family={data.get('filter_family', '')} operator={data.get('filter_operator', '')}",
+        f"Latest: {data.get('latest_snapshot_id', '')}",
+        "",
+    ]
+    for item in data.get("items", [])[:20]:
+        lines.append(f"  [{item.get('operator','?')}] sig={item.get('signature','?')[:12]}... first={item.get('first_seen_snapshot')} last={item.get('last_seen_snapshot')} count={item.get('snapshot_count')} in_latest={item.get('present_in_latest')}")
+    if len(data.get("items", [])) > 20:
+        lines.append(f"  ... +{len(data['items']) - 20} more")
+    return "\n".join(lines)
+
+
+def sync_lineage_report(sync_dir: Path | str) -> dict[str, Any]:
+    """
+    Change-focused lineage report: added/removed/stable families by snapshot interval.
+    Phase 7: change-focused reporting.
+    """
+    sync = Path(sync_dir).resolve()
+    lineage = _load_lineage(sync)
+    snapshots = lineage.get("snapshots", [])
+    sorted_snaps = sorted(
+        [s for s in snapshots if isinstance(s, dict) and s.get("path")],
+        key=lambda x: x.get("created", ""),
+    )
+    intervals: list[dict[str, Any]] = []
+    for i in range(1, len(sorted_snaps)):
+        a_path = Path(sorted_snaps[i - 1]["path"])
+        b_path = Path(sorted_snaps[i]["path"])
+        if not a_path.exists() or not b_path.exists():
+            continue
+        diff = sync_compare(a_path, b_path)
+        added = {
+            "duplicate": len(diff.get("duplicate_families_changed", {}).get("added", [])),
+            "template": len(diff.get("template_families_changed", {}).get("added", [])),
+            "hierarchy": len(diff.get("hierarchy_templates_changed", {}).get("added", [])),
+            "dependency": len(diff.get("dependency_motifs_changed", {}).get("added", [])),
+            "byte_fold": len(diff.get("byte_fold_families_changed", {}).get("added", [])),
+        }
+        removed = {
+            "duplicate": len(diff.get("duplicate_families_changed", {}).get("removed", [])),
+            "template": len(diff.get("template_families_changed", {}).get("removed", [])),
+            "hierarchy": len(diff.get("hierarchy_templates_changed", {}).get("removed", [])),
+            "dependency": len(diff.get("dependency_motifs_changed", {}).get("removed", [])),
+            "byte_fold": len(diff.get("byte_fold_families_changed", {}).get("removed", [])),
+        }
+        intervals.append({
+            "from_id": sorted_snaps[i - 1].get("id"),
+            "to_id": sorted_snaps[i].get("id"),
+            "from_created": sorted_snaps[i - 1].get("created"),
+            "to_created": sorted_snaps[i].get("created"),
+            "added_by_operator": added,
+            "removed_by_operator": removed,
+            "logical_gain_diff": diff.get("logical_gain", {}).get("diff", 0),
+        })
+    return {
+        "sync_dir": str(sync),
+        "intervals": intervals,
+        "total_intervals": len(intervals),
+    }
+
+
+def sync_lineage_report_to_text(data: dict[str, Any]) -> str:
+    """Human-readable lineage report."""
+    lines = [
+        "Lineage Report (Change-focused)",
+        "===============================",
+        "",
+        f"Sync dir: {data.get('sync_dir', '?')}",
+        f"Intervals: {data.get('total_intervals', 0)}",
+        "",
+    ]
+    for iv in data.get("intervals", [])[:10]:
+        lines.append(f"  {iv.get('from_id','?')} -> {iv.get('to_id','?')}:")
+        a = iv.get("added_by_operator", {})
+        r = iv.get("removed_by_operator", {})
+        for op in ["duplicate", "template", "hierarchy", "dependency", "byte_fold"]:
+            if a.get(op, 0) or r.get(op, 0):
+                lines.append(f"    {op}: +{a.get(op,0)} -{r.get(op,0)}")
+        lines.append(f"    gain_diff: {iv.get('logical_gain_diff',0):+,}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def sync_summary(sync_dir: Path | str) -> dict[str, Any]:

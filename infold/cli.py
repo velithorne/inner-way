@@ -386,6 +386,7 @@ def sync_search_cmd(args) -> int:
         snapshot_path=getattr(args, "snapshot_path", None),
         created_after=getattr(args, "created_after", None),
         created_before=getattr(args, "created_before", None),
+        with_lineage=getattr(args, "with_lineage", False),
         operator=getattr(args, "operator", None),
         path=getattr(args, "path", None),
         family=getattr(args, "family", None),
@@ -405,6 +406,43 @@ def sync_summary_cmd(args) -> int:
         print(json.dumps(r, indent=2))
     else:
         print(sync_summary_to_text(r))
+    return 0
+
+
+def sync_timeline_cmd(args) -> int:
+    """Lineage timeline: gain/size/fold over time."""
+    from infold.sync.operations import sync_timeline, sync_timeline_to_text
+    r = sync_timeline(getattr(args, "sync_dir", ".infold-sync"))
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_timeline_to_text(r))
+    return 0
+
+
+def sync_trace_cmd(args) -> int:
+    """Trace family lifecycle: first_seen, last_seen, present_in_latest."""
+    from infold.sync.operations import sync_trace, sync_trace_to_text
+    r = sync_trace(
+        getattr(args, "sync_dir", ".infold-sync"),
+        family=getattr(args, "family", None),
+        operator=getattr(args, "operator", None),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_trace_to_text(r))
+    return 0
+
+
+def sync_lineage_report_cmd(args) -> int:
+    """Change-focused lineage report: added/removed by interval."""
+    from infold.sync.operations import sync_lineage_report, sync_lineage_report_to_text
+    r = sync_lineage_report(getattr(args, "sync_dir", ".infold-sync"))
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_lineage_report_to_text(r))
     return 0
 
 
@@ -679,6 +717,7 @@ def main() -> int:
     sync_search_p.add_argument("--operator", help="Search filter: operator")
     sync_search_p.add_argument("--path", help="Search filter: path substring")
     sync_search_p.add_argument("--family", help="Search filter: family type")
+    sync_search_p.add_argument("--with-lineage", action="store_true", help="Add first_seen, last_seen, lineage_tracking to results")
     sync_search_p.add_argument("--json", action="store_true", help="JSON output")
     sync_search_p.set_defaults(func=sync_search_cmd)
     sync_summary_p = sync_sub.add_parser("summary", help="Show lineage summary")
@@ -693,6 +732,20 @@ def main() -> int:
     sync_report_diff_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
     sync_report_diff_p.add_argument("--json", action="store_true", help="JSON output")
     sync_report_diff_p.set_defaults(func=sync_report_diff_cmd)
+    sync_timeline_p = sync_sub.add_parser("timeline", help="Lineage timeline: gain/size/fold over time")
+    sync_timeline_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_timeline_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_timeline_p.set_defaults(func=sync_timeline_cmd)
+    sync_trace_p = sync_sub.add_parser("trace", help="Trace family lifecycle: first_seen, last_seen, present_in_latest")
+    sync_trace_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_trace_p.add_argument("--family", help="Filter by family: duplicate, template, hierarchy, dependency, byte_fold")
+    sync_trace_p.add_argument("--operator", help="Filter by operator")
+    sync_trace_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_trace_p.set_defaults(func=sync_trace_cmd)
+    sync_lineage_report_p = sync_sub.add_parser("lineage-report", help="Change-focused report: added/removed families by interval")
+    sync_lineage_report_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_lineage_report_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_lineage_report_p.set_defaults(func=sync_lineage_report_cmd)
     args = parser.parse_args()
 
     if args.benchmark_suite:

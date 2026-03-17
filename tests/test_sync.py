@@ -18,6 +18,12 @@ from infold.sync import (
     sync_search,
     sync_summary,
     sync_summary_to_text,
+    sync_timeline,
+    sync_timeline_to_text,
+    sync_trace,
+    sync_trace_to_text,
+    sync_lineage_report,
+    sync_lineage_report_to_text,
 )
 from infold.archive import create_archive
 from infold.cli import load_config
@@ -168,3 +174,70 @@ def test_sync_resolve_latest(sync_with_snapshots):
     p = resolve_snapshot_ref(sync_with_snapshots, "latest")
     assert p is not None
     assert p.exists()
+
+
+def test_sync_timeline(sync_with_snapshots):
+    """sync_timeline returns gain/size/fold over time."""
+    r = sync_timeline(sync_with_snapshots)
+    assert r["total_snapshots"] == 2
+    assert "fold_over_time" in r
+    assert "logical_gain_over_time" in r
+    assert len(r["fold_over_time"]) == 2
+    text = sync_timeline_to_text(r)
+    assert "Sync Timeline" in text
+
+
+def test_sync_trace(sync_with_snapshots):
+    """sync_trace returns first_seen, last_seen, present_in_latest."""
+    r = sync_trace(sync_with_snapshots)
+    assert "items" in r
+    assert "latest_snapshot_id" in r
+    for item in r.get("items", [])[:3]:
+        assert "first_seen_snapshot" in item
+        assert "last_seen_snapshot" in item
+        assert "present_in_latest" in item
+    text = sync_trace_to_text(r)
+    assert "Sync Trace" in text
+
+
+def test_sync_trace_filter_family(sync_with_snapshots):
+    """sync_trace filters by family."""
+    r = sync_trace(sync_with_snapshots, family="template")
+    assert r.get("filter_family") == "template"
+    for item in r.get("items", []):
+        assert item.get("operator") == "template_skeleton"
+
+
+def test_sync_lineage_report(sync_with_snapshots):
+    """sync_lineage_report returns added/removed by interval."""
+    r = sync_lineage_report(sync_with_snapshots)
+    assert "intervals" in r
+    assert r["total_intervals"] >= 1
+    for iv in r.get("intervals", []):
+        assert "added_by_operator" in iv
+        assert "removed_by_operator" in iv
+    text = sync_lineage_report_to_text(r)
+    assert "Lineage Report" in text
+
+
+def test_sync_search_with_lineage(sync_with_snapshots):
+    """sync_search with_lineage adds lineage metadata."""
+    r = sync_search(sync_with_snapshots, operator="exact_repetition", with_lineage=True)
+    assert "lineage_tracking" in r
+    for m in r.get("matches", []):
+        assert "snapshot_id" in m
+        assert "present_in_latest" in m
+
+
+def test_lineage_tracking_first_last_seen(sync_with_snapshots):
+    """compute_lineage_tracking produces first_seen, last_seen, present_in_latest."""
+    from infold.sync.lineage_insights import compute_lineage_tracking
+    r = compute_lineage_tracking(sync_with_snapshots)
+    assert "operators" in r
+    assert "snapshots" in r
+    for op, sig_map in r.get("operators", {}).items():
+        for sig, entry in sig_map.items():
+            assert "first_seen_snapshot" in entry
+            assert "last_seen_snapshot" in entry
+            assert "present_in_latest" in entry
+            assert "snapshot_count" in entry
