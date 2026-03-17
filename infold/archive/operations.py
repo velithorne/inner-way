@@ -55,7 +55,7 @@ def create_archive(
     pkg_dir = Path(tempfile.mkdtemp(prefix="infold_pkg_"))
     try:
         export_package(result, config, pkg_dir)
-        _write_integrity_checksums(pkg_dir)
+        _write_integrity_checksums(pkg_dir, config)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in sorted(pkg_dir.rglob("*")):
                 if f.is_file():
@@ -67,8 +67,9 @@ def create_archive(
     return out
 
 
-def _write_integrity_checksums(pkg_dir: Path) -> None:
+def _write_integrity_checksums(pkg_dir: Path, config: dict[str, Any] | None = None) -> None:
     """Write integrity.json with SHA256 checksums for key files."""
+    compact = config.get("package_export", {}).get("compact", False) if config else False
     checksums: dict[str, str] = {}
     for name in ["manifest.json", "ledger.json"]:
         p = pkg_dir / name
@@ -85,7 +86,7 @@ def _write_integrity_checksums(pkg_dir: Path) -> None:
             if f.is_file():
                 checksums[f"maps/{f.name}"] = _sha256_file(f)
     (pkg_dir / "integrity.json").write_text(
-        json.dumps({"checksums": checksums}, indent=2),
+        json.dumps({"checksums": checksums}, indent=None, separators=(",", ":")) if compact else json.dumps({"checksums": checksums}, indent=2),
         encoding="utf-8",
     )
 

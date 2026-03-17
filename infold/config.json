@@ -86,5 +86,10 @@
     "export_json": true,
     "export_text": true,
     "output_dir": "infold_reports"
+  },
+  "package_export": {
+    "compact": false,
+    "report_text": true,
+    "inventory_minimal": false
   }
 }

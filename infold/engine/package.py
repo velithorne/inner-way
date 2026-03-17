@@ -3,6 +3,7 @@ Physical folded package export: manifest, ledger, shared, maps, reports, snapsho
 
 Package spec v1: required manifest.json, ledger.json; required dirs shared/, maps/, reports/, snapshots/.
 Versioning and compatibility metadata in manifest.
+Supports compact mode for reduced footprint.
 """
 
 import json
@@ -17,6 +18,11 @@ from infold.engine.package_spec import (
     PACKAGE_SPEC_VERSION,
 )
 from infold.models.project_sheet import ProjectSheet
+
+
+def _json_dump(obj: Any, compact: bool) -> str:
+    """Serialize to JSON. Compact = no indent."""
+    return json.dumps(obj, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": "))
 
 
 def export_package(
@@ -35,6 +41,11 @@ def export_package(
     """
     out = Path(output_path).resolve()
     out.mkdir(parents=True, exist_ok=True)
+
+    pkg_cfg = config.get("package_export", {})
+    compact = pkg_cfg.get("compact", False)
+    report_text = pkg_cfg.get("report_text", True)
+    inventory_minimal = pkg_cfg.get("inventory_minimal", False)
 
     sheet = result.project_sheet
     ledger = result.ledger
@@ -58,10 +69,10 @@ def export_package(
         "required_files": ["manifest.json", "ledger.json"],
         "required_dirs": ["shared", "maps", "reports", "snapshots"],
     }
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 
     # ledger.json
-    (out / "ledger.json").write_text(json.dumps(ledger.to_dict(), indent=2), encoding="utf-8")
+    (out / "ledger.json").write_text(_json_dump(ledger.to_dict(), compact), encoding="utf-8")
 
     # shared/ - canonical content from fold records (always create, even when empty)
     shared_dir = out / "shared"
@@ -74,44 +85,44 @@ def export_package(
         elif record.operator_id == "template_skeleton":
             recipe = record.unfold_recipe
             (shared_dir / f"template_{i}.json").write_text(
-                json.dumps({
+                _json_dump({
                     "const_blocks": recipe.get("const_blocks"),
                     "slot_groups": recipe.get("slot_groups", []),
                     "paths": recipe.get("paths", [str(t) for t in record.targets]),
-                }, indent=2),
+                }, compact),
                 encoding="utf-8",
             )
         elif record.operator_id == "symbol_table":
             recipe = record.unfold_recipe
             (shared_dir / f"symbols_{i}.json").write_text(
-                json.dumps({
+                _json_dump({
                     "id_to_symbol": recipe.get("id_to_symbol"),
                     "folded_files": recipe.get("folded_files", {}),
-                }, indent=2),
+                }, compact),
                 encoding="utf-8",
             )
         elif record.operator_id == "hierarchy_mirror":
             recipe = record.unfold_recipe
             (shared_dir / f"hierarchy_{i}.json").write_text(
-                json.dumps({
+                _json_dump({
                     "structure_sig": recipe.get("structure_sig"),
                     "roots": recipe.get("roots"),
                     "instance_count": recipe.get("instance_count"),
                     "file_contents": recipe.get("file_contents", {}),
-                }, indent=2),
+                }, compact),
                 encoding="utf-8",
             )
         elif record.operator_id == "dependency_motif":
             recipe = record.unfold_recipe
             (shared_dir / f"dependency_motif_{i}.json").write_text(
-                json.dumps({
+                _json_dump({
                     "signature": recipe.get("signature"),
                     "canonical_imports": recipe.get("canonical_imports"),
                     "paths": recipe.get("paths"),
                     "instance_count": recipe.get("instance_count"),
                     "motif_size": recipe.get("motif_size"),
                     "file_contents": recipe.get("file_contents", {}),
-                }, indent=2),
+                }, compact),
                 encoding="utf-8",
             )
 
@@ -130,14 +141,19 @@ def export_package(
             "targets": [str(t) for t in record.targets],
             "gain": record.gain,
         })
-    (maps_dir / "reconstruction.json").write_text(json.dumps(maps_data, indent=2), encoding="utf-8")
+    (maps_dir / "reconstruction.json").write_text(_json_dump(maps_data, compact), encoding="utf-8")
 
     # reports/
     reports_dir = out / "reports"
     reports_dir.mkdir(exist_ok=True)
-    from infold.reporting.report import report_to_json, report_to_text
-    (reports_dir / "report.json").write_text(report_to_json(result, config), encoding="utf-8")
-    (reports_dir / "report.txt").write_text(report_to_text(result, config), encoding="utf-8")
+    from infold.reporting.report import build_report, report_to_json, report_to_text
+    report_dict = build_report(result, config)
+    (reports_dir / "report.json").write_text(
+        _json_dump(report_dict, compact) if compact else report_to_json(result, config),
+        encoding="utf-8",
+    )
+    if report_text:
+        (reports_dir / "report.txt").write_text(report_to_text(result, config), encoding="utf-8")
 
     # snapshots/ - file inventory; passthrough = files not in any fold (for full reconstruction)
     snapshots_dir = out / "snapshots"
@@ -153,10 +169,13 @@ def export_package(
         for p in recipe.get("folded_files", {}).keys():
             folded_paths.add(str(p).replace("\\", "/"))
     inventory = {
-        "files": [{"path": str(p), "size": len(n.raw_text.encode("utf-8")), "language": n.language} for p, n in sheet.file_nodes.items()],
+        "files": [
+            {"path": str(p), "size": len(n.raw_text.encode("utf-8")), **({} if inventory_minimal else {"language": n.language})}
+            for p, n in sheet.file_nodes.items()
+        ],
     }
-    (snapshots_dir / "inventory.json").write_text(json.dumps(inventory, indent=2), encoding="utf-8")
+    (snapshots_dir / "inventory.json").write_text(_json_dump(inventory, compact), encoding="utf-8")
     passthrough = {str(p): n.raw_text for p, n in sheet.file_nodes.items() if str(p).replace("\\", "/") not in folded_paths}
-    (snapshots_dir / "passthrough.json").write_text(json.dumps(passthrough, indent=2), encoding="utf-8")
+    (snapshots_dir / "passthrough.json").write_text(_json_dump(passthrough, compact), encoding="utf-8")
 
     return out

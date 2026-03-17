@@ -94,14 +94,20 @@ def run_benchmark_campaign(
                     ok, errors = validate_archive(archive_path)
                     row["archive_validate_status"] = "ok" if ok else f"failed:{len(errors)}"
                     row["integrity_status"] = "ok" if ok and not any("integrity" in e.lower() for e in errors) else "failed"
-                    # Package overhead
+                    # Package overhead (full audit)
                     import zipfile
                     with zipfile.ZipFile(archive_path, "r") as zf:
                         overhead: dict[str, int] = {}
+                        total_archive = 0
                         for info in zf.infolist():
                             name = info.filename
                             size = info.file_size
-                            if name.startswith("shared/"):
+                            total_archive += size
+                            if name == "manifest.json":
+                                overhead["manifest"] = overhead.get("manifest", 0) + size
+                            elif name == "ledger.json":
+                                overhead["ledger"] = overhead.get("ledger", 0) + size
+                            elif name.startswith("shared/"):
                                 overhead["shared"] = overhead.get("shared", 0) + size
                             elif name.startswith("maps/"):
                                 overhead["maps"] = overhead.get("maps", 0) + size
@@ -112,7 +118,8 @@ def run_benchmark_campaign(
                             elif name.startswith("snapshots/"):
                                 overhead["snapshots"] = overhead.get("snapshots", 0) + size
                         row["package_overhead"] = overhead
-                        row["tuning_report"] = build_tuning_report(result, cfg, overhead)
+                        row["archive_size_bytes"] = total_archive
+                        row["tuning_report"] = build_tuning_report(result, cfg, overhead, total_archive)
                     # Reconstruction time
                     out_dir = Path(tmp) / "restored"
                     t0_recon = time.perf_counter()

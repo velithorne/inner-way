@@ -108,6 +108,14 @@ def archive_create(args) -> int:
     """Create Infold archive."""
     from infold.archive import create_archive
     config = load_config()
+    if getattr(args, "compact", False):
+        config = {**config}
+        config["package_export"] = {
+            **config.get("package_export", {}),
+            "compact": True,
+            "report_text": False,
+            "inventory_minimal": True,
+        }
     out = create_archive(args.source, args.output, config)
     print(f"Created: {out}")
     return 0
@@ -217,6 +225,7 @@ def main() -> int:
     create_p = archive_sub.add_parser("create", help="Create archive")
     create_p.add_argument("--source", required=True, help="Source path")
     create_p.add_argument("--output", required=True, help="Output .infold path")
+    create_p.add_argument("--compact", action="store_true", help="Use compact package format (smaller archive)")
     create_p.set_defaults(func=archive_create)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
     inspect_p.add_argument("archive", help="Archive path")

@@ -158,6 +158,54 @@ def test_template_stress_diagnostics():
     assert "5 lines" in r0["reject_reason"] or "file_count" in r0["reject_reason"]
 
 
+def test_package_compact_mode(tmp_path):
+    """Compact package export produces smaller archive, validates, reconstructs."""
+    from pathlib import Path
+    from infold.engine import run_fold, export_package
+    from infold.archive import create_archive, validate_archive, reconstruct_archive
+    from infold.cli import load_config
+
+    base = Path(__file__).parent.parent
+    dup = base / "tests" / "fixtures" / "duplicate_python"
+    if not dup.exists():
+        pytest.skip("duplicate_python fixture not found")
+    config = load_config()
+    config["project"] = {**config.get("project", {}), "id": "dup"}
+    # Default
+    config_def = {**config, "package_export": {"compact": False, "report_text": True}}
+    out_def = tmp_path / "default"
+    export_package(run_fold(dup, config_def), config_def, out_def)
+    size_def = sum(f.stat().st_size for f in out_def.rglob("*") if f.is_file())
+    # Compact
+    config_compact = {**config, "package_export": {"compact": True, "report_text": False, "inventory_minimal": True}}
+    out_compact = tmp_path / "compact"
+    export_package(run_fold(dup, config_compact), config_compact, out_compact)
+    size_compact = sum(f.stat().st_size for f in out_compact.rglob("*") if f.is_file())
+    assert size_compact < size_def
+    # Archive create + validate + reconstruct
+    arc_compact = tmp_path / "test.infold"
+    create_archive(dup, arc_compact, config_compact)
+    ok, _ = validate_archive(arc_compact)
+    assert ok
+    restored = tmp_path / "restored"
+    reconstruct_archive(arc_compact, restored)
+    import subprocess
+    r = subprocess.run(["diff", "-rq", str(dup), str(restored)], capture_output=True)
+    assert r.returncode == 0
+
+
+def test_package_audit():
+    """Package audit identifies dominant sections and hotspots."""
+    from infold.engine.package_audit import audit_package_overhead
+
+    overhead = {"reports": 4000, "snapshots": 3000, "maps": 500, "shared": 200}
+    audit = audit_package_overhead(overhead, total_archive_bytes=10000)
+    assert "dominant_sections" in audit
+    assert "reports" in audit["dominant_sections"]
+    assert "hotspots" in audit
+    assert any("reports" in h for h in audit["hotspots"])
+
+
 def test_tuning_report():
     """Tuning report builds from FoldResult."""
     from pathlib import Path

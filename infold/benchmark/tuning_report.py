@@ -4,6 +4,7 @@ Tuning report: logical gain vs physical size, metadata overhead, low-value folds
 Analyzes fold results to identify:
 - operator contributions to logical gain
 - package overhead by directory
+- overhead hotspots (which sections dominate)
 - accepted folds with low physical benefit
 - rejected candidates by planner reason
 - operators most often blocked or rejected
@@ -13,11 +14,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+from infold.engine.package_audit import audit_package_overhead
+
 
 def build_tuning_report(
     result: Any,
     config: dict[str, Any],
     package_overhead: dict[str, int] | None = None,
+    total_archive_bytes: int | None = None,
 ) -> dict[str, Any]:
     """
     Build tuning-focused report from FoldResult.
@@ -83,6 +87,9 @@ def build_tuning_report(
     if package_overhead:
         report["package_overhead"] = package_overhead
         report["total_overhead_bytes"] = sum(package_overhead.values())
+        report["package_audit"] = audit_package_overhead(
+            package_overhead, total_archive_bytes
+        )
     return report
 
 
@@ -110,6 +117,13 @@ def tuning_report_to_text(report: dict[str, Any], dataset_id: str = "") -> str:
         lines.append(f"  {k}: {v:,} bytes")
     if report.get("total_overhead_bytes"):
         lines.append(f"  total: {report['total_overhead_bytes']:,} bytes")
+    audit = report.get("package_audit", {})
+    if audit:
+        lines.append("")
+        lines.append("## Overhead hotspots")
+        lines.append(f"  Dominant: {', '.join(audit.get('dominant_sections', []))}")
+        for h in audit.get("hotspots", []):
+            lines.append(f"  - {h}")
     lines.extend([
         "",
         "## Low-value accepted folds (gain < 50 bytes)",
