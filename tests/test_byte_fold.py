@@ -105,3 +105,66 @@ def test_archive_validate_strict_with_byte_fold() -> None:
         create_archive(Path("tests/fixtures/byte_fold"), out)
         ok, errors = validate_archive(out, mode="strict")
         assert ok, errors
+
+
+# Byte Fold focused tests: mixed, opaque, large text, version-like datasets
+
+
+def test_byte_fold_mixed_arbitrary_content() -> None:
+    """Mixed arbitrary content: archive create/validate/reconstruct preserves exact reconstruction."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "mixed.infold"
+        restored = Path(tmp) / "restored"
+        create_archive(Path("tests/fixtures/mixed_project"), out)
+        ok, _ = validate_archive(out, mode="strict")
+        assert ok
+        result = reconstruct_archive(out, restored)
+        for path_str, content in result.items():
+            orig = Path("tests/fixtures/mixed_project") / path_str
+            if orig.exists():
+                assert content == orig.read_text(encoding="utf-8"), f"Mismatch: {path_str}"
+
+
+def test_byte_fold_repeated_opaque_files() -> None:
+    """Repeated opaque/binary-like files: archive create/validate/reconstruct."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "opaque.infold"
+        restored = Path(tmp) / "restored"
+        create_archive(Path("tests/fixtures/byte_fold"), out)
+        ok, _ = validate_archive(out, mode="strict")
+        assert ok
+        result = reconstruct_archive(out, restored)
+        for path_str, content in result.items():
+            orig = Path("tests/fixtures/byte_fold") / path_str
+            if orig.exists():
+                assert content == orig.read_text(encoding="utf-8"), f"Mismatch: {path_str}"
+
+
+def test_byte_fold_slightly_changed_large_text() -> None:
+    """Slightly changed large text files: archive create/validate/reconstruct."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "large.infold"
+        restored = Path(tmp) / "restored"
+        create_archive(Path("tests/fixtures/byte_fold_large_text"), out)
+        ok, _ = validate_archive(out, mode="strict")
+        assert ok
+        result = reconstruct_archive(out, restored)
+        for path_str, content in result.items():
+            orig = Path("tests/fixtures/byte_fold_large_text") / path_str
+            if orig.exists():
+                assert content == orig.read_text(encoding="utf-8"), f"Mismatch: {path_str}"
+
+
+def test_byte_fold_version_like_partial_repeated() -> None:
+    """Version-like folders with partial repeated content: archive create/validate/reconstruct."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "version.infold"
+        restored = Path(tmp) / "restored"
+        create_archive(Path("tests/fixtures/byte_fold_version_like"), out)
+        ok, _ = validate_archive(out, mode="strict")
+        assert ok
+        result = reconstruct_archive(out, restored)
+        for path_str, content in result.items():
+            orig = Path("tests/fixtures/byte_fold_version_like") / path_str
+            if orig.exists():
+                assert content == orig.read_text(encoding="utf-8"), f"Mismatch: {path_str}"

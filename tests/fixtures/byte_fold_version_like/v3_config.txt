@@ -1,0 +1,17 @@
+# Config version 1.0 - shared header
+# ===================================
+# Application settings
+# ===================================
+
+[section_a]
+key1=value1
+key2=value2
+
+# Version-specific block
+version=3.0
+build=300
+
+# ===================================
+# Shared footer - do not edit below
+# ===================================
+# End of config
