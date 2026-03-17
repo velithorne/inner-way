@@ -82,6 +82,8 @@ def run_benchmark_campaign_cmd(args) -> int:
     from infold.benchmark.pack import ensure_stress_datasets
 
     config = load_config()
+    profile = getattr(args, "profile", "auto")
+    config["_benchmark_profile"] = profile
     base = Path(__file__).parent.parent
     ensure_stress_datasets(base)
     datasets = get_benchmark_datasets(base)
@@ -116,7 +118,8 @@ def archive_create(args) -> int:
             "report_text": False,
             "inventory_minimal": True,
         }
-    out = create_archive(args.source, args.output, config)
+    profile = getattr(args, "profile", "auto")
+    out = create_archive(args.source, args.output, config, profile=profile)
     print(f"Created: {out}")
     return 0
 
@@ -132,6 +135,9 @@ def archive_inspect(args) -> int:
         print(f"Archive: {info['path']}")
         print(f"Source: {info['source_path']}")
         print(f"Files: {info['file_count']}, Folds: {info['fold_count']}")
+        fp = info.get("manifest", {}).get("fold_profile")
+        if fp:
+            print(f"Fold profile: {fp}")
         print(f"Logical gain: {info['logical_gain_bytes']:,} bytes")
         print(f"Physical folded: {info['physical_folded_size_bytes']:,} bytes")
     return 0
@@ -505,6 +511,7 @@ def main() -> int:
     parser.add_argument("--benchmark-campaign", action="store_true", help="Run full benchmark campaign")
     parser.add_argument("--campaign-output", dest="campaign_output", help="Output dir for campaign csv/json/md")
     parser.add_argument("--no-archives", dest="archives", action="store_false", default=True, help="Skip archive create/validate (with --benchmark-campaign)")
+    parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     archive_parser = subparsers.add_parser("archive", help="Infold Archive commands")
     archive_parser.add_argument("--json", action="store_true", help="Machine-readable JSON output")
@@ -512,6 +519,7 @@ def main() -> int:
     create_p = archive_sub.add_parser("create", help="Create archive")
     create_p.add_argument("--source", required=True, help="Source path")
     create_p.add_argument("--output", required=True, help="Output .infold path")
+    create_p.add_argument("--profile", default="auto", dest="profile", help="Fold profile: auto, sparrow, fox, dragon, golem, serpent")
     create_p.add_argument("--compact", action="store_true", help="Use compact package format (smaller archive)")
     create_p.set_defaults(func=archive_create)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
@@ -658,6 +666,7 @@ def main() -> int:
         ca = CampaignArgs()
         ca.output = getattr(args, "campaign_output", None)
         ca.archives = getattr(args, "archives", True)
+        ca.profile = getattr(args, "profile", "auto")
         return run_benchmark_campaign_cmd(ca)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:

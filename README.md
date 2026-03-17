@@ -51,6 +51,27 @@ pip install -e .
 
 Default configuration is in `infold/config.json`. Override with a project-local config file.
 
+## Fold Profiles (Phase 6A)
+
+Adaptive Origami Profiles change fold behavior by size, structure, and context:
+
+| Profile | Use case |
+|---------|----------|
+| **auto** | Default; selects sparrow/fox/dragon/golem/serpent by project metrics |
+| **sparrow** | Tiny archives, overhead-sensitive |
+| **fox** | Balanced structured projects |
+| **dragon** | Large structure-rich archives |
+| **golem** | Binary/opaque-heavy content |
+| **serpent** | Lineage/snapshot-oriented workflows |
+
+```bash
+# Auto-select profile (default)
+python3 -m infold.cli archive create --source . --output archive.infold
+
+# Manual profile
+python3 -m infold.cli archive create --source . --output archive.infold --profile dragon
+```
+
 ## Infold Archive
 
 Create, inspect, validate, explain, compare, and reconstruct folded archives:

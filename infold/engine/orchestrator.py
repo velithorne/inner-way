@@ -93,6 +93,52 @@ def run_fold(
     if profile is not None:
         profile["parse_time_s"] = time.perf_counter() - t0_parse
 
+    # Fold profile: resolve auto or apply manual
+    fold_profile = config.get("_fold_profile", "auto")
+    from infold.profiles.definitions import VALID_PROFILES, get_profile_config
+
+    def _merge(d: dict, o: dict) -> None:
+        for k, v in o.items():
+            if k in d and isinstance(d[k], dict) and isinstance(v, dict):
+                _merge(d[k], v)
+            else:
+                d[k] = v
+
+    if fold_profile == "auto":
+        from infold.profiles.selector import select_profile_auto
+        selected, reason, factors = select_profile_auto(sheet, config, source_path)
+        overrides = get_profile_config(selected)
+        for k, v in overrides.items():
+            if k not in config:
+                config[k] = {}
+            if isinstance(v, dict) and isinstance(config.get(k), dict):
+                _merge(config[k], v)
+            else:
+                config[k] = v
+        config["_fold_profile_info"] = {
+            "fold_profile": selected,
+            "fold_profile_mode": "auto",
+            "fold_profile_reason": reason,
+            "fold_profile_factors": factors,
+        }
+    elif fold_profile in VALID_PROFILES:
+        overrides = get_profile_config(fold_profile)
+        for k, v in overrides.items():
+            if k not in config:
+                config[k] = {}
+            if isinstance(v, dict) and isinstance(config.get(k), dict):
+                _merge(config[k], v)
+            else:
+                config[k] = v
+        config["_fold_profile_info"] = {
+            "fold_profile": fold_profile,
+            "fold_profile_mode": "manual",
+            "fold_profile_reason": "user_selected",
+            "fold_profile_factors": {},
+        }
+    else:
+        raise ValueError(f"Invalid profile: {fold_profile}. Valid: auto, {sorted(VALID_PROFILES)}")
+
     ledger = FoldLedger(
         project_id=config.get("project", {}).get("id"),
         config_snapshot=config,

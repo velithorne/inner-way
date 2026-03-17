@@ -53,6 +53,7 @@ def export_package(
     # manifest.json (package spec v1)
     raw_size = sheet.metrics.get("original_size_bytes", 0)
     physical_folded = raw_size - ledger.total_bytes_saved
+    pfi = config.get("_fold_profile_info") or {}
     manifest = {
         "version": PACKAGE_SPEC_VERSION,
         "package_spec": "1.0",
@@ -68,6 +69,9 @@ def export_package(
         "physical_folded_size_bytes": physical_folded,
         "required_files": ["manifest.json", "ledger.json"],
         "required_dirs": ["shared", "maps", "reports", "snapshots"],
+        "fold_profile": pfi.get("fold_profile"),
+        "fold_profile_mode": pfi.get("fold_profile_mode"),
+        "fold_profile_reason": pfi.get("fold_profile_reason"),
     }
     (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 

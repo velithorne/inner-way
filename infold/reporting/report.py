@@ -164,6 +164,10 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             getattr(result, "interaction_diagnostics", None)
         ),
         "byte_fold_routing": config.get("_run_diagnostics", {}).get("byte_fold_routing"),
+        "fold_profile": config.get("_fold_profile_info", {}).get("fold_profile"),
+        "fold_profile_mode": config.get("_fold_profile_info", {}).get("fold_profile_mode"),
+        "fold_profile_reason": config.get("_fold_profile_info", {}).get("fold_profile_reason"),
+        "fold_profile_factors": config.get("_fold_profile_info", {}).get("fold_profile_factors"),
     }
 
 
@@ -196,13 +200,21 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         f"Folders: {report['folder_count']}",
         f"Original size (raw): {report['original_size_bytes']:,} bytes",
         "",
+    ]
+    fp = report.get("fold_profile")
+    if fp:
+        mode = report.get("fold_profile_mode", "?")
+        reason = report.get("fold_profile_reason", "?")
+        lines.append(f"Fold profile: {fp} ({mode}, reason={reason})")
+        lines.append("")
+    lines.extend([
         f"Folds: {report['fold_count']}",
         f"Logical gain (bytes saved): {report['total_bytes_saved']:,}",
         f"Physical folded size: {report.get('physical_folded_size_bytes', report['original_size_bytes'] - report['total_bytes_saved']):,} bytes",
         f"Exact reconstruction: {'OK' if report.get('exact_reconstruction_ok', True) else 'FAILED'}",
         "",
         "Candidate counts:",
-    ]
+    ])
     for op_id, count in report.get("candidate_counts", {}).items():
         lines.append(f"  {op_id}: {count}")
     lines.append("")

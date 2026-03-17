@@ -38,10 +38,12 @@ def run_benchmark_campaign(
     if "infold_sweep_report" not in excludes:
         excludes.append("infold_sweep_report")
 
+    campaign_profile = config.get("_benchmark_profile", "auto")
     for path, dataset_id, category in datasets:
         if not path.exists():
             continue
         cfg = {**config, "project": {**config.get("project", {}), "id": dataset_id, "exclude_patterns": excludes}}
+        cfg["_fold_profile"] = campaign_profile
         row: dict[str, Any] = {
             "dataset_id": dataset_id,
             "category": category,
@@ -87,13 +89,17 @@ def run_benchmark_campaign(
         report = build_report(result, cfg)
         bfm = report.get("byte_fold_metrics") or {}
         row["byte_fold_metrics"] = bfm if bfm else None
+        pfi = cfg.get("_fold_profile_info") or {}
+        row["fold_profile"] = pfi.get("fold_profile")
+        row["fold_profile_mode"] = pfi.get("fold_profile_mode")
+        row["fold_profile_reason"] = pfi.get("fold_profile_reason")
 
         if create_archives:
             with tempfile.TemporaryDirectory(prefix="infold_campaign_") as tmp:
                 archive_path = Path(tmp) / f"{dataset_id}.infold"
                 t0_create = time.perf_counter()
                 try:
-                    create_archive(path, archive_path, cfg)
+                    create_archive(path, archive_path, cfg, profile=campaign_profile)
                     row["archive_creation_time_s"] = time.perf_counter() - t0_create
                     ok, errors = validate_archive(archive_path)
                     row["archive_validate_status"] = "ok" if ok else f"failed:{len(errors)}"
@@ -203,12 +209,13 @@ def export_campaign_markdown(results: list[dict[str, Any]], out_path: Path) -> N
     lines = [
         "# Infold Benchmark Campaign",
         "",
-        "| Dataset | Category | Raw | ZIP | Gzip | Infold Phys | Infold Gain | Fold | Recon | Validate | Integrity |",
-        "|---------|----------|-----|-----|------|-------------|-------------|------|-------|----------|-----------|",
+        "| Dataset | Category | Profile | Raw | ZIP | Gzip | Infold Phys | Infold Gain | Fold | Recon | Validate | Integrity |",
+        "|---------|----------|---------|-----|-----|------|-------------|-------------|------|-------|----------|-----------|",
     ]
     for r in results:
         did = r.get("dataset_id", "")
         cat = r.get("category", "")
+        fp = r.get("fold_profile", "")
         raw = r.get("raw_bytes", 0)
         zip_b = r.get("zip_bytes", 0)
         gz = r.get("gzip_bytes", 0)
@@ -218,7 +225,7 @@ def export_campaign_markdown(results: list[dict[str, Any]], out_path: Path) -> N
         recon = r.get("exact_reconstruction_status", "")
         val = r.get("archive_validate_status", "")
         integ = r.get("integrity_status", "")
-        lines.append(f"| {did} | {cat} | {raw:,} | {zip_b:,} | {gz:,} | {phys:,} | {gain:,} | {fold} | {recon} | {val} | {integ} |")
+        lines.append(f"| {did} | {cat} | {fp} | {raw:,} | {zip_b:,} | {gz:,} | {phys:,} | {gain:,} | {fold} | {recon} | {val} | {integ} |")
     lines.extend(["", "## Times (s)", ""])
     for r in results:
         ft = r.get("fold_time_s")

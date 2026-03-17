@@ -35,9 +35,11 @@ def create_archive(
     source_path: Path | str,
     output_path: Path | str,
     config: dict[str, Any] | None = None,
+    profile: str = "auto",
 ) -> Path:
     """
     Create an Infold archive: run fold, export package, zip to .infold.
+    profile: auto (default), sparrow, fox, dragon, golem, serpent.
     """
     import shutil
     import tempfile
@@ -48,6 +50,8 @@ def create_archive(
     if config is None:
         from infold.cli import load_config
         config = load_config()
+    config = dict(config)
+    config["_fold_profile"] = profile
     source = Path(source_path).resolve()
     out = Path(output_path).resolve()
     if out.suffix != ".infold":
@@ -227,6 +231,9 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
         return {
             "path": str(archive),
             "manifest": manifest,
+            "fold_profile": manifest.get("fold_profile"),
+            "fold_profile_mode": manifest.get("fold_profile_mode"),
+            "fold_profile_reason": manifest.get("fold_profile_reason"),
             "package_summary": {
                 "file_count": manifest.get("file_count", 0),
                 "fold_count": manifest.get("fold_count", 0),
@@ -327,8 +334,14 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
                 fam["paths"] = targets[:5]
             families_by_op[op].append(fam)
 
+        manifest = {}
+        if (root / "manifest.json").exists():
+            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
         return {
             "path": str(archive),
+            "manifest": manifest,
+            "fold_profile": manifest.get("fold_profile"),
+            "fold_profile_mode": manifest.get("fold_profile_mode"),
             "shared_artifacts": shared_artifacts,
             "families_by_operator": families_by_op,
         }
@@ -1708,8 +1721,14 @@ def explain_to_text(info: dict[str, Any]) -> str:
         "",
         f"Path: {info.get('path', '?')}",
         "",
-        "Package summary:",
     ]
+    fp = info.get("fold_profile")
+    if fp:
+        mode = info.get("fold_profile_mode", "?")
+        reason = info.get("fold_profile_reason", "?")
+        lines.append(f"Fold profile: {fp} ({mode}, reason={reason})")
+        lines.append("")
+    lines.append("Package summary:")
     pkg = info.get("package_summary", {})
     for k, v in pkg.items():
         if isinstance(v, int) and "bytes" in str(k):
