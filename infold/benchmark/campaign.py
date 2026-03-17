@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from infold.reporting.benchmark import _gzip_size, _raw_size, _zip_size
+from infold.benchmark.tuning_report import build_tuning_report, tuning_report_to_text
 
 
 def run_benchmark_campaign(
@@ -81,6 +82,7 @@ def run_benchmark_campaign(
         row["archive_creation_time_s"] = None
         row["reconstruction_time_s"] = None
         row["package_overhead"] = None
+        row["tuning_report"] = build_tuning_report(result, cfg, None)
 
         if create_archives:
             with tempfile.TemporaryDirectory(prefix="infold_campaign_") as tmp:
@@ -110,6 +112,7 @@ def run_benchmark_campaign(
                             elif name.startswith("snapshots/"):
                                 overhead["snapshots"] = overhead.get("snapshots", 0) + size
                         row["package_overhead"] = overhead
+                        row["tuning_report"] = build_tuning_report(result, cfg, overhead)
                     # Reconstruction time
                     out_dir = Path(tmp) / "restored"
                     t0_recon = time.perf_counter()
@@ -167,6 +170,21 @@ def export_campaign_json(results: list[dict[str, Any]], out_path: Path) -> None:
         out.append(c)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2)
+
+
+def export_campaign_tuning_report(results: list[dict[str, Any]], out_path: Path) -> None:
+    """Export tuning reports for each dataset."""
+    lines = ["# Campaign Tuning Report", ""]
+    for r in results:
+        tr = r.get("tuning_report", {})
+        if not tr:
+            continue
+        lines.append(tuning_report_to_text(tr, r.get("dataset_id", "")))
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
 
 
 def export_campaign_markdown(results: list[dict[str, Any]], out_path: Path) -> None:

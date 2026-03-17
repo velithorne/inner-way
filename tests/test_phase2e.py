@@ -158,6 +158,29 @@ def test_template_stress_diagnostics():
     assert "5 lines" in r0["reject_reason"] or "file_count" in r0["reject_reason"]
 
 
+def test_tuning_report():
+    """Tuning report builds from FoldResult."""
+    from pathlib import Path
+    from infold.engine import run_fold
+    from infold.benchmark.tuning_report import build_tuning_report, tuning_report_to_text
+    from infold.cli import load_config
+
+    base = Path(__file__).parent.parent
+    dup = base / "tests" / "fixtures" / "duplicate_python"
+    if not dup.exists():
+        pytest.skip("duplicate_python fixture not found")
+    config = load_config()
+    config["project"] = {**config.get("project", {}), "id": "dup"}
+    result = run_fold(dup, config)
+    report = build_tuning_report(result, config, {"shared": 100, "maps": 50})
+    assert "logical_gain_bytes" in report
+    assert "gain_by_operator" in report
+    assert report.get("package_overhead", {}).get("shared") == 100
+    text = tuning_report_to_text(report, "dup")
+    assert "Logical vs Physical" in text
+    assert "Operator contributions" in text
+
+
 def test_benchmark_campaign_no_archives():
     """Campaign runs without archive creation."""
     base = Path(__file__).parent.parent

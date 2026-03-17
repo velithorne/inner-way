@@ -76,6 +76,7 @@ def run_benchmark_campaign_cmd(args) -> int:
         export_campaign_csv,
         export_campaign_json,
         export_campaign_markdown,
+        export_campaign_tuning_report,
         get_benchmark_datasets,
     )
     from infold.benchmark.pack import ensure_stress_datasets
@@ -96,7 +97,8 @@ def run_benchmark_campaign_cmd(args) -> int:
         export_campaign_csv(results, out / "campaign.csv")
         export_campaign_json(results, out / "campaign.json")
         export_campaign_markdown(results, out / "campaign.md")
-        print(f"Exported to {out}/campaign.csv, campaign.json, campaign.md")
+        export_campaign_tuning_report(results, out / "tuning_report.md")
+        print(f"Exported to {out}/campaign.csv, campaign.json, campaign.md, tuning_report.md")
     for r in results:
         print(f"{r['dataset_id']}: raw={r['raw_bytes']:,} fold={r['fold_count']} recon={r['exact_reconstruction_status']}")
     return 0
