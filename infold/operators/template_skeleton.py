@@ -27,21 +27,22 @@ def _find_template_families(
     min_family: int,
     min_similarity: float,
     max_slot_ratio: float,
+    min_lines: int = 5,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[tuple[list[Path], list[str], list[list[str]], float, float]]:
     """
     Find families of files with same line count, high line-level similarity.
     Returns accepted families: (paths, const_blocks, slot_groups, similarity, slot_ratio).
     If diagnostics list provided, appends rejected-family diagnostics to it.
+    min_lines: minimum line count for a file to be included in template analysis.
     """
-    MIN_LINES = 5
     by_lang: dict[str, list[tuple[Path, list[str]]]] = {}
     skipped_few_lines = 0
     for path, node in project_sheet.file_nodes.items():
         if node.diagnostics:
             continue
         lines = node.raw_text.splitlines(keepends=True)
-        if len(lines) < MIN_LINES:
+        if len(lines) < min_lines:
             skipped_few_lines += 1
             continue
         by_lang.setdefault(node.language, []).append((path, lines))
@@ -54,7 +55,7 @@ def _find_template_families(
             "scaffold_similarity": None,
             "slot_ratio": None,
             "family_purity": None,
-            "reject_reason": f"files skipped: {skipped_few_lines} with < {MIN_LINES} lines (min for template analysis)",
+            "reject_reason": f"files skipped: {skipped_few_lines} with < {min_lines} lines (min for template analysis)",
         })
 
     for lang, files in by_lang.items():
@@ -182,10 +183,12 @@ class TemplateSkeletonOperator(BaseOperator):
         min_family = thresh.get("min_family_size", 3)
         min_similarity = thresh.get("min_scaffold_similarity", 0.80)
         max_slot_ratio = thresh.get("max_slot_ratio", 0.35)
+        min_lines = thresh.get("min_lines", 5)
 
         diag_list = config.get("_run_diagnostics", {}).get("template_rejected", [])
         families = _find_template_families(
-            project_sheet, min_family, min_similarity, max_slot_ratio, diagnostics=diag_list
+            project_sheet, min_family, min_similarity, max_slot_ratio,
+            min_lines=min_lines, diagnostics=diag_list
         )
         candidates: list[CandidateCrease] = []
         for paths, const_blocks, slot_groups, sim, slot_ratio in families:

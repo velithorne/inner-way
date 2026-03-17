@@ -1,0 +1,1749 @@
+{
+  "min_lines_5": [
+    {
+      "dataset_id": "template-heavy",
+      "min_lines": 5,
+      "raw_bytes": 422,
+      "logical_gain": 127,
+      "physical_folded_size": 295,
+      "total_fold_count": 1,
+      "template_families_found": 1,
+      "template_logical_gain": 127,
+      "rejected_template_families": 0,
+      "rejected_details": [],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": []
+    },
+    {
+      "dataset_id": "template-stress",
+      "min_lines": 5,
+      "raw_bytes": 1940,
+      "logical_gain": 0,
+      "physical_folded_size": 1940,
+      "total_fold_count": 0,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 1,
+      "rejected_details": [
+        {
+          "file_count": 30,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "files skipped: 30 with < 5 lines (min for template analysis)"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": []
+    },
+    {
+      "dataset_id": "template-reject",
+      "min_lines": 5,
+      "raw_bytes": 1161,
+      "logical_gain": 0,
+      "physical_folded_size": 1161,
+      "total_fold_count": 0,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 3,
+      "rejected_details": [
+        {
+          "file_count": 5,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "files skipped: 5 with < 5 lines (min for template analysis)"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.0909,
+          "slot_ratio": 0.9091,
+          "family_purity": 0.0909,
+          "reject_reason": "scaffold_similarity 0.091 < 0.8; slot_ratio 0.909 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.5,
+          "slot_ratio": 0.5,
+          "family_purity": 0.5,
+          "reject_reason": "scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": [
+        "High slot_ratio rejection: scaffold_similarity 0.091 < 0.8; slot_ratio 0.909 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+      ]
+    },
+    {
+      "dataset_id": "infold-workspace",
+      "min_lines": 5,
+      "raw_bytes": 924932,
+      "logical_gain": 49421,
+      "physical_folded_size": 875511,
+      "total_fold_count": 22,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 107,
+      "rejected_details": [
+        {
+          "file_count": 121,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "files skipped: 121 with < 5 lines (min for template analysis)"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 6,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.0769,
+          "slot_ratio": 0.9231,
+          "family_purity": 0.0769,
+          "reject_reason": "scaffold_similarity 0.077 < 0.8; slot_ratio 0.923 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 1.0,
+          "slot_ratio": 0.0,
+          "family_purity": 1.0,
+          "reject_reason": "exact_duplicates (leave to Exact Repetition)"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 1.0,
+          "slot_ratio": 0.0,
+          "family_purity": 1.0,
+          "reject_reason": "exact_duplicates (leave to Exact Repetition)"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 4,
+          "scaffold_similarity": 0.625,
+          "slot_ratio": 0.375,
+          "family_purity": 0.625,
+          "reject_reason": "scaffold_similarity 0.625 < 0.8; slot_ratio 0.375 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 5,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 14,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 4,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.5,
+          "slot_ratio": 0.5,
+          "family_purity": 0.5,
+          "reject_reason": "scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": [
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.077 < 0.8; slot_ratio 0.923 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.625 < 0.8; slot_ratio 0.375 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+      ]
+    }
+  ],
+  "min_lines_4": [
+    {
+      "dataset_id": "template-heavy",
+      "min_lines": 4,
+      "raw_bytes": 422,
+      "logical_gain": 127,
+      "physical_folded_size": 295,
+      "total_fold_count": 1,
+      "template_families_found": 1,
+      "template_logical_gain": 127,
+      "rejected_template_families": 0,
+      "rejected_details": [],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": []
+    },
+    {
+      "dataset_id": "template-stress",
+      "min_lines": 4,
+      "raw_bytes": 1940,
+      "logical_gain": 0,
+      "physical_folded_size": 1940,
+      "total_fold_count": 0,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 1,
+      "rejected_details": [
+        {
+          "file_count": 30,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "files skipped: 30 with < 4 lines (min for template analysis)"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": []
+    },
+    {
+      "dataset_id": "template-reject",
+      "min_lines": 4,
+      "raw_bytes": 1161,
+      "logical_gain": 0,
+      "physical_folded_size": 1161,
+      "total_fold_count": 0,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 3,
+      "rejected_details": [
+        {
+          "file_count": 5,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.0909,
+          "slot_ratio": 0.9091,
+          "family_purity": 0.0909,
+          "reject_reason": "scaffold_similarity 0.091 < 0.8; slot_ratio 0.909 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.5,
+          "slot_ratio": 0.5,
+          "family_purity": 0.5,
+          "reject_reason": "scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": [
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.091 < 0.8; slot_ratio 0.909 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+      ]
+    },
+    {
+      "dataset_id": "infold-workspace",
+      "min_lines": 4,
+      "raw_bytes": 924932,
+      "logical_gain": 49421,
+      "physical_folded_size": 875511,
+      "total_fold_count": 22,
+      "template_families_found": 0,
+      "template_logical_gain": 0,
+      "rejected_template_families": 109,
+      "rejected_details": [
+        {
+          "file_count": 112,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "files skipped: 112 with < 4 lines (min for template analysis)"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 6,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.0769,
+          "slot_ratio": 0.9231,
+          "family_purity": 0.0769,
+          "reject_reason": "scaffold_similarity 0.077 < 0.8; slot_ratio 0.923 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 1.0,
+          "slot_ratio": 0.0,
+          "family_purity": 1.0,
+          "reject_reason": "exact_duplicates (leave to Exact Repetition)"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 1.0,
+          "slot_ratio": 0.0,
+          "family_purity": 1.0,
+          "reject_reason": "exact_duplicates (leave to Exact Repetition)"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 4,
+          "scaffold_similarity": 0.625,
+          "slot_ratio": 0.375,
+          "family_purity": 0.625,
+          "reject_reason": "scaffold_similarity 0.625 < 0.8; slot_ratio 0.375 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 5,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 14,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 7,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 4,
+          "scaffold_similarity": 0.0,
+          "slot_ratio": 1.0,
+          "family_purity": 0.0,
+          "reject_reason": "scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35"
+        },
+        {
+          "file_count": 3,
+          "scaffold_similarity": 0.5,
+          "slot_ratio": 0.5,
+          "family_purity": 0.5,
+          "reject_reason": "scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 2,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 2 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        },
+        {
+          "file_count": 1,
+          "scaffold_similarity": null,
+          "slot_ratio": null,
+          "family_purity": null,
+          "reject_reason": "file_count 1 < min_family_size 3"
+        }
+      ],
+      "exact_reconstruction_ok": true,
+      "false_positive_risk_signals": [
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.077 < 0.8; slot_ratio 0.923 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.625 < 0.8; slot_ratio 0.375 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+        "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+      ]
+    }
+  ],
+  "summary": {
+    "improved_with_4": [],
+    "regressed_with_4": [],
+    "unchanged": [
+      "template-heavy",
+      "template-stress",
+      "template-reject",
+      "infold-workspace"
+    ],
+    "false_positive_risk_at_4": [
+      {
+        "dataset": "template-reject",
+        "signals": [
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.091 < 0.8; slot_ratio 0.909 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        ]
+      },
+      {
+        "dataset": "infold-workspace",
+        "signals": [
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.077 < 0.8; slot_ratio 0.923 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.625 < 0.8; slot_ratio 0.375 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.000 < 0.8; slot_ratio 1.000 > 0.35",
+          "High slot_ratio rejection: scaffold_similarity 0.500 < 0.8; slot_ratio 0.500 > 0.35"
+        ]
+      }
+    ]
+  }
+}

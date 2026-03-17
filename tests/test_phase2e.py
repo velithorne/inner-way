@@ -111,6 +111,32 @@ def test_0fold_archive_validation(tmp_path):
     assert ok, errors
 
 
+def test_template_min_lines_configurable():
+    """min_lines threshold is configurable via config."""
+    from pathlib import Path
+    from infold.engine import run_fold
+    from infold.cli import load_config
+
+    base = Path(__file__).parent.parent
+    stress = base / "benchmark" / "synthetic" / "template_stress"
+    if not stress.exists():
+        pytest.skip("template_stress not found")
+    config = load_config()
+    config["project"] = {**config.get("project", {}), "id": "template-stress"}
+    config.setdefault("_run_diagnostics", {})["template_rejected"] = []
+    # With min_lines=5, 30 files skipped
+    config["thresholds"]["template_skeleton"] = {**config["thresholds"]["template_skeleton"], "min_lines": 5}
+    result5 = run_fold(stress, config)
+    rejected5 = config["_run_diagnostics"].get("template_rejected", [])
+    assert any("5 lines" in str(r.get("reject_reason", "")) for r in rejected5)
+    # With min_lines=3, files are included (3-line files)
+    config["_run_diagnostics"]["template_rejected"] = []
+    config["thresholds"]["template_skeleton"]["min_lines"] = 3
+    result3 = run_fold(stress, config)
+    rejected3 = config["_run_diagnostics"].get("template_rejected", [])
+    assert not any("3 lines" in str(r.get("reject_reason", "")) for r in rejected3)
+
+
 def test_template_stress_diagnostics():
     """template_stress produces diagnostics explaining 0 folds (files < 5 lines)."""
     from pathlib import Path

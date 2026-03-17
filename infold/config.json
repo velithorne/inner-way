@@ -32,7 +32,8 @@
     "template_skeleton": {
       "min_family_size": 3,
       "min_scaffold_similarity": 0.80,
-      "max_slot_ratio": 0.35
+      "max_slot_ratio": 0.35,
+      "min_lines": 5
     },
     "symbol_table": {
       "min_symbol_reuse_count": 5,
