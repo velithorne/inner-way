@@ -1,4 +1,4 @@
-"""Tests for archive search (Infold Search v0.1)."""
+"""Tests for archive search (Infold Search v0.1 and v0.2)."""
 
 import json
 import tempfile
@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from infold.archive import search_archive, create_archive
+from infold.archive import search_archive, search_archives, create_archive
 from infold.cli import load_config
 
 
@@ -108,3 +108,109 @@ def test_search_by_artifact_id(sample_archive):
     r = search_archive(sample_archive, artifact_id=idx)
     assert r["match_count"] == 1
     assert r["matches"][0]["index"] == idx
+
+
+# --- Infold Search v0.2 ---
+
+
+def test_search_match_has_archive_path(sample_archive):
+    """Every match includes archive_path for schema consistency."""
+    r = search_archive(sample_archive)
+    for m in r.get("matches", []):
+        assert "archive_path" in m
+        assert m["archive_path"] == str(sample_archive.resolve())
+
+
+def test_search_has_summary(sample_archive):
+    """Search result includes summary with total_matches, matches_by_operator."""
+    r = search_archive(sample_archive)
+    assert "summary" in r
+    s = r["summary"]
+    assert "total_archives_searched" in s
+    assert "total_matches" in s
+    assert "matches_by_operator" in s
+
+
+def test_search_min_gain_filter(sample_archive):
+    """min_gain filter excludes low-gain matches."""
+    r_all = search_archive(sample_archive)
+    if r_all["match_count"] == 0:
+        pytest.skip("no folds")
+    max_gain = max(m["gain"] for m in r_all["matches"])
+    r = search_archive(sample_archive, min_gain=max_gain + 9999)
+    assert r["match_count"] == 0
+
+
+def test_search_min_target_count_filter(sample_archive):
+    """min_target_count filter excludes small families."""
+    r_all = search_archive(sample_archive)
+    if r_all["match_count"] == 0:
+        pytest.skip("no folds")
+    max_tc = max(m["target_count"] for m in r_all["matches"])
+    r = search_archive(sample_archive, min_target_count=max_tc + 999)
+    assert r["match_count"] == 0
+
+
+def test_search_sort_by_gain(sample_archive):
+    """sort_by=gain orders by gain descending."""
+    r = search_archive(sample_archive, sort_by="gain")
+    gains = [m["gain"] for m in r["matches"]]
+    assert gains == sorted(gains, reverse=True)
+
+
+def test_search_sort_by_operator(sample_archive):
+    """sort_by=operator orders by operator_id."""
+    r = search_archive(sample_archive, sort_by="operator")
+    ops = [m["operator_id"] for m in r["matches"]]
+    assert ops == sorted(ops)
+
+
+def test_multi_archive_search(sample_archive, template_archive):
+    """search_archives aggregates matches across archives."""
+    r = search_archives([sample_archive, template_archive])
+    assert "paths" in r
+    assert len(r["paths"]) == 2
+    assert r["summary"]["total_archives_searched"] == 2
+    assert r["summary"]["total_matches"] == r["match_count"]
+    for m in r["matches"]:
+        assert "archive_path" in m
+        assert m["archive_path"] in (str(sample_archive.resolve()), str(template_archive.resolve()))
+
+
+def test_multi_archive_archive_filter(sample_archive, template_archive):
+    """archive_filter restricts which archives are searched."""
+    r = search_archives(
+        [sample_archive, template_archive],
+        archive_filter="template",
+    )
+    assert len(r["paths"]) == 1
+    assert "template" in r["paths"][0].lower()
+
+
+def test_multi_archive_empty_dir(tmp_path):
+    """Empty directory of archives returns empty matches."""
+    r = search_archives([])
+    assert r["match_count"] == 0
+    assert r["summary"]["total_archives_searched"] == 0
+    assert r["matches"] == []
+
+
+def test_multi_archive_empty_result(sample_archive):
+    """Multi-archive search with no matching operator returns empty."""
+    r = search_archives([sample_archive], operator="dependency_motif")
+    assert r["match_count"] == 0
+    assert r["summary"]["total_archives_searched"] == 1
+    assert r["matches"] == []
+
+
+def test_search_json_schema_validity(sample_archive):
+    """JSON output has stable schema: path/paths, query, match_count, matches, summary."""
+    r = search_archive(sample_archive)
+    assert "path" in r or "paths" in r
+    assert "query" in r
+    assert "match_count" in r
+    assert "matches" in r
+    assert "summary" in r
+    j = json.dumps(r)
+    parsed = json.loads(j)
+    assert parsed["match_count"] == len(parsed["matches"])

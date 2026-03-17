@@ -212,19 +212,51 @@ def archive_stats(args) -> int:
 
 
 def archive_search(args) -> int:
-    """Search within archive."""
-    from infold.archive import search_archive
+    """Search within archive(s). Path can be .infold file or directory of .infold archives."""
+    from infold.archive import search_archive, search_archives
     from infold.archive.operations import search_to_text
-    result = search_archive(
-        args.archive,
-        operator=getattr(args, "operator", None),
-        path=getattr(args, "path", None),
-        family=getattr(args, "family", None),
-        family_id=getattr(args, "family_id", None),
-        artifact_id=getattr(args, "artifact_id", None),
-    )
+
+    target = Path(args.archive)
+    if not target.exists():
+        print(f"Error: path not found: {target}", file=sys.stderr)
+        return 1
+
+    min_gain = getattr(args, "min_gain", None)
+    min_targets = getattr(args, "min_targets", None)
+    archive_filter = getattr(args, "archive_filter", None)
+    sort_by = getattr(args, "sort_by", None)
+
+    if target.is_file():
+        result = search_archive(
+            target,
+            operator=getattr(args, "operator", None),
+            path=getattr(args, "path", None),
+            family=getattr(args, "family", None),
+            family_id=getattr(args, "family_id", None),
+            artifact_id=getattr(args, "artifact_id", None),
+            min_gain=min_gain,
+            min_target_count=min_targets,
+            sort_by=sort_by,
+        )
+    else:
+        archives = sorted(target.glob("*.infold"))
+        if not archives:
+            print(f"No .infold archives found in {target}", file=sys.stderr)
+            return 1
+        result = search_archives(
+            archives,
+            operator=getattr(args, "operator", None),
+            path=getattr(args, "path", None),
+            family=getattr(args, "family", None),
+            family_id=getattr(args, "family_id", None),
+            artifact_id=getattr(args, "artifact_id", None),
+            min_gain=min_gain,
+            min_target_count=min_targets,
+            archive_filter=archive_filter,
+            sort_by=sort_by,
+        )
+
     if getattr(args, "json", False):
-        import json
         print(json.dumps(result, indent=2))
     else:
         print(search_to_text(result))
@@ -276,13 +308,17 @@ def main() -> int:
     compare_p.add_argument("archive_b", help="Second archive path")
     compare_p.add_argument("--json", action="store_true", help="JSON output")
     compare_p.set_defaults(func=archive_compare)
-    search_p = archive_sub.add_parser("search", help="Search within archive")
-    search_p.add_argument("archive", help="Archive path")
+    search_p = archive_sub.add_parser("search", help="Search within archive(s). Path: .infold file or directory of archives.")
+    search_p.add_argument("archive", help="Archive path or directory containing .infold files")
     search_p.add_argument("--operator", help="Filter by operator (exact_repetition, template_skeleton, etc.)")
-    search_p.add_argument("--path", help="Filter by path (contains match)")
+    search_p.add_argument("--path", help="Filter by path substring (contains match)")
     search_p.add_argument("--family", help="Filter by family type (duplicate, template, symbol, hierarchy, dependency)")
     search_p.add_argument("--family-id", type=int, dest="family_id", help="Filter by family index")
     search_p.add_argument("--artifact-id", type=int, dest="artifact_id", help="Filter by artifact index")
+    search_p.add_argument("--min-gain", type=int, dest="min_gain", help="Minimum gain (bytes)")
+    search_p.add_argument("--min-targets", type=int, dest="min_targets", help="Minimum target count")
+    search_p.add_argument("--archive-filter", dest="archive_filter", help="Filter archives by path substring (multi-archive)")
+    search_p.add_argument("--sort-by", dest="sort_by", choices=["gain", "operator", "archive", "target_count"], help="Sort results")
     search_p.add_argument("--json", action="store_true", help="JSON output")
     search_p.set_defaults(func=archive_search)
     args = parser.parse_args()

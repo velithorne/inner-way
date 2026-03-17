@@ -240,6 +240,67 @@ FAMILY_TO_OPERATOR = {
     "dependency": "dependency_motif",
 }
 
+OPERATOR_TO_FAMILY = {v: k for k, v in FAMILY_TO_OPERATOR.items()}
+
+
+def _apply_post_filters(
+    matches: list[dict[str, Any]],
+    *,
+    min_gain: int | None = None,
+    min_target_count: int | None = None,
+) -> list[dict[str, Any]]:
+    """Apply min_gain and min_target_count filters. Deterministic."""
+    out: list[dict[str, Any]] = []
+    for m in matches:
+        if min_gain is not None and m.get("gain", 0) < min_gain:
+            continue
+        if min_target_count is not None and m.get("target_count", 0) < min_target_count:
+            continue
+        out.append(m)
+    return out
+
+
+def _sort_matches(
+    matches: list[dict[str, Any]],
+    sort_by: str | None,
+) -> list[dict[str, Any]]:
+    """Sort matches deterministically. Keys: gain, operator, archive, target_count."""
+    if not sort_by or not matches:
+        return matches
+    key = (sort_by or "").lower()
+    # Secondary sort by index then archive for stability
+    def keyfn(m: dict[str, Any]) -> tuple:
+        if key == "gain":
+            return (-m.get("gain", 0), m.get("archive_path", ""), m.get("index", 0))
+        if key == "operator":
+            return (m.get("operator_id", ""), m.get("archive_path", ""), m.get("index", 0))
+        if key == "archive":
+            return (m.get("archive_path", ""), m.get("index", 0))
+        if key == "target_count":
+            return (-m.get("target_count", 0), m.get("archive_path", ""), m.get("index", 0))
+        return (m.get("archive_path", ""), m.get("index", 0))
+    return sorted(matches, key=keyfn)
+
+
+def _build_search_summary(
+    matches: list[dict[str, Any]],
+    archives_searched: int,
+) -> dict[str, Any]:
+    """Build search summary: total matches, by operator, by family type."""
+    by_op: dict[str, int] = {}
+    by_family: dict[str, int] = {}
+    for m in matches:
+        op = m.get("operator_id", "unknown")
+        by_op[op] = by_op.get(op, 0) + 1
+        fam = OPERATOR_TO_FAMILY.get(op, op)
+        by_family[fam] = by_family.get(fam, 0) + 1
+    return {
+        "total_archives_searched": archives_searched,
+        "total_matches": len(matches),
+        "matches_by_operator": dict(sorted(by_op.items())),
+        "matches_by_family": dict(sorted(by_family.items())),
+    }
+
 
 def search_archive(
     archive_path: Path | str,
@@ -249,11 +310,14 @@ def search_archive(
     family: str | None = None,
     family_id: int | None = None,
     artifact_id: int | None = None,
+    min_gain: int | None = None,
+    min_target_count: int | None = None,
+    sort_by: str | None = None,
 ) -> dict[str, Any]:
     """
     Search within one archive. Deterministic, archive-focused.
-    Filters: operator, path, family, family_id, artifact_id.
-    Returns matching records with metadata.
+    Filters: operator, path, family, family_id, artifact_id, min_gain, min_target_count.
+    Returns matching records with metadata. Each match includes archive_path.
     """
     archive = Path(archive_path).resolve()
     if not archive.exists():
@@ -273,6 +337,7 @@ def search_archive(
 
         matches: list[dict[str, Any]] = []
         path_lower = (path or "").lower().replace("\\", "/")
+        archive_str = str(archive)
 
         for i, rec in enumerate(records):
             op = rec.get("operator_id", "unknown")
@@ -307,7 +372,7 @@ def search_archive(
                     else:
                         continue
 
-            # Build match entry
+            # Build match entry (include archive_path for schema consistency)
             entry: dict[str, Any] = {
                 "index": i,
                 "operator_id": op,
@@ -315,6 +380,7 @@ def search_archive(
                 "gain": gain,
                 "target_count": len(targets),
                 "paths": [str(t) for t in targets],
+                "archive_path": archive_str,
             }
             if op == "template_skeleton":
                 tmpl = root / "shared" / f"template_{i}.json"
@@ -328,33 +394,127 @@ def search_archive(
                     entry["roots_or_paths"] = data.get("roots", data.get("paths", [str(t) for t in targets]))
             matches.append(entry)
 
+    matches = _apply_post_filters(matches, min_gain=min_gain, min_target_count=min_target_count)
+    matches = _sort_matches(matches, sort_by)
+
+    query = {
+        "operator": operator,
+        "path": path,
+        "family": family,
+        "family_id": family_id,
+        "artifact_id": artifact_id,
+        "min_gain": min_gain,
+        "min_target_count": min_target_count,
+        "sort_by": sort_by,
+    }
+    summary = _build_search_summary(matches, archives_searched=1)
+
     return {
-        "path": str(archive),
-        "query": {
-            "operator": operator,
-            "path": path,
-            "family": family,
-            "family_id": family_id,
-            "artifact_id": artifact_id,
-        },
+        "path": archive_str,
+        "query": query,
         "match_count": len(matches),
         "matches": matches,
+        "summary": summary,
+    }
+
+
+def search_archives(
+    archive_paths: list[Path | str],
+    *,
+    operator: str | None = None,
+    path: str | None = None,
+    family: str | None = None,
+    family_id: int | None = None,
+    artifact_id: int | None = None,
+    min_gain: int | None = None,
+    min_target_count: int | None = None,
+    archive_filter: str | None = None,
+    sort_by: str | None = None,
+) -> dict[str, Any]:
+    """
+    Search across multiple archives. Aggregates matches, deterministic.
+    archive_filter: substring match in archive path (case-insensitive).
+    Each match includes archive_path.
+    """
+    archive_filter_lower = (archive_filter or "").lower()
+    all_matches: list[dict[str, Any]] = []
+    searched: list[str] = []
+
+    for ap in sorted(str(p) for p in archive_paths):
+        arch = Path(ap).resolve()
+        if not arch.exists():
+            continue
+        if archive_filter_lower and archive_filter_lower not in str(arch).lower():
+            continue
+        searched.append(str(arch))
+        r = search_archive(
+            arch,
+            operator=operator,
+            path=path,
+            family=family,
+            family_id=family_id,
+            artifact_id=artifact_id,
+            min_gain=min_gain,
+            min_target_count=min_target_count,
+            sort_by=None,
+        )
+        for m in r.get("matches", []):
+            m["archive_path"] = str(arch)
+            all_matches.append(m)
+
+    all_matches = _sort_matches(all_matches, sort_by)
+    query = {
+        "operator": operator,
+        "path": path,
+        "family": family,
+        "family_id": family_id,
+        "artifact_id": artifact_id,
+        "min_gain": min_gain,
+        "min_target_count": min_target_count,
+        "archive_filter": archive_filter,
+        "sort_by": sort_by,
+    }
+    summary = _build_search_summary(all_matches, archives_searched=len(searched))
+
+    return {
+        "paths": searched,
+        "query": query,
+        "match_count": len(all_matches),
+        "matches": all_matches,
+        "summary": summary,
     }
 
 
 def search_to_text(result: dict[str, Any]) -> str:
-    """Human-readable search output."""
+    """Human-readable search output. Supports single-archive and multi-archive results."""
     lines = [
         "Archive Search",
         "==============",
         "",
-        f"Archive: {result.get('path', '?')}",
-        f"Query: {result.get('query', {})}",
-        f"Matches: {result.get('match_count', 0)}",
-        "",
     ]
+    path_or_paths = result.get("path") or result.get("paths", [])
+    if isinstance(path_or_paths, list):
+        lines.append(f"Archives: {len(path_or_paths)} searched")
+        for p in path_or_paths[:5]:
+            lines.append(f"  - {p}")
+        if len(path_or_paths) > 5:
+            lines.append(f"  ... +{len(path_or_paths) - 5} more")
+    else:
+        lines.append(f"Archive: {path_or_paths}")
+    lines.append("")
+    summary = result.get("summary", {})
+    if summary:
+        lines.append(f"Summary: {summary.get('total_matches', 0)} matches from {summary.get('total_archives_searched', 0)} archives")
+        if summary.get("matches_by_operator"):
+            lines.append(f"  By operator: {summary['matches_by_operator']}")
+        lines.append("")
+    lines.append(f"Query: {result.get('query', {})}")
+    lines.append(f"Matches: {result.get('match_count', 0)}")
+    lines.append("")
     for m in result.get("matches", []):
-        lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}")
+        arch = m.get("archive_path", "")
+        arch_part = f" [{arch}]" if arch and (result.get("paths") or len(result.get("matches", [])) > 1) else ""
+        lines.append(f"[{m.get('index', '?')}] {m.get('operator_id', '?')} gain={m.get('gain', 0)} targets={m.get('target_count', 0)}{arch_part}")
         for p in m.get("paths", [])[:5]:
             lines.append(f"  - {p}")
         if len(m.get("paths", [])) > 5:
