@@ -22,7 +22,8 @@ from typing import Any
 from infold.models.candidate import CandidateCrease
 
 # Content operators: modify file content, claim file ownership
-# byte_fold is the first active byte-operator; future byte operators (e.g. byte_delta) can be added here
+# byte_fold is the first active byte-operator; metadata_table_fold is the second (package-level)
+# Future byte operators (e.g. byte_delta) can be added here
 CONTENT_OPERATORS = {"exact_repetition", "template_skeleton", "symbol_table", "byte_fold"}
 
 # Structural metadata operators: no content change, metadata-family ownership

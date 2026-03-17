@@ -1,0 +1,256 @@
+"""
+Metadata Table Fold: second byte operator. Reduces package overhead by folding
+repeated metadata (paths, strings) into compact shared tables.
+
+Runs after package export, before integrity. Metadata-level only; does not
+modify source content. Preserves exact reconstruction.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+PATH_TABLE_FILENAME = "path_table.json"
+METADATA_TABLES_DIR = "metadata_tables"
+MIN_NET_GAIN_BYTES = 32
+
+
+def load_path_table(root: Path) -> list[str] | None:
+    """Load path table from package if present. Returns None if not using metadata table fold."""
+    pt_path = root / "shared" / METADATA_TABLES_DIR / PATH_TABLE_FILENAME
+    if not pt_path.exists():
+        return None
+    data = json.loads(pt_path.read_text(encoding="utf-8"))
+    return data.get("paths", [])
+
+
+def _collect_paths_from_package(pkg_dir: Path) -> set[str]:
+    """Collect path strings from targeted package files (maps, snapshots). Deterministic."""
+    paths: set[str] = set()
+    maps_dir = pkg_dir / "maps"
+    snapshots_dir = pkg_dir / "snapshots"
+
+    if (maps_dir / "reconstruction.json").exists():
+        data = json.loads((maps_dir / "reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            for t in rec.get("targets", []):
+                if isinstance(t, str):
+                    paths.add(t)
+
+    if (maps_dir / "chunk_reconstruction.json").exists():
+        data = json.loads((maps_dir / "chunk_reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            for p in rec.get("paths", []):
+                if isinstance(p, str):
+                    paths.add(p)
+
+    if (snapshots_dir / "inventory.json").exists():
+        data = json.loads((snapshots_dir / "inventory.json").read_text(encoding="utf-8"))
+        for item in data.get("files", []):
+            p = item.get("path")
+            if isinstance(p, str):
+                paths.add(p)
+
+    if (snapshots_dir / "passthrough.json").exists():
+        data = json.loads((snapshots_dir / "passthrough.json").read_text(encoding="utf-8"))
+        for k in data.keys():
+            if isinstance(k, str):
+                paths.add(k)
+
+    return paths
+
+
+def _build_path_table(paths: set[str]) -> list[str]:
+    """Build deterministic ordered path table."""
+    return sorted(paths)
+
+
+def _estimate_gain(
+    paths: set[str],
+    path_table: list[str],
+    path_to_ref: dict[str, int],
+) -> tuple[int, int, int]:
+    """
+    Estimate bytes: (gross_saved, table_overhead, net_saved).
+    gross_saved = sum(len(p) for each occurrence) - sum(ref size in JSON)
+    ref in JSON: integer like 0, 1, 2 -> ~1-4 chars. Path ~20-80 chars.
+    """
+    path_to_count: dict[str, int] = {}
+    maps_dir = Path("/dummy")
+    # We need occurrence counts. Re-collect from files.
+    return 0, 0, 0  # Placeholder; we'll compute in apply
+
+
+def _compute_occurrences(pkg_dir: Path) -> dict[str, int]:
+    """Count how many times each path string appears in targeted package files."""
+    counts: dict[str, int] = {}
+    maps_dir = pkg_dir / "maps"
+    snapshots_dir = pkg_dir / "snapshots"
+
+    def add(p: str) -> None:
+        if isinstance(p, str):
+            counts[p] = counts.get(p, 0) + 1
+
+    if (maps_dir / "reconstruction.json").exists():
+        data = json.loads((maps_dir / "reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            for t in rec.get("targets", []):
+                add(t)
+
+    if (maps_dir / "chunk_reconstruction.json").exists():
+        data = json.loads((maps_dir / "chunk_reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            for p in rec.get("paths", []):
+                add(p)
+
+    if (snapshots_dir / "inventory.json").exists():
+        data = json.loads((snapshots_dir / "inventory.json").read_text(encoding="utf-8"))
+        for item in data.get("files", []):
+            add(item.get("path", ""))
+
+    if (snapshots_dir / "passthrough.json").exists():
+        data = json.loads((snapshots_dir / "passthrough.json").read_text(encoding="utf-8"))
+        for k in data.keys():
+            add(k)
+
+    return counts
+
+
+def apply_metadata_table_fold(
+    pkg_dir: Path,
+    config: dict[str, Any],
+) -> dict[str, Any] | None:
+    """
+    Apply Metadata Table Fold to package. Rewrites maps/snapshots with path refs.
+    Returns metrics dict if applied, None if skipped (low gain).
+    """
+    cfg = config.get("thresholds", {}).get("metadata_table_fold", {})
+    min_net = cfg.get("min_net_gain_bytes", MIN_NET_GAIN_BYTES)
+    enabled = config.get("operators", {}).get("metadata_table_fold", {}).get("enabled", True)
+    if not enabled:
+        return None
+
+    paths = _collect_paths_from_package(pkg_dir)
+    if not paths:
+        return None
+
+    path_table = _build_path_table(paths)
+    path_to_ref = {p: i for i, p in enumerate(path_table)}
+    occurrences = _compute_occurrences(pkg_dir)
+
+    gross_saved = 0
+    for p, cnt in occurrences.items():
+        if p in path_to_ref:
+            orig_bytes = len(p.encode("utf-8")) * cnt
+            ref_bytes = len(str(path_to_ref[p]).encode("utf-8")) * cnt
+            gross_saved += orig_bytes - ref_bytes
+
+    table_json = json.dumps({"paths": path_table}, separators=(",", ":"))
+    table_overhead = len(table_json.encode("utf-8"))
+    net_saved = gross_saved - table_overhead
+
+    if net_saved < min_net:
+        return None
+
+    mt_dir = pkg_dir / "shared" / METADATA_TABLES_DIR
+    mt_dir.mkdir(parents=True, exist_ok=True)
+    (mt_dir / PATH_TABLE_FILENAME).write_text(table_json, encoding="utf-8")
+
+    maps_dir = pkg_dir / "maps"
+    shared_dir = pkg_dir / "shared"
+    snapshots_dir = pkg_dir / "snapshots"
+
+    if (maps_dir / "reconstruction.json").exists():
+        data = json.loads((maps_dir / "reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            targets = rec.get("targets", [])
+            rec["targets_refs"] = [path_to_ref[str(t)] for t in targets if str(t) in path_to_ref]
+            del rec["targets"]
+        data["path_table_ref"] = True
+        (maps_dir / "reconstruction.json").write_text(
+            json.dumps(data, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+    if (maps_dir / "chunk_reconstruction.json").exists():
+        data = json.loads((maps_dir / "chunk_reconstruction.json").read_text(encoding="utf-8"))
+        for rec in data.get("records", []):
+            paths_list = rec.get("paths", [])
+            rec["path_refs"] = [path_to_ref[p] for p in paths_list if p in path_to_ref]
+            if "paths" in rec:
+                del rec["paths"]
+        data["path_table_ref"] = True
+        (maps_dir / "chunk_reconstruction.json").write_text(
+            json.dumps(data, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+    if (snapshots_dir / "inventory.json").exists():
+        data = json.loads((snapshots_dir / "inventory.json").read_text(encoding="utf-8"))
+        new_files = []
+        for item in data.get("files", []):
+            p = item.get("path", "")
+            if p in path_to_ref:
+                new_item = {k: v for k, v in item.items() if k != "path"}
+                new_item["path_ref"] = path_to_ref[p]
+                new_files.append(new_item)
+            else:
+                new_files.append(item)
+        data["files"] = new_files
+        data["path_table_ref"] = True
+        (snapshots_dir / "inventory.json").write_text(
+            json.dumps(data, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+    if (snapshots_dir / "passthrough.json").exists():
+        data = json.loads((snapshots_dir / "passthrough.json").read_text(encoding="utf-8"))
+        new_passthrough = {}
+        for k, v in data.items():
+            if k in path_to_ref:
+                new_passthrough[path_to_ref[k]] = v
+            else:
+                new_passthrough[k] = v
+        (snapshots_dir / "passthrough.json").write_text(
+            json.dumps(new_passthrough, separators=(",", ":")),
+            encoding="utf-8",
+        )
+
+    manifest_path = pkg_dir / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["metadata_table_fold"] = True
+        manifest["metadata_table_fold_net_bytes_saved"] = net_saved
+        compact = config.get("package_export", {}).get("compact", False)
+        manifest_path.write_text(
+            json.dumps(manifest, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": ")),
+            encoding="utf-8",
+        )
+
+    report_path = pkg_dir / "reports" / "report.json"
+    if report_path.exists():
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["metadata_table_fold_metrics"] = {
+            "metadata_table_fold_count": 1,
+            "metadata_table_unique_paths": len(path_table),
+            "metadata_table_reused_refs": sum(occurrences.get(p, 0) for p in path_table) - len(path_table),
+            "metadata_table_table_size_bytes": table_overhead,
+            "metadata_table_gross_saved_bytes": gross_saved,
+            "metadata_table_net_bytes_saved": net_saved,
+        }
+        compact = config.get("package_export", {}).get("compact", False)
+        report_path.write_text(
+            json.dumps(report, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": ")),
+            encoding="utf-8",
+        )
+
+    return {
+        "metadata_table_fold_count": 1,
+        "metadata_table_unique_paths": len(path_table),
+        "metadata_table_reused_refs": sum(occurrences.get(p, 0) for p in path_table) - len(path_table),
+        "metadata_table_table_size_bytes": table_overhead,
+        "metadata_table_gross_saved_bytes": gross_saved,
+        "metadata_table_net_bytes_saved": net_saved,
+    }

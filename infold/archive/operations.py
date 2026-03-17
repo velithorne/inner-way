@@ -56,6 +56,8 @@ def create_archive(
     pkg_dir = Path(tempfile.mkdtemp(prefix="infold_pkg_"))
     try:
         export_package(result, config, pkg_dir)
+        from infold.engine.metadata_table_fold import apply_metadata_table_fold
+        apply_metadata_table_fold(pkg_dir, config)
         _write_integrity_checksums(pkg_dir, config)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in sorted(pkg_dir.rglob("*")):
@@ -86,6 +88,11 @@ def _write_integrity_checksums(pkg_dir: Path, config: dict[str, Any] | None = No
             for cf in sorted(chunks_dir.iterdir()):
                 if cf.is_file():
                     checksums[f"shared/chunks/{cf.name}"] = _sha256_file(cf)
+        metadata_tables_dir = shared_dir / "metadata_tables"
+        if metadata_tables_dir.exists():
+            for mf in sorted(metadata_tables_dir.iterdir()):
+                if mf.is_file():
+                    checksums[f"shared/metadata_tables/{mf.name}"] = _sha256_file(mf)
     maps_dir = pkg_dir / "maps"
     if maps_dir.exists():
         for f in sorted(maps_dir.iterdir()):
@@ -242,6 +249,8 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "hierarchy_templates": report.get("hierarchy_templates", []),
             "dependency_motifs": report.get("dependency_motifs", []),
             "byte_fold_families": report.get("byte_fold_families", []),
+            "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
+            "metadata_table_fold": manifest.get("metadata_table_fold", False),
         }
 
 
@@ -261,6 +270,13 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
         shared_dir = root / "shared"
         maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
         records = maps_data.get("records", [])
+        from infold.engine.metadata_table_fold import load_path_table
+        _pt = load_path_table(root)
+
+        def _t(rec: dict) -> list:
+            if _pt is not None and "targets_refs" in rec:
+                return [_pt[i] for i in rec["targets_refs"] if i < len(_pt)]
+            return rec.get("targets", [])
 
         shared_artifacts: list[dict[str, Any]] = []
         if shared_dir.exists():
@@ -272,11 +288,16 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
                 for cf in sorted(chunks_dir.iterdir()):
                     if cf.is_file():
                         shared_artifacts.append({"path": f"shared/chunks/{cf.name}", "size": cf.stat().st_size})
+            mt_dir = shared_dir / "metadata_tables"
+            if mt_dir.exists():
+                for mf in sorted(mt_dir.iterdir()):
+                    if mf.is_file():
+                        shared_artifacts.append({"path": f"shared/metadata_tables/{mf.name}", "size": mf.stat().st_size})
 
         families_by_op: dict[str, list[dict[str, Any]]] = {}
         for i, rec in enumerate(records):
             op = rec.get("operator_id", "unknown")
-            targets = rec.get("targets", [])
+            targets = _t(rec)
             gain = rec.get("gain", 0)
             if op not in families_by_op:
                 families_by_op[op] = []
@@ -643,10 +664,17 @@ def search_archive(
         if not diagnostics_only:
             maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
             records = maps_data.get("records", [])
+            from infold.engine.metadata_table_fold import load_path_table
+            _path_table = load_path_table(root)
+
+            def _targets(rec: dict) -> list:
+                if _path_table is not None and "targets_refs" in rec:
+                    return [_path_table[i] for i in rec["targets_refs"] if i < len(_path_table)]
+                return rec.get("targets", [])
 
             for i, rec in enumerate(records):
                 op = rec.get("operator_id", "unknown")
-                targets = rec.get("targets", [])
+                targets = _targets(rec)
                 gain = rec.get("gain", 0)
 
                 # Apply filters
@@ -1150,6 +1178,9 @@ def stats_archive(archive_path: Path | str) -> dict[str, Any]:
         "average_motif_size": dm.get("average_motif_size", []),
     } if dm else None
 
+    mtf = report.get("metadata_table_fold_metrics") or {}
+    stats["metadata_table_fold_metrics"] = mtf if mtf else None
+
     return stats
 
 
@@ -1286,6 +1317,10 @@ def validate_archive(
         maps_path = root / "maps" / "reconstruction.json"
         if maps_path.exists() and mode == "strict":
             maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
+            if maps_data.get("path_table_ref"):
+                pt_path = root / "shared" / "metadata_tables" / "path_table.json"
+                if not pt_path.exists():
+                    errors.append("path_table_ref set but shared/metadata_tables/path_table.json missing")
             records = maps_data.get("records", [])
             manifest_fold = manifest.get("fold_count", 0)
             if len(records) != manifest_fold:
@@ -1367,11 +1402,19 @@ def reconstruct_archive(
         maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
         records = maps_data.get("records", [])
         shared_dir = root / "shared"
+        from infold.engine.metadata_table_fold import load_path_table
+        path_table = load_path_table(root)
         result: dict[str, str] = {}
+
+        def _resolve_targets(rec: dict) -> list[str]:
+            if path_table is not None and "targets_refs" in rec:
+                return [path_table[i] for i in rec["targets_refs"] if i < len(path_table)]
+            return rec.get("targets", [])
+
         for rec in records:
             idx = rec.get("index", 0)
             op_id = rec.get("operator_id", "")
-            targets = rec.get("targets", [])
+            targets = _resolve_targets(rec)
             if op_id == "exact_repetition":
                 content_path = shared_dir / f"exact_{idx}.txt"
                 if content_path.exists():
@@ -1451,12 +1494,15 @@ def reconstruct_archive(
                     index_data = json.loads(chunk_index_path.read_text(encoding="utf-8"))
                     chunk_ids = index_data.get("ids", index_data.get("chunk_ids", []))
                     recs = recon_data.get("records", [])
-                    rec = recs[idx] if idx < len(recs) else {}
-                    if "paths" in rec and "seqs" in rec:
-                        for path_idx, path_str in enumerate(rec["paths"]):
+                    crec = recs[idx] if idx < len(recs) else {}
+                    paths_list = crec.get("paths", [])
+                    if path_table is not None and "path_refs" in crec:
+                        paths_list = [path_table[i] for i in crec["path_refs"] if i < len(path_table)]
+                    if (paths_list or crec.get("path_refs")) and "seqs" in crec:
+                        for path_idx, path_str in enumerate(paths_list):
                             if path_str in result:
                                 continue
-                            seq = rec["seqs"][path_idx] if path_idx < len(rec["seqs"]) else []
+                            seq = crec["seqs"][path_idx] if path_idx < len(crec["seqs"]) else []
                             parts = []
                             for ch_idx in seq:
                                 ch_id = chunk_ids[ch_idx] if ch_idx < len(chunk_ids) else None
@@ -1470,7 +1516,7 @@ def reconstruct_archive(
                             p.write_text(content, encoding="utf-8")
                             result[path_str] = content
                     else:
-                        path_to_ids = rec.get("path_to_chunk_ids", {})
+                        path_to_ids = crec.get("path_to_chunk_ids", {})
                         for path_str, ch_ids in path_to_ids.items():
                             if path_str in result:
                                 continue
@@ -1487,7 +1533,8 @@ def reconstruct_archive(
         passthrough_path = root / "snapshots" / "passthrough.json"
         if passthrough_path.exists():
             passthrough = json.loads(passthrough_path.read_text(encoding="utf-8"))
-            for path_str, content in passthrough.items():
+            for k, content in passthrough.items():
+                path_str = path_table[int(k)] if path_table is not None and k.isdigit() else k
                 if path_str not in result:
                     p = out_root / path_str
                     p.parent.mkdir(parents=True, exist_ok=True)
@@ -1538,8 +1585,13 @@ def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str
             if recon_path.exists() and i < len(records):
                 recon_data = json.loads(recon_path.read_text(encoding="utf-8"))
                 recs = recon_data.get("records", [])
-                rec = recs[i] if i < len(recs) else {}
-                paths = tuple(sorted(rec.get("paths", [str(t) for t in targets])))
+                crec = recs[i] if i < len(recs) else {}
+                from infold.engine.metadata_table_fold import load_path_table as _load_pt
+                pt = _load_pt(root) if recon_data.get("path_table_ref") else None
+                if pt is not None and "path_refs" in crec:
+                    paths = tuple(sorted(pt[ref] for ref in crec["path_refs"] if ref < len(pt)))
+                else:
+                    paths = tuple(sorted(crec.get("paths", [str(t) for t in targets])))
                 if paths:
                     sig = hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
                     sigs[op][sig] = set(paths)
@@ -1688,6 +1740,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
         lines.append("  Blocking is correct: content operators cannot double-fold the same file.")
         for sb in sym_blocked[:2]:
             lines.append(f"  Detail: {sb.get('detail', '')[:60]}")
+    mtf = info.get("metadata_table_fold_metrics")
+    if mtf:
+        lines.append("")
+        lines.append("Metadata Table Fold:")
+        lines.append(f"  unique_paths: {mtf.get('metadata_table_unique_paths', 0)}")
+        lines.append(f"  table_size_bytes: {mtf.get('metadata_table_table_size_bytes', 0):,}")
+        lines.append(f"  net_bytes_saved: {mtf.get('metadata_table_net_bytes_saved', 0):,}")
     lines.append("")
     lines.append("Reconstruction guarantees:")
     for g in info.get("reconstruction_guarantees", []):
@@ -1834,4 +1893,12 @@ def stats_to_text(stats: dict[str, Any]) -> str:
         lines.append(f"  motifs_found: {dm.get('motifs_found', 0)}")
         if dm.get("average_motif_size"):
             lines.append(f"  average_motif_size: {dm['average_motif_size']}")
+    mtf = stats.get("metadata_table_fold_metrics")
+    if mtf:
+        lines.append("")
+        lines.append("Metadata Table Fold:")
+        lines.append(f"  unique_paths: {mtf.get('metadata_table_unique_paths', 0)}")
+        lines.append(f"  reused_refs: {mtf.get('metadata_table_reused_refs', 0)}")
+        lines.append(f"  table_size_bytes: {mtf.get('metadata_table_table_size_bytes', 0):,}")
+        lines.append(f"  net_bytes_saved: {mtf.get('metadata_table_net_bytes_saved', 0):,}")
     return "\n".join(lines)
