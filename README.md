@@ -98,9 +98,15 @@ python3 -m infold.cli archive reconstruct archive.infold --output ./restored
 python3 -m infold.cli archive sync init --dir .infold-sync --source .
 python3 -m infold.cli archive sync add --dir .infold-sync --source .
 python3 -m infold.cli archive sync list --dir .infold-sync
+python3 -m infold.cli archive sync validate --dir .infold-sync
+python3 -m infold.cli archive sync summary --dir .infold-sync
+python3 -m infold.cli archive sync search --dir .infold-sync --operator template_skeleton
 python3 -m infold.cli archive sync compare v1.infold v2.infold
+python3 -m infold.cli archive sync compare latest previous --dir .infold-sync
 python3 -m infold.cli archive sync report v1.infold v2.infold
-python3 -m infold.cli archive sync reconstruct v2.infold --output ./restored
+python3 -m infold.cli archive sync diff --dir .infold-sync
+python3 -m infold.cli archive sync report-diff --dir .infold-sync
+python3 -m infold.cli archive sync reconstruct latest --dir .infold-sync --output ./restored
 ```
 
 ### Demo workflow

@@ -1,4 +1,4 @@
-"""Tests for Infold Sync v0.1."""
+"""Tests for Infold Sync v0.1 and Phase 4A."""
 
 import json
 from pathlib import Path
@@ -14,6 +14,10 @@ from infold.sync import (
     sync_report,
     sync_report_to_text,
     sync_list_to_text,
+    validate_sync,
+    sync_search,
+    sync_summary,
+    sync_summary_to_text,
 )
 from infold.archive import create_archive
 from infold.cli import load_config
@@ -104,3 +108,58 @@ def test_sync_reconstruct(sync_with_snapshots, tmp_path):
     reconstruct_archive(snaps[0]["path"], out)
     assert out.exists()
     assert any(out.iterdir())
+
+
+def test_sync_validate(sync_with_snapshots):
+    """validate_sync checks lineage and archives."""
+    r = validate_sync(sync_with_snapshots)
+    assert r["valid"] is True
+    assert r["snapshot_count"] == 2
+
+
+def test_sync_validate_missing(tmp_path):
+    """validate_sync fails when lineage missing."""
+    r = validate_sync(tmp_path / "nonexistent")
+    assert r["valid"] is False
+    assert "not found" in r["errors"][0].lower()
+
+
+def test_sync_search(sync_with_snapshots):
+    """sync_search searches across lineage snapshots."""
+    r = sync_search(sync_with_snapshots, operator="exact_repetition")
+    assert r["match_count"] >= 1
+    assert all(m["operator_id"] == "exact_repetition" for m in r["matches"])
+
+
+def test_sync_search_snapshot_id(sync_with_snapshots):
+    """sync_search filters by snapshot_id."""
+    r = sync_search(sync_with_snapshots, snapshot_id="v1")
+    assert len(r["paths"]) == 1
+    assert "v1" in r["paths"][0] or "v1" in str(r["paths"][0])
+
+
+def test_sync_summary(sync_with_snapshots):
+    """sync_summary returns lineage stats."""
+    r = sync_summary(sync_with_snapshots)
+    assert r["total_snapshots"] == 2
+    assert "total_logical_gain_bytes" in r
+    assert "top_operators" in r
+    assert r.get("newest_snapshot") is not None
+    assert r.get("oldest_snapshot") is not None
+
+
+def test_sync_report_by_operator(sync_with_snapshots):
+    """sync_report includes by_operator grouping."""
+    snaps = list_snapshots(sync_with_snapshots)["snapshots"]
+    r = sync_report(snaps[0]["path"], snaps[1]["path"])
+    assert "by_operator" in r
+    text = sync_report_to_text(r)
+    assert "Changes by operator" in text or "Sync Report" in text
+
+
+def test_sync_resolve_latest(sync_with_snapshots):
+    """resolve_snapshot_ref resolves 'latest'."""
+    from infold.sync.operations import resolve_snapshot_ref
+    p = resolve_snapshot_ref(sync_with_snapshots, "latest")
+    assert p is not None
+    assert p.exists()

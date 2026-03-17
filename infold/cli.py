@@ -252,10 +252,28 @@ def sync_list_cmd(args) -> int:
     return 0
 
 
+def _resolve_sync_archive(ref: str, sync_dir: str) -> str:
+    """Resolve archive ref (path, 'latest', 'previous') to path."""
+    from infold.sync.operations import resolve_snapshot_ref
+    if (ref or "").lower() in ("latest", "previous"):
+        resolved = resolve_snapshot_ref(sync_dir, ref)
+        if not resolved or not resolved.exists():
+            raise FileNotFoundError(f"No {ref} snapshot in lineage")
+        return str(resolved)
+    return ref
+
+
 def sync_compare_cmd(args) -> int:
     """Compare two snapshots."""
     from infold.archive.operations import compare_archives, compare_to_text
-    r = compare_archives(args.archive_a, args.archive_b)
+    sync_dir = getattr(args, "sync_dir", ".infold-sync")
+    try:
+        a = _resolve_sync_archive(args.archive_a, sync_dir)
+        b = _resolve_sync_archive(args.archive_b, sync_dir)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    r = compare_archives(a, b)
     if getattr(args, "json", False):
         print(json.dumps(r, indent=2))
     else:
@@ -266,7 +284,14 @@ def sync_compare_cmd(args) -> int:
 def sync_report_cmd(args) -> int:
     """Report added/removed/changed fold families."""
     from infold.sync import sync_report, sync_report_to_text
-    r = sync_report(args.archive_a, args.archive_b)
+    sync_dir = getattr(args, "sync_dir", ".infold-sync")
+    try:
+        a = _resolve_sync_archive(args.archive_a, sync_dir)
+        b = _resolve_sync_archive(args.archive_b, sync_dir)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    r = sync_report(a, b)
     if getattr(args, "json", False):
         print(json.dumps(r, indent=2))
     else:
@@ -275,10 +300,108 @@ def sync_report_cmd(args) -> int:
 
 
 def sync_reconstruct_cmd(args) -> int:
-    """Reconstruct snapshot (delegates to archive reconstruct)."""
+    """Reconstruct snapshot (delegates to archive reconstruct). Supports 'latest'."""
     from infold.archive import reconstruct_archive
-    reconstruct_archive(args.archive, args.output)
+    from infold.sync.operations import resolve_snapshot_ref
+    sync_dir = getattr(args, "sync_dir", ".infold-sync")
+    archive_ref = args.archive
+    if (archive_ref or "").lower() in ("latest", "previous"):
+        resolved = resolve_snapshot_ref(sync_dir, archive_ref)
+        if not resolved or not resolved.exists():
+            print(f"Error: no {archive_ref} snapshot in lineage", file=sys.stderr)
+            return 1
+        archive_ref = str(resolved)
+    reconstruct_archive(archive_ref, args.output)
     print(f"Reconstructed to {args.output}")
+    return 0
+
+
+def sync_validate_cmd(args) -> int:
+    """Validate sync lineage."""
+    from infold.sync import validate_sync
+    r = validate_sync(getattr(args, "sync_dir", ".infold-sync"))
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        if r["valid"]:
+            print("Valid")
+        else:
+            print("Invalid")
+            for e in r.get("errors", []):
+                print(f"  Error: {e}")
+        for w in r.get("warnings", []):
+            print(f"  Warning: {w}")
+    return 0 if r["valid"] else 1
+
+
+def sync_search_cmd(args) -> int:
+    """Search across lineage snapshots."""
+    from infold.sync import sync_search
+    from infold.archive.operations import search_to_text
+    r = sync_search(
+        getattr(args, "sync_dir", ".infold-sync"),
+        snapshot_id=getattr(args, "snapshot_id", None),
+        snapshot_path=getattr(args, "snapshot_path", None),
+        created_after=getattr(args, "created_after", None),
+        created_before=getattr(args, "created_before", None),
+        operator=getattr(args, "operator", None),
+        path=getattr(args, "path", None),
+        family=getattr(args, "family", None),
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(search_to_text(r))
+    return 0
+
+
+def sync_summary_cmd(args) -> int:
+    """Show lineage summary."""
+    from infold.sync import sync_summary, sync_summary_to_text
+    r = sync_summary(getattr(args, "sync_dir", ".infold-sync"))
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_summary_to_text(r))
+    return 0
+
+
+def sync_diff_cmd(args) -> int:
+    """Compare latest vs previous snapshot."""
+    from infold.sync.operations import _get_latest_and_previous
+    from infold.archive.operations import compare_archives, compare_to_text
+    from pathlib import Path
+    sync_dir = Path(getattr(args, "sync_dir", ".infold-sync"))
+    latest, previous = _get_latest_and_previous(sync_dir)
+    if not latest:
+        print("Error: no snapshots in lineage", file=sys.stderr)
+        return 1
+    if not previous:
+        print("Error: only one snapshot; need at least two for diff", file=sys.stderr)
+        return 1
+    r = compare_archives(previous["path"], latest["path"])
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(compare_to_text(r))
+    return 0
+
+
+def sync_report_diff_cmd(args) -> int:
+    """Report added/removed/changed (latest vs previous)."""
+    from infold.sync import sync_report, sync_report_to_text
+    from infold.sync.operations import _get_latest_and_previous
+    from pathlib import Path
+    sync_dir = Path(getattr(args, "sync_dir", ".infold-sync"))
+    latest, previous = _get_latest_and_previous(sync_dir)
+    if not latest or not previous:
+        print("Error: need at least two snapshots for report-diff", file=sys.stderr)
+        return 1
+    r = sync_report(previous["path"], latest["path"])
+    if getattr(args, "json", False):
+        print(json.dumps(r, indent=2))
+    else:
+        print(sync_report_to_text(r))
     return 0
 
 
@@ -469,19 +592,49 @@ def main() -> int:
     sync_list_p.add_argument("--json", action="store_true", help="JSON output")
     sync_list_p.set_defaults(func=sync_list_cmd)
     sync_compare_p = sync_sub.add_parser("compare", help="Compare two snapshots structurally")
-    sync_compare_p.add_argument("archive_a", help="First snapshot (archive path)")
-    sync_compare_p.add_argument("archive_b", help="Second snapshot (archive path)")
+    sync_compare_p.add_argument("archive_a", help="First snapshot (path or 'latest'/'previous')")
+    sync_compare_p.add_argument("archive_b", help="Second snapshot (path or 'latest'/'previous')")
+    sync_compare_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory (for latest/previous)")
     sync_compare_p.add_argument("--json", action="store_true", help="JSON output")
     sync_compare_p.set_defaults(func=sync_compare_cmd)
     sync_report_p = sync_sub.add_parser("report", help="Report added/removed/changed fold families")
-    sync_report_p.add_argument("archive_a", help="First snapshot")
-    sync_report_p.add_argument("archive_b", help="Second snapshot")
+    sync_report_p.add_argument("archive_a", help="First snapshot (path or 'latest'/'previous')")
+    sync_report_p.add_argument("archive_b", help="Second snapshot (path or 'latest'/'previous')")
+    sync_report_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory (for latest/previous)")
     sync_report_p.add_argument("--json", action="store_true", help="JSON output")
     sync_report_p.set_defaults(func=sync_report_cmd)
-    sync_reconstruct_p = sync_sub.add_parser("reconstruct", help="Reconstruct chosen snapshot")
-    sync_reconstruct_p.add_argument("archive", help="Snapshot (archive path)")
+    sync_reconstruct_p = sync_sub.add_parser("reconstruct", help="Reconstruct chosen snapshot (archive path or 'latest')")
+    sync_reconstruct_p.add_argument("archive", help="Snapshot path or 'latest'")
     sync_reconstruct_p.add_argument("--output", "-o", required=True, help="Output directory")
+    sync_reconstruct_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory (for 'latest')")
     sync_reconstruct_p.set_defaults(func=sync_reconstruct_cmd)
+    sync_validate_p = sync_sub.add_parser("validate", help="Validate lineage structure and snapshot archives")
+    sync_validate_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_validate_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_validate_p.set_defaults(func=sync_validate_cmd)
+    sync_search_p = sync_sub.add_parser("search", help="Search across all snapshots in lineage")
+    sync_search_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_search_p.add_argument("--snapshot-id", dest="snapshot_id", help="Filter by snapshot ID")
+    sync_search_p.add_argument("--snapshot-path", dest="snapshot_path", help="Filter by path substring")
+    sync_search_p.add_argument("--created-after", dest="created_after", help="Filter snapshots created after ISO timestamp")
+    sync_search_p.add_argument("--created-before", dest="created_before", help="Filter snapshots created before ISO timestamp")
+    sync_search_p.add_argument("--operator", help="Search filter: operator")
+    sync_search_p.add_argument("--path", help="Search filter: path substring")
+    sync_search_p.add_argument("--family", help="Search filter: family type")
+    sync_search_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_search_p.set_defaults(func=sync_search_cmd)
+    sync_summary_p = sync_sub.add_parser("summary", help="Show lineage summary")
+    sync_summary_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_summary_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_summary_p.set_defaults(func=sync_summary_cmd)
+    sync_diff_p = sync_sub.add_parser("diff", help="Compare latest vs previous snapshot")
+    sync_diff_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_diff_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_diff_p.set_defaults(func=sync_diff_cmd)
+    sync_report_diff_p = sync_sub.add_parser("report-diff", help="Report added/removed/changed (latest vs previous)")
+    sync_report_diff_p.add_argument("--dir", dest="sync_dir", default=".infold-sync", help="Sync directory")
+    sync_report_diff_p.add_argument("--json", action="store_true", help="JSON output")
+    sync_report_diff_p.set_defaults(func=sync_report_diff_cmd)
     args = parser.parse_args()
 
     if args.benchmark_suite:

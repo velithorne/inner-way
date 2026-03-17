@@ -13,6 +13,10 @@ from infold.sync.operations import (
     sync_report,
     sync_report_to_text,
     sync_list_to_text,
+    validate_sync,
+    sync_search,
+    sync_summary,
+    sync_summary_to_text,
 )
 
 __all__ = [
@@ -24,4 +28,8 @@ __all__ = [
     "sync_report",
     "sync_report_to_text",
     "sync_list_to_text",
+    "validate_sync",
+    "sync_search",
+    "sync_summary",
+    "sync_summary_to_text",
 ]
