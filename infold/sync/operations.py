@@ -166,11 +166,13 @@ def sync_report(
         "template_families": diff.get("template_families_changed", {}).get("added", []),
         "hierarchy_templates": diff.get("hierarchy_templates_changed", {}).get("added", []),
         "dependency_motifs": diff.get("dependency_motifs_changed", {}).get("added", []),
+        "byte_fold_families": diff.get("byte_fold_families_changed", {}).get("added", []),
     }
     removed = {
         "template_families": diff.get("template_families_changed", {}).get("removed", []),
         "hierarchy_templates": diff.get("hierarchy_templates_changed", {}).get("removed", []),
         "dependency_motifs": diff.get("dependency_motifs_changed", {}).get("removed", []),
+        "byte_fold_families": diff.get("byte_fold_families_changed", {}).get("removed", []),
     }
     fold_diff = diff.get("fold_counts_by_operator", {}).get("diff", {})
     by_operator: dict[str, dict[str, Any]] = {}
@@ -179,7 +181,7 @@ def sync_report(
             by_operator[op] = {"fold_count_diff": delta}
     for kind, items in added.items():
         op = kind.replace("_families", "").replace("_templates", "").replace("_motifs", "")
-        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif"}
+        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
         op_id = op_map.get(op, op)
         if op_id not in by_operator:
             by_operator[op_id] = {}
@@ -187,7 +189,7 @@ def sync_report(
             by_operator[op_id]["added"] = items
     for kind, items in removed.items():
         op = kind.replace("_families", "").replace("_templates", "").replace("_motifs", "")
-        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif"}
+        op_map = {"template": "template_skeleton", "hierarchy": "hierarchy_mirror", "dependency": "dependency_motif", "byte_fold": "byte_fold"}
         op_id = op_map.get(op, op)
         if op_id not in by_operator:
             by_operator[op_id] = {}
@@ -205,6 +207,7 @@ def sync_report(
             "duplicate_families": diff.get("duplicate_families", {}),
             "hierarchy_templates": diff.get("hierarchy_templates", {}),
             "dependency_motifs": diff.get("dependency_motifs", {}),
+            "byte_fold_families": diff.get("byte_fold_families", {}),
         },
         "logical_gain_diff": diff.get("logical_gain", {}).get("diff", 0),
         "fold_counts_diff": fold_diff,

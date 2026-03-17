@@ -1344,24 +1344,46 @@ def reconstruct_archive(
                         result[path_str] = content
             elif op_id == "byte_fold":
                 chunk_recon_path = root / "maps" / "chunk_reconstruction.json"
+                chunk_index_path = shared_dir / "chunk_index.json"
                 chunks_dir = shared_dir / "chunks"
-                if chunk_recon_path.exists() and chunks_dir.exists():
+                if chunk_recon_path.exists() and chunks_dir.exists() and chunk_index_path.exists():
                     recon_data = json.loads(chunk_recon_path.read_text(encoding="utf-8"))
+                    index_data = json.loads(chunk_index_path.read_text(encoding="utf-8"))
+                    chunk_ids = index_data.get("ids", index_data.get("chunk_ids", []))
                     recs = recon_data.get("records", [])
-                    path_to_ids = recs[idx].get("path_to_chunk_ids", {}) if idx < len(recs) else {}
-                    for path_str, chunk_ids in path_to_ids.items():
-                        if path_str in result:
-                            continue
-                        parts = []
-                        for ch_id in chunk_ids:
-                            bin_path = chunks_dir / f"{ch_id}.bin"
-                            if bin_path.exists():
-                                parts.append(bin_path.read_bytes())
-                        content = b"".join(parts).decode("utf-8")
-                        p = out_root / path_str
-                        p.parent.mkdir(parents=True, exist_ok=True)
-                        p.write_text(content, encoding="utf-8")
-                        result[path_str] = content
+                    rec = recs[idx] if idx < len(recs) else {}
+                    if "paths" in rec and "seqs" in rec:
+                        for path_idx, path_str in enumerate(rec["paths"]):
+                            if path_str in result:
+                                continue
+                            seq = rec["seqs"][path_idx] if path_idx < len(rec["seqs"]) else []
+                            parts = []
+                            for ch_idx in seq:
+                                ch_id = chunk_ids[ch_idx] if ch_idx < len(chunk_ids) else None
+                                if ch_id:
+                                    bin_path = chunks_dir / f"{ch_id}.bin"
+                                    if bin_path.exists():
+                                        parts.append(bin_path.read_bytes())
+                            content = b"".join(parts).decode("utf-8")
+                            p = out_root / path_str
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_text(content, encoding="utf-8")
+                            result[path_str] = content
+                    else:
+                        path_to_ids = rec.get("path_to_chunk_ids", {})
+                        for path_str, ch_ids in path_to_ids.items():
+                            if path_str in result:
+                                continue
+                            parts = []
+                            for ch_id in ch_ids:
+                                bin_path = chunks_dir / f"{ch_id}.bin"
+                                if bin_path.exists():
+                                    parts.append(bin_path.read_bytes())
+                            content = b"".join(parts).decode("utf-8")
+                            p = out_root / path_str
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_text(content, encoding="utf-8")
+                            result[path_str] = content
         passthrough_path = root / "snapshots" / "passthrough.json"
         if passthrough_path.exists():
             passthrough = json.loads(passthrough_path.read_text(encoding="utf-8"))
@@ -1375,11 +1397,12 @@ def reconstruct_archive(
 
 
 def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str]]]:
-    """Extract family signatures for template, hierarchy, dependency. Returns {op: {sig: set of paths/roots}}."""
+    """Extract family signatures for template, hierarchy, dependency, byte_fold. Returns {op: {sig: set of paths/roots}}."""
     sigs: dict[str, dict[str, set[str]]] = {
         "template_skeleton": {},
         "hierarchy_mirror": {},
         "dependency_motif": {},
+        "byte_fold": {},
     }
     shared = root / "shared"
     for i, rec in enumerate(records):
@@ -1410,6 +1433,16 @@ def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str
                 paths = tuple(sorted(str(p) for p in data.get("paths", targets)))
                 sig = data.get("signature", "") or hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
                 sigs[op][sig] = set(paths)
+        elif op == "byte_fold":
+            recon_path = root / "maps" / "chunk_reconstruction.json"
+            if recon_path.exists() and i < len(records):
+                recon_data = json.loads(recon_path.read_text(encoding="utf-8"))
+                recs = recon_data.get("records", [])
+                rec = recs[i] if i < len(recs) else {}
+                paths = tuple(sorted(rec.get("paths", [str(t) for t in targets])))
+                if paths:
+                    sig = hashlib.sha256(json.dumps(paths).encode()).hexdigest()[:16]
+                    sigs[op][sig] = set(paths)
     return sigs
 
 
@@ -1462,9 +1495,11 @@ def compare_archives(
         "duplicate_families": {"a_count": len(info_a["duplicate_families"]), "b_count": len(info_b["duplicate_families"])},
         "hierarchy_templates": {"a_count": len(info_a["hierarchy_templates"]), "b_count": len(info_b["hierarchy_templates"])},
         "dependency_motifs": {"a_count": len(info_a["dependency_motifs"]), "b_count": len(info_b["dependency_motifs"])},
+        "byte_fold_families": {"a_count": len(info_a["byte_fold_families"]), "b_count": len(info_b["byte_fold_families"])},
         "template_families_changed": {"added": [], "removed": []},
         "hierarchy_templates_changed": {"added": [], "removed": []},
         "dependency_motifs_changed": {"added": [], "removed": []},
+        "byte_fold_families_changed": {"added": [], "removed": []},
         "compatibility": {
             "a": m_a.get("compatibility", {}),
             "b": m_b.get("compatibility", {}),
@@ -1492,7 +1527,7 @@ def compare_archives(
         recs_b = maps_b.get("records", [])
         sigs_b = _family_signatures(root_b, recs_b)
 
-    for op in ["template_skeleton", "hierarchy_mirror", "dependency_motif"]:
+    for op in ["template_skeleton", "hierarchy_mirror", "dependency_motif", "byte_fold"]:
         sa = sigs_a.get(op, {})
         sb = sigs_b.get(op, {})
         added = [sig for sig in sb if sig not in sa]
@@ -1506,6 +1541,9 @@ def compare_archives(
         elif op == "dependency_motif":
             diff["dependency_motifs_changed"]["added"] = added
             diff["dependency_motifs_changed"]["removed"] = removed
+        elif op == "byte_fold":
+            diff["byte_fold_families_changed"]["added"] = added
+            diff["byte_fold_families_changed"]["removed"] = removed
 
     return diff
 
@@ -1586,10 +1624,12 @@ def compare_to_text(diff: dict[str, Any]) -> str:
     df = diff.get("duplicate_families", {})
     hf = diff.get("hierarchy_templates", {})
     mf = diff.get("dependency_motifs", {})
+    bf = diff.get("byte_fold_families", {})
     lines.append(f"  template: A={tf.get('a_count', 0)} B={tf.get('b_count', 0)}")
     lines.append(f"  duplicate: A={df.get('a_count', 0)} B={df.get('b_count', 0)}")
     lines.append(f"  hierarchy: A={hf.get('a_count', 0)} B={hf.get('b_count', 0)}")
     lines.append(f"  dependency: A={mf.get('a_count', 0)} B={mf.get('b_count', 0)}")
+    lines.append(f"  byte_fold: A={bf.get('a_count', 0)} B={bf.get('b_count', 0)}")
     tfc = diff.get("template_families_changed", {})
     htc = diff.get("hierarchy_templates_changed", {})
     dmc = diff.get("dependency_motifs_changed", {})
@@ -1614,6 +1654,14 @@ def compare_to_text(diff: dict[str, Any]) -> str:
             lines.append(f"  added: {dmc['added']}")
         if dmc.get("removed"):
             lines.append(f"  removed: {dmc['removed']}")
+    bfc = diff.get("byte_fold_families_changed", {})
+    if bfc.get("added") or bfc.get("removed"):
+        lines.append("")
+        lines.append("Byte Fold families changed:")
+        if bfc.get("added"):
+            lines.append(f"  added: {bfc['added']}")
+        if bfc.get("removed"):
+            lines.append(f"  removed: {bfc['removed']}")
     return "\n".join(lines)
 
 

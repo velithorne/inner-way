@@ -83,6 +83,14 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             )
             byte_fold_metrics.setdefault("net_bytes_saved", 0)
             byte_fold_metrics["net_bytes_saved"] = byte_fold_metrics.get("net_bytes_saved", 0) + r.gain
+            byte_fold_metrics.setdefault("chunk_reused_bytes", 0)
+            byte_fold_metrics["chunk_reused_bytes"] = byte_fold_metrics.get("chunk_reused_bytes", 0) + recipe.get("chunk_reused_bytes", 0)
+            byte_fold_metrics.setdefault("reused_chunk_count", 0)
+            byte_fold_metrics["reused_chunk_count"] = byte_fold_metrics.get("reused_chunk_count", 0) + recipe.get("reused_chunk_count", 0)
+            byte_fold_metrics.setdefault("chunk_dictionary_size_bytes", 0)
+            byte_fold_metrics["chunk_dictionary_size_bytes"] = byte_fold_metrics.get("chunk_dictionary_size_bytes", 0) + recipe.get("chunk_dictionary_size_bytes", 0)
+            byte_fold_metrics.setdefault("chunk_folded_paths", [])
+            byte_fold_metrics["chunk_folded_paths"].extend(list(reconstruction.keys()))
 
     raw = metrics.get("original_size_bytes", 0)
     logical_gain = ledger.total_bytes_saved  # bytes saved by deduplication
@@ -155,6 +163,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "interaction_diagnostics": _interaction_diagnostics_to_dict(
             getattr(result, "interaction_diagnostics", None)
         ),
+        "byte_fold_routing": config.get("_run_diagnostics", {}).get("byte_fold_routing"),
     }
 
 
@@ -284,9 +293,32 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         lines.append("Byte Fold metrics:")
         lines.append(f"  files_chunk_folded: {bfm.get('files_chunk_folded', 0)}")
         lines.append(f"  unique_chunk_count: {bfm.get('unique_chunk_count', 0)}")
+        lines.append(f"  reused_chunk_count: {bfm.get('reused_chunk_count', 0)}")
+        lines.append(f"  chunk_reused_bytes: {bfm.get('chunk_reused_bytes', 0)}")
+        lines.append(f"  chunk_dictionary_size_bytes: {bfm.get('chunk_dictionary_size_bytes', 0)}")
         lines.append(f"  net_bytes_saved: {bfm.get('net_bytes_saved', 0)}")
         if bfm.get("chunk_reuse_ratio"):
             lines.append(f"  chunk_reuse_ratio: {bfm['chunk_reuse_ratio']}")
+        if bfm.get("chunk_folded_paths"):
+            paths = bfm["chunk_folded_paths"][:10]
+            lines.append(f"  chunk_folded_paths (sample): {paths}")
+            if len(bfm["chunk_folded_paths"]) > 10:
+                lines.append(f"    ... and {len(bfm['chunk_folded_paths']) - 10} more")
+    if report.get("byte_fold_routing"):
+        lines.append("")
+        lines.append("Byte Fold routing (by file):")
+        routing = report["byte_fold_routing"]
+        by_route: dict[str, list[str]] = {}
+        for path, info in routing.items():
+            route = info.get("route", "?")
+            by_route.setdefault(route, []).append(f"{path} ({info.get('reason', '')})")
+        for route in ("chunk_first", "structural_first", "passthrough_only", "low_value"):
+            if route in by_route:
+                lines.append(f"  {route}: {len(by_route[route])} files")
+                for item in by_route[route][:5]:
+                    lines.append(f"    {item}")
+                if len(by_route[route]) > 5:
+                    lines.append(f"    ... and {len(by_route[route]) - 5} more")
     lines.append("")
     lines.append("Per-operator gain share:")
     for op_id, share in report.get("per_operator_gain_share", {}).items():

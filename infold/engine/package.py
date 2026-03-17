@@ -133,17 +133,19 @@ def export_package(
             reconstruction = recipe.get("reconstruction", {})
             chunks_dir = shared_dir / "chunks"
             chunks_dir.mkdir(exist_ok=True)
-            chunk_ids = []
+            chunk_ids = list(chunk_dict_b64.keys())
+            id_to_idx = {cid: idx for idx, cid in enumerate(chunk_ids)}
             for ch_id, b64 in chunk_dict_b64.items():
-                chunk_ids.append(ch_id)
                 (chunks_dir / f"{ch_id}.bin").write_bytes(base64.b64decode(b64))
             (shared_dir / "chunk_index.json").write_text(
-                _json_dump({"chunk_ids": chunk_ids, "record_index": i}, compact),
+                _json_dump({"ids": chunk_ids, "record_index": i}, compact),
                 encoding="utf-8",
             )
+            paths = list(reconstruction.keys())
+            seqs = [[id_to_idx[cid] for cid in reconstruction[p]] for p in paths]
             while len(chunk_reconstruction_records) <= i:
                 chunk_reconstruction_records.append({})
-            chunk_reconstruction_records[i] = {"path_to_chunk_ids": reconstruction}
+            chunk_reconstruction_records[i] = {"paths": paths, "seqs": seqs}
 
     # Ensure shared/ has at least one file when empty (0 folds) so ZIP/validation sees the dir
     if not any(shared_dir.iterdir()):

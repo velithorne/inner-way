@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from infold.chunking.roller import ChunkResult, chunk_bytes
-from infold.engine.file_routing import get_chunk_eligible_paths
+from infold.engine.file_routing import get_chunk_eligible_paths, get_chunk_eligible_paths_with_diagnostics
 from infold.models.candidate import CandidateCrease
 from infold.models.estimates import GainEstimate, StressEstimate
 from infold.models.fold_record import FoldRecord
@@ -61,10 +61,16 @@ class ByteFoldOperator(BaseOperator):
         max_chunk = cfg.get("max_chunk_bytes", 8192)
         avg_chunk = cfg.get("avg_chunk_bytes", 1024)
         min_net_gain = cfg.get("min_net_gain", 64)
+        min_chunk_reuse = cfg.get("min_chunk_reuse_count", 2)
+        max_chunks_per_file = cfg.get("max_chunks_per_file", 1024)
 
-        eligible = get_chunk_eligible_paths(
+        eligible, path_to_route = get_chunk_eligible_paths_with_diagnostics(
             project_sheet.file_nodes, committed, config
         )
+        config.setdefault("_run_diagnostics", {})["byte_fold_routing"] = {
+            str(p).replace("\\", "/"): {"route": r.route, "reason": r.reason}
+            for p, r in path_to_route.items()
+        }
         if not eligible:
             return []
 
@@ -75,9 +81,14 @@ class ByteFoldOperator(BaseOperator):
             if not node or not node.raw_text:
                 continue
             data = node.raw_text.encode("utf-8")
-            path_to_result[path] = chunk_bytes(
+            result = chunk_bytes(
                 data, min_chunk=min_chunk, max_chunk=max_chunk, avg_chunk=avg_chunk
             )
+            if len(result.chunk_ids) <= max_chunks_per_file:
+                path_to_result[path] = result
+
+        if not path_to_result:
+            return []
 
         # Build global chunk dict and occurrence counts
         chunk_to_content: dict[str, bytes] = {}
@@ -94,10 +105,10 @@ class ByteFoldOperator(BaseOperator):
                     chunk_to_content[ch_id] = blob
                 chunk_to_count[ch_id] = chunk_to_count.get(ch_id, 0) + 1
 
-        # Gross reused bytes: for each chunk, (count-1)*size
+        # Gross reused bytes: chunks with count >= min_chunk_reuse
         gross = 0
         for ch_id, count in chunk_to_count.items():
-            if count > 1:
+            if count >= min_chunk_reuse:
                 gross += (count - 1) * len(chunk_to_content[ch_id])
 
         # Metadata: chunk dict size + reconstruction map
@@ -121,6 +132,10 @@ class ByteFoldOperator(BaseOperator):
             str(p).replace("\\", "/"): ids for p, ids in path_to_chunk_ids.items()
         }
 
+        chunk_dict_bytes = sum(len(b) for b in chunk_to_content.values())
+        avg_chunk_size = chunk_dict_bytes // len(chunk_to_content) if chunk_to_content else 0
+        reused_count = sum(1 for c in chunk_to_count.values() if c >= min_chunk_reuse)
+
         return [
             CandidateCrease(
                 operator_id=self.operator_id(),
@@ -133,8 +148,10 @@ class ByteFoldOperator(BaseOperator):
                     "chunk_dict_b64": chunk_dict_b64,
                     "reconstruction": reconstruction,
                     "unique_chunk_count": len(chunk_to_content),
-                    "reused_chunk_count": sum(1 for c in chunk_to_count.values() if c > 1),
+                    "reused_chunk_count": reused_count,
                     "chunk_reused_bytes": gross,
+                    "chunk_dictionary_size_bytes": chunk_dict_bytes,
+                    "average_chunk_size": avg_chunk_size,
                 },
             )
         ]
@@ -250,6 +267,10 @@ class ByteFoldOperator(BaseOperator):
         unfold_recipe = {
             "chunk_dict_b64": meta["chunk_dict_b64"],
             "reconstruction": meta["reconstruction"],
+            "chunk_reused_bytes": meta.get("chunk_reused_bytes", 0),
+            "reused_chunk_count": meta.get("reused_chunk_count", 0),
+            "chunk_dictionary_size_bytes": meta.get("chunk_dictionary_size_bytes", 0),
+            "average_chunk_size": meta.get("average_chunk_size", 0),
         }
         return FoldRecord(
             operator_id=self.operator_id(),
