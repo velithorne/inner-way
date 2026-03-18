@@ -43,6 +43,30 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _load_ledger(root: Path) -> dict[str, Any]:
+    """Load ledger.json, expanding compact micro format (Phase 14D) if present."""
+    p = root / "ledger.json"
+    if not p.exists():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if data.get("_l"):
+        from infold.engine.compact_micro import decode_ledger_micro
+        return decode_ledger_micro(data)
+    return data
+
+
+def _load_report(root: Path) -> dict[str, Any]:
+    """Load report.json, expanding compact micro format (Phase 14D) if present."""
+    p = root / "reports" / "report.json"
+    if not p.exists():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if data.get("_r"):
+        from infold.engine.compact_micro import decode_report_micro
+        return decode_report_micro(data)
+    return data
+
+
 def _load_reconstruction_data(root: Path) -> dict[str, Any]:
     """
     Load maps/reconstruction.json and expand Family Membranes (Phase 14A) and
@@ -167,9 +191,7 @@ def _load_archive_metadata(root: Path) -> dict[str, Any]:
     if (root / "manifest.json").exists():
         manifest = _load_manifest(root)
     compat = manifest.get("compatibility", {})
-    report = {}
-    if (root / "reports" / "report.json").exists():
-        report = json.loads((root / "reports" / "report.json").read_text(encoding="utf-8"))
+    report = _load_report(root)
     rejection_count = len(report.get("rejected_candidates_summary", []))
     return {
         "spec_version": compat.get("spec_version", manifest.get("package_spec", "?")),
@@ -243,10 +265,8 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             zf.extractall(tmp)
         root = _extract_root(Path(tmp))
         manifest = _load_manifest(root)
-        ledger = json.loads((root / "ledger.json").read_text(encoding="utf-8"))
-        report = {}
-        if (root / "reports" / "report.json").exists():
-            report = json.loads((root / "reports" / "report.json").read_text(encoding="utf-8"))
+        ledger = _load_ledger(root)
+        report = _load_report(root)
         maps_data = _load_reconstruction_data(root)
         records = maps_data.get("records", [])
 
@@ -1422,7 +1442,7 @@ def validate_archive(
         ledger_path = root / "ledger.json"
         if ledger_path.exists() and mode in ("strict", "schema-only"):
             try:
-                ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+                ledger = _load_ledger(root)
             except json.JSONDecodeError as e:
                 errors.append(f"Ledger invalid JSON: {e}")
                 ledger = {}
@@ -1477,7 +1497,7 @@ def validate_archive(
 
         report_path = root / "reports" / "report.json"
         if report_path.exists() and mode == "strict":
-            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report = _load_report(root)
             rfold = report.get("fold_count", -1)
             mfold = manifest.get("fold_count", -1)
             if rfold != mfold:

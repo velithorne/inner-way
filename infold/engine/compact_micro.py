@@ -173,10 +173,81 @@ def load_inventory_micro(root: Path) -> dict[str, Any]:
     return data
 
 
+def encode_ledger_micro(ledger: dict[str, Any]) -> dict[str, Any]:
+    """Phase 14D: Compact ledger for micro. Gains array only. Deterministic."""
+    records = ledger.get("fold_records", [])
+    gains = [r.get("gain", 0) for r in records]
+    return {
+        "_l": 1,
+        "v": ledger.get("version", "1.0"),
+        "nf": ledger.get("total_folds", len(gains)),
+        "lg": ledger.get("total_bytes_saved", sum(gains)),
+        "g": gains,
+    }
+
+
+def decode_ledger_micro(data: dict[str, Any]) -> dict[str, Any]:
+    """Decode compact ledger to full form."""
+    if "_l" not in data:
+        return data
+    gains = data.get("g", [])
+    return {
+        "version": data.get("v", "1.0"),
+        "project_id": data.get("pid"),
+        "total_folds": data.get("nf", len(gains)),
+        "total_bytes_saved": data.get("lg", sum(gains)),
+        "fold_records": [{"gain": g} for g in gains],
+    }
+
+
+def encode_report_micro(report: dict[str, Any]) -> dict[str, Any]:
+    """Phase 14D: Minimal report for micro. Deterministic."""
+    scope = report.get("scope_accounting")
+    return {
+        "_r": 1,
+        "fc": report.get("file_count", 0),
+        "fd": report.get("folder_count", 0),
+        "os": report.get("original_size_bytes", 0),
+        "nf": report.get("fold_count", 0),
+        "lg": report.get("logical_gain_bytes", report.get("total_bytes_saved", 0)),
+        "pf": report.get("physical_folded_size_bytes", 0),
+        "ok": report.get("exact_reconstruction_ok", True),
+        "st": report.get("reconstruction_status", "ok"),
+        "err": report.get("errors", []),
+        "rc": report.get("rejected_candidates_count", 0),
+        **({"sc": scope} if scope else {}),
+    }
+
+
+def decode_report_micro(data: dict[str, Any]) -> dict[str, Any]:
+    """Decode compact report to full form."""
+    if "_r" not in data:
+        return data
+    rc = data.get("rc", 0)
+    out = {
+        "file_count": data.get("fc", 0),
+        "folder_count": data.get("fd", 0),
+        "original_size_bytes": data.get("os", 0),
+        "fold_count": data.get("nf", 0),
+        "logical_gain_bytes": data.get("lg", 0),
+        "total_bytes_saved": data.get("lg", 0),
+        "physical_folded_size_bytes": data.get("pf", 0),
+        "exact_reconstruction_ok": data.get("ok", True),
+        "reconstruction_status": data.get("st", "ok"),
+        "errors": data.get("err", []),
+        "rejected_candidates_count": rc,
+        "rejected_candidates_summary": [{}] * rc,  # placeholder for len() compat
+    }
+    if "sc" in data:
+        out["scope_accounting"] = data["sc"]
+    return out
+
+
 def apply_compact_micro(pkg_dir: Path, config: dict[str, Any]) -> None:
     """
-    Rewrite manifest, reconstruction, inventory, path_table with compact encoding.
+    Rewrite manifest, reconstruction, inventory, path_table, ledger, report with compact encoding.
     Call after metadata_table_fold and apply_family_membranes. Only when micro.
+    Phase 14D: Added ledger and report compaction.
     """
     if not config.get("_micro_mode", False):
         return
@@ -189,6 +260,22 @@ def apply_compact_micro(pkg_dir: Path, config: dict[str, Any]) -> None:
     # Encode manifest
     compact_m = encode_manifest_micro(manifest)
     manifest_path.write_text(json.dumps(compact_m, separators=(",", ":")), encoding="utf-8")
+
+    # Encode ledger (Phase 14D)
+    ledger_path = pkg_dir / "ledger.json"
+    if ledger_path.exists():
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        if "_l" not in ledger:
+            compact_ledger = encode_ledger_micro(ledger)
+            ledger_path.write_text(json.dumps(compact_ledger, separators=(",", ":")), encoding="utf-8")
+
+    # Encode report (Phase 14D)
+    report_path = pkg_dir / "reports" / "report.json"
+    if report_path.exists():
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if "_r" not in report:
+            compact_report = encode_report_micro(report)
+            report_path.write_text(json.dumps(compact_report, separators=(",", ":")), encoding="utf-8")
 
     # Encode reconstruction
     recon_path = pkg_dir / "maps" / "reconstruction.json"

@@ -9,9 +9,13 @@ from infold.engine.compact_micro import (
     decode_manifest_micro,
     decode_reconstruction_micro,
     decode_inventory_micro,
+    decode_ledger_micro,
+    decode_report_micro,
     encode_manifest_micro,
     encode_reconstruction_micro,
     encode_inventory_micro,
+    encode_ledger_micro,
+    encode_report_micro,
 )
 
 
@@ -97,3 +101,42 @@ def test_micro_archive_validate_strict(tmp_path):
     create_archive(fixture, out, {"_micro_mode": True, "_lean_mode": True})
     ok, errors = validate_archive(out, mode="strict")
     assert ok, errors
+
+
+def test_compact_ledger_encode_decode():
+    """Phase 14D: Compact ledger encoding is reversible."""
+    ledger = {
+        "version": "1.0",
+        "total_folds": 3,
+        "total_bytes_saved": 300,
+        "fold_records": [{"gain": 100}, {"gain": 150}, {"gain": 50}],
+    }
+    encoded = encode_ledger_micro(ledger)
+    assert "_l" in encoded
+    assert encoded["g"] == [100, 150, 50]
+    decoded = decode_ledger_micro(encoded)
+    assert decoded["total_folds"] == 3
+    assert decoded["total_bytes_saved"] == 300
+    assert [r["gain"] for r in decoded["fold_records"]] == [100, 150, 50]
+
+
+def test_compact_report_encode_decode():
+    """Phase 14D: Compact report encoding is reversible."""
+    report = {
+        "file_count": 10,
+        "fold_count": 2,
+        "logical_gain_bytes": 200,
+        "physical_folded_size_bytes": 800,
+        "exact_reconstruction_ok": True,
+        "reconstruction_status": "ok",
+        "errors": [],
+        "rejected_candidates_count": 1,
+        "scope_accounting": {"source_file_count": 12, "included_file_count": 10},
+    }
+    encoded = encode_report_micro(report)
+    assert "_r" in encoded
+    decoded = decode_report_micro(encoded)
+    assert decoded["file_count"] == 10
+    assert decoded["fold_count"] == 2
+    assert decoded["logical_gain_bytes"] == 200
+    assert len(decoded["rejected_candidates_summary"]) == 1

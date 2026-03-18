@@ -189,6 +189,8 @@ Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matri
 
 **Phase 14C (Ruthless Micro + Scope)**: Stricter micro thresholds (min_net_value 0.5, metadata_table_fold 64 bytes, path_dna min 100 bytes), scope accounting (source/included/excluded), and `--fair-scope` for staged benchmark fairness. See `docs/PHASE14C_RUTHLESS_MICRO_SCOPE_RESULTS.md`.
 
+**Phase 14D (Last-Mile Micro Density)**: Compact ledger and report encoding in micro mode (~1 KB savings). See `docs/PHASE14D_LAST_MILE_MICRO_DENSITY_RESULTS.md`.
+
 ## Quick Workflows (Phase 8)
 
 ```bash
