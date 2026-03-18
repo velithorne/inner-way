@@ -119,6 +119,16 @@ Meta-planning layer using multi-dimensional identity to guide routing, operator 
 
 Shown in archive explain, report, and manifest.
 
+## Tesseract Cooperation (Phase 10C)
+
+Conservative orchestration: short execution plans for structural→metadata and byte→metadata cooperation.
+
+- **structural_then_metadata**: Structural folds then metadata compaction (lower min_net threshold)
+- **byte_then_metadata**: Byte fold then metadata compaction
+- **primary_only**: No cross-family chaining (structure+byte, time-dominant, mixed)
+
+Shown in archive explain, report, manifest.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

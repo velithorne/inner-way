@@ -86,6 +86,11 @@ def export_package(
         manifest["tesseract_planner_route_reason"] = tpi.get("route_reason")
         manifest["tesseract_planner_dominant"] = tpi.get("dominant_dimension")
         manifest["tesseract_planner_operator_priority"] = tpi.get("operator_family_priority")
+    ep = config.get("_tesseract_execution_plan")
+    if ep:
+        manifest["tesseract_execution_steps"] = ep.get("execution_steps", [])
+        manifest["tesseract_cooperation_mode"] = ep.get("cooperation_mode")
+        manifest["tesseract_plan_reason"] = ep.get("plan_reason")
     (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 
     # ledger.json

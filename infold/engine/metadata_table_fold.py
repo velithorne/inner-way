@@ -125,9 +125,15 @@ def apply_metadata_table_fold(
     """
     Apply Metadata Table Fold to package. Rewrites maps/snapshots with path refs.
     Returns metrics dict if applied, None if skipped (low gain).
+    Phase 10C: When Tesseract cooperation allows metadata follow-up, use lower min_net threshold.
     """
     cfg = config.get("thresholds", {}).get("metadata_table_fold", {})
     min_net = cfg.get("min_net_gain_bytes", MIN_NET_GAIN_BYTES)
+    plan = config.get("_tesseract_execution_plan")
+    if plan:
+        from infold.tesseract.execution_plan import execution_plan_allows_metadata_followup
+        if execution_plan_allows_metadata_followup(plan):
+            min_net = min(min_net, max(16, min_net - 8))
     enabled = config.get("operators", {}).get("metadata_table_fold", {}).get("enabled", True)
     if not enabled:
         return None

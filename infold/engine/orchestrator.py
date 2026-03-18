@@ -163,11 +163,26 @@ def run_fold(
     if config.get("_tesseract_planner", True):
         from infold.profiles.creatures import compute_signals
         from infold.tesseract.planner import compute_tesseract_planner_profile
+        from infold.tesseract.execution_plan import generate_execution_plan
 
         signals = compute_signals(sheet, source_path)
-        config["_tesseract_planner_info"] = compute_tesseract_planner_profile(signals)
+        profile = compute_tesseract_planner_profile(signals)
+        plan = generate_execution_plan(profile)
+        from infold.tesseract.execution_plan import execution_plan_allows_metadata_followup
+        if execution_plan_allows_metadata_followup(plan):
+            profile["planner_bias"] = dict(profile.get("planner_bias", {}))
+            profile["planner_bias"]["favor_compactness"] = min(
+                0.08,
+                profile["planner_bias"].get("favor_compactness", 0) + 0.03,
+            )
+            profile["planner_bias"]["favor_compactness"] = round(
+                profile["planner_bias"]["favor_compactness"], 4
+            )
+        config["_tesseract_planner_info"] = profile
+        config["_tesseract_execution_plan"] = plan
     else:
         config["_tesseract_planner_info"] = None
+        config["_tesseract_execution_plan"] = None
 
     ledger = FoldLedger(
         project_id=config.get("project", {}).get("id"),

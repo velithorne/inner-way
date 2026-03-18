@@ -291,6 +291,16 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
                 "planner_bias": {},
             }
     out["tesseract_planner"] = tp
+    ep = report.get("tesseract_execution_plan")
+    if not ep and manifest:
+        steps = manifest.get("tesseract_execution_steps")
+        if steps is not None:
+            ep = {
+                "execution_steps": steps,
+                "cooperation_mode": manifest.get("tesseract_cooperation_mode", "primary_only"),
+                "plan_reason": manifest.get("tesseract_plan_reason", ""),
+            }
+    out["tesseract_execution_plan"] = ep
     return out
 
 
@@ -1879,6 +1889,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
         active = [f"{k}={v}" for k, v in bias.items() if v and v > 0]
         if active:
             lines.append(f"  planner_bias={', '.join(active)}")
+    ep = info.get("tesseract_execution_plan")
+    if ep:
+        lines.append("")
+        lines.append("Tesseract Execution Plan:")
+        lines.append(f"  steps={'->'.join(ep.get('execution_steps', []))}")
+        lines.append(f"  cooperation_mode={ep.get('cooperation_mode')}")
+        lines.append(f"  plan_reason={ep.get('plan_reason')}")
     lines.append("")
     lines.append("Reconstruction guarantees:")
     for g in info.get("reconstruction_guarantees", []):

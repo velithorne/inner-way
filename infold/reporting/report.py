@@ -177,6 +177,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "fold_creature_adapt_reasons": config.get("_fold_creature_info", {}).get("fold_creature_adapt_reasons") if config.get("_fold_creature_info") else None,
         "fold_creature_behavior_changes": config.get("_fold_creature_info", {}).get("fold_creature_behavior_changes") if config.get("_fold_creature_info") else None,
         "tesseract_planner": config.get("_tesseract_planner_info"),
+        "tesseract_execution_plan": config.get("_tesseract_execution_plan"),
     }
 
 
@@ -251,6 +252,14 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
         active = [f"{k}={v}" for k, v in bias.items() if v and v > 0]
         if active:
             lines.append(f"  planner_bias={', '.join(active)}")
+        lines.append("")
+    ep = report.get("tesseract_execution_plan")
+    if ep:
+        from infold.tesseract.execution_plan import execution_plan_summary
+        lines.append(f"Tesseract Execution Plan: {execution_plan_summary(ep)}")
+        lines.append(f"  steps={'->'.join(ep.get('execution_steps', []))}")
+        lines.append(f"  cooperation_mode={ep.get('cooperation_mode')}")
+        lines.append(f"  plan_reason={ep.get('plan_reason')}")
         lines.append("")
     lines.extend([
         f"Folds: {report['fold_count']}",
