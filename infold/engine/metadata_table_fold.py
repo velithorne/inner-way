@@ -27,7 +27,7 @@ def load_path_table(root: Path) -> list[str] | None:
     if "path_dna" in data:
         from infold.engine.path_dna import expand_path_dna
         return expand_path_dna(data["path_dna"])
-    return data.get("paths", [])
+    return data.get("p", data.get("paths", []))
 
 
 def _collect_paths_from_package(pkg_dir: Path) -> set[str]:

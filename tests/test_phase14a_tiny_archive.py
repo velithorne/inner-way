@@ -58,6 +58,9 @@ def test_micro_archive_has_family_membranes_or_path_dna(tmp_path):
     import zipfile
     with zipfile.ZipFile(out, "r") as zf:
         manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+    if manifest.get("_m"):
+        from infold.engine.compact_micro import decode_manifest_micro
+        manifest = decode_manifest_micro(manifest)
     assert manifest.get("family_membranes") is True or manifest.get("path_dna_folding") is True or manifest.get("metadata_table_fold") is True
 
 

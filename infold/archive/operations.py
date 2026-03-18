@@ -22,6 +22,18 @@ from infold.engine.package_schema import (
 )
 
 
+def _load_manifest(root: Path) -> dict[str, Any]:
+    """Load manifest.json, expanding compact micro format (Phase 14B) if present."""
+    p = root / "manifest.json"
+    if not p.exists():
+        return {}
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if data.get("_m"):
+        from infold.engine.compact_micro import decode_manifest_micro
+        return decode_manifest_micro(data)
+    return data
+
+
 def _sha256_file(path: Path) -> str:
     """Compute SHA256 of file. Deterministic."""
     h = hashlib.sha256()
@@ -33,22 +45,27 @@ def _sha256_file(path: Path) -> str:
 
 def _load_reconstruction_data(root: Path) -> dict[str, Any]:
     """
-    Load maps/reconstruction.json and expand Family Membranes (Phase 14A) if present.
-    Returns data with records having operator_id (expanded from o when family_membranes).
+    Load maps/reconstruction.json and expand Family Membranes (Phase 14A) and
+    compact micro encoding (Phase 14B) if present.
+    Returns data with records having operator_id.
     """
     maps_path = root / "maps" / "reconstruction.json"
     if not maps_path.exists():
         return {}
     data = json.loads(maps_path.read_text(encoding="utf-8"))
-    records = data.get("records", [])
-    op_ids = data.get("operator_ids", [])
-    if data.get("family_membranes") and op_ids:
-        for rec in records:
-            o = rec.get("o", -1)
-            if 0 <= o < len(op_ids):
-                rec["operator_id"] = op_ids[o]
-            if "o" in rec:
-                del rec["o"]
+    if "r" in data:
+        from infold.engine.compact_micro import decode_reconstruction_micro
+        data = decode_reconstruction_micro(data)
+    else:
+        records = data.get("records", [])
+        op_ids = data.get("operator_ids", [])
+        if data.get("family_membranes") and op_ids:
+            for rec in records:
+                o = rec.get("o", -1)
+                if 0 <= o < len(op_ids):
+                    rec["operator_id"] = op_ids[o]
+                if "o" in rec:
+                    del rec["o"]
     return data
 
 
@@ -82,8 +99,10 @@ def create_archive(
     try:
         export_package(result, config, pkg_dir)
         from infold.engine.metadata_table_fold import apply_metadata_table_fold, apply_family_membranes
+        from infold.engine.compact_micro import apply_compact_micro
         mt_result = apply_metadata_table_fold(pkg_dir, config)
         apply_family_membranes(pkg_dir, config, metadata_table_applied=mt_result is not None)
+        apply_compact_micro(pkg_dir, config)
         _write_integrity_checksums(pkg_dir, config)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in sorted(pkg_dir.rglob("*")):
@@ -146,7 +165,7 @@ def _load_archive_metadata(root: Path) -> dict[str, Any]:
     """
     manifest = {}
     if (root / "manifest.json").exists():
-        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        manifest = _load_manifest(root)
     compat = manifest.get("compatibility", {})
     report = {}
     if (root / "reports" / "report.json").exists():
@@ -223,7 +242,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
         with zipfile.ZipFile(archive, "r") as zf:
             zf.extractall(tmp)
         root = _extract_root(Path(tmp))
-        manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+        manifest = _load_manifest(root)
         ledger = json.loads((root / "ledger.json").read_text(encoding="utf-8"))
         report = {}
         if (root / "reports" / "report.json").exists():
@@ -407,7 +426,7 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
 
         manifest = {}
         if (root / "manifest.json").exists():
-            manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            manifest = _load_manifest(root)
         return {
             "path": str(archive),
             "manifest": manifest,
@@ -1306,7 +1325,8 @@ def inspect_archive(archive_path: Path | str) -> dict[str, Any]:
             manifest_path = found[0] if found else manifest_path
         if not manifest_path.exists():
             raise ValueError("Invalid archive: missing manifest.json")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        pkg_root = manifest_path.parent
+        manifest = _load_manifest(pkg_root)
         return {
             "path": str(archive),
             "manifest": manifest,
@@ -1380,7 +1400,7 @@ def validate_archive(
             manifest = {}
         else:
             try:
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest = _load_manifest(root)
             except json.JSONDecodeError as e:
                 errors.append(f"Manifest invalid JSON: {e}")
                 manifest = {}
