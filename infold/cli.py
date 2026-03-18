@@ -321,9 +321,10 @@ def archive_workflow_cmd(args) -> int:
 
 
 def _apply_create_flags(config: dict, args) -> dict:
-    """Apply archive create flags (compact, lean, creature, tesseract) to config."""
+    """Apply archive create flags (compact, lean, micro, creature, tesseract) to config."""
     cfg = dict(config)
-    lean = getattr(args, "lean", False)
+    micro = getattr(args, "micro", False)
+    lean = getattr(args, "lean", False) or micro
     if lean:
         cfg["_lean_mode"] = True
         cfg["package_export"] = {
@@ -335,7 +336,9 @@ def _apply_create_flags(config: dict, args) -> dict:
         cfg["_creature_adaptive"] = False
         cfg["_tesseract_planner"] = False
         cfg["_tesseract_cooperation"] = False
-    else:
+    if micro:
+        cfg["_micro_mode"] = True
+    if not lean:
         if getattr(args, "compact", False):
             cfg["package_export"] = {
                 **cfg.get("package_export", {}),
@@ -837,6 +840,7 @@ def main() -> int:
     create_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract Planner and Cooperation (size-first)")
     create_p.add_argument("--no-tesseract-cooperation", dest="no_tesseract_cooperation", action="store_true", help="Disable Tesseract Cooperation only (planner stays on)")
     create_p.add_argument("--lean", action="store_true", help="Size-first mode: compact, no creature, no Tesseract, minimal metadata")
+    create_p.add_argument("--micro", action="store_true", help="Micro-archive mode: minimal overhead for tiny archives (implies --lean)")
     create_p.set_defaults(func=archive_create)
     workflow_p = archive_sub.add_parser("workflow", help="Create + validate + summary in one command")
     workflow_p.add_argument("--source", required=True, help="Source path")
@@ -845,6 +849,7 @@ def main() -> int:
     workflow_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation")
     workflow_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract (size-first)")
     workflow_p.add_argument("--lean", action="store_true", help="Size-first mode")
+    workflow_p.add_argument("--micro", action="store_true", help="Micro-archive mode (minimal overhead)")
     workflow_p.add_argument("--json", action="store_true", help="JSON output")
     workflow_p.set_defaults(func=archive_workflow_cmd)
     showcase_p = archive_sub.add_parser("showcase", help="Full workflow: create, validate, reconstruct, save results")
@@ -854,6 +859,7 @@ def main() -> int:
     showcase_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation")
     showcase_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract (size-first)")
     showcase_p.add_argument("--lean", action="store_true", help="Size-first mode")
+    showcase_p.add_argument("--micro", action="store_true", help="Micro-archive mode (minimal overhead)")
     showcase_p.set_defaults(func=archive_showcase_cmd)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
     inspect_p.add_argument("archive", help="Archive path")
