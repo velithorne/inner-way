@@ -506,6 +506,7 @@ def sync_search_cmd(args) -> int:
         created_after=getattr(args, "created_after", None),
         created_before=getattr(args, "created_before", None),
         with_lineage=getattr(args, "with_lineage", False),
+        with_tesseract=getattr(args, "with_tesseract", False),
         operator=getattr(args, "operator", None),
         path=getattr(args, "path", None),
         family=getattr(args, "family", None),
@@ -638,6 +639,7 @@ def archive_search(args) -> int:
         diagnostics_only=getattr(args, "diagnostics_only", False),
         group_by=getattr(args, "group_by", None),
         explain=getattr(args, "explain", False),
+        with_tesseract=getattr(args, "with_tesseract", False),
     )
     _df = getattr(args, "debug_friendly", None)
     _df_val = None if _df is None else (_df == "true")
@@ -791,6 +793,7 @@ def main() -> int:
     search_p.add_argument("--diagnostics-only", dest="diagnostics_only", action="store_true", help="Search only diagnostics (no folds)")
     search_p.add_argument("--group-by", dest="group_by", choices=["archive", "operator", "family"], help="Group results")
     search_p.add_argument("--explain", action="store_true", help="Add match explanation to each result")
+    search_p.add_argument("--with-tesseract", dest="with_tesseract", action="store_true", help="Add multi-dimensional family identity (structure, byte, metadata, time)")
     search_p.add_argument("--spec-version", dest="spec_version", help="Filter archives by spec_version (multi-archive)")
     search_p.add_argument("--reconstruction-mode", dest="reconstruction_mode", help="Filter by reconstruction_mode")
     search_p.add_argument("--source-path", dest="source_path", help="Filter by source_path substring")
@@ -861,6 +864,7 @@ def main() -> int:
     sync_search_p.add_argument("--path", help="Search filter: path substring")
     sync_search_p.add_argument("--family", help="Search filter: family type")
     sync_search_p.add_argument("--with-lineage", action="store_true", help="Add first_seen, last_seen, lineage_tracking to results")
+    sync_search_p.add_argument("--with-tesseract", dest="with_tesseract", action="store_true", help="Add multi-dimensional family identity (structure, byte, metadata, time)")
     sync_search_p.add_argument("--json", action="store_true", help="JSON output")
     sync_search_p.set_defaults(func=sync_search_cmd)
     sync_summary_p = sync_sub.add_parser("summary", help="Show lineage summary")

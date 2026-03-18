@@ -228,7 +228,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             f"debug_friendly={compat.get('debug_friendly', False)}",
         ]
 
-        return {
+        out = {
             "path": str(archive),
             "manifest": manifest,
             "fold_profile": manifest.get("fold_profile"),
@@ -265,6 +265,21 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "fold_creature_traits_final": manifest.get("fold_creature_traits_final"),
             "fold_creature_adapt_reasons": manifest.get("fold_creature_adapt_reasons"),
         }
+    # Phase 10: Tesseract multi-dimensional summary (after with block; archive path still valid)
+    try:
+        from infold.tesseract import build_tesseract_signatures_from_archive
+        tess_list = build_tesseract_signatures_from_archive(archive, lineage_tracking=None)
+        by_dim: dict[str, list[str]] = {"structure": [], "byte": [], "metadata": [], "time": []}
+        for t in tess_list:
+            for d in t.get("dimensions_present", []):
+                if d in by_dim:
+                    by_dim[d].append(t.get("operator", "?"))
+        out["tesseract_families_by_dimension"] = {k: sorted(set(v)) for k, v in by_dim.items() if v}
+        out["tesseract_family_count"] = len(tess_list)
+    except Exception:
+        out["tesseract_families_by_dimension"] = {}
+        out["tesseract_family_count"] = 0
+    return out
 
 
 def list_archive(archive_path: Path | str) -> dict[str, Any]:
@@ -655,6 +670,7 @@ def search_archive(
     diagnostics_only: bool = False,
     group_by: str | None = None,
     explain: bool = False,
+    with_tesseract: bool = False,
 ) -> dict[str, Any]:
     """
     Search within one archive. Deterministic, archive-focused.
@@ -769,6 +785,19 @@ def search_archive(
                     m["chunk_metrics"] = dict(bfm)
                     m["chunk_metrics"]["files_chunk_folded"] = m.get("target_count", bfm.get("files_chunk_folded"))
 
+        # Enrich with Tesseract when requested (Phase 10)
+        if with_tesseract:
+            from infold.tesseract import build_tesseract_signatures_from_archive, get_tesseract_for_match, tesseract_summary
+            tess_list = build_tesseract_signatures_from_archive(archive, lineage_tracking=None)
+            for m in matches:
+                if m.get("match_type") != "fold":
+                    continue
+                tess = get_tesseract_for_match(m, tess_list)
+                if tess:
+                    m["tesseract"] = tess
+                    m["dimensions_present"] = tess.get("dimensions_present", [])
+                    m["tesseract_summary"] = tesseract_summary(tess)
+
     matches = _apply_post_filters(
         matches,
         min_gain=min_gain,
@@ -808,6 +837,7 @@ def search_archive(
         "diagnostics_only": diagnostics_only,
         "group_by": group_by,
         "explain": explain,
+        "with_tesseract": with_tesseract,
     }
     if explain:
         for m in matches:
@@ -866,6 +896,7 @@ def search_archives(
     max_files_chunk_folded: int | None = None,
     group_by: str | None = None,
     explain: bool = False,
+    with_tesseract: bool = False,
 ) -> dict[str, Any]:
     """
     Search across multiple archives. Aggregates matches, deterministic.
@@ -938,6 +969,7 @@ def search_archives(
             planner_decision=planner_decision,
             diagnostics_only=diagnostics_only,
             explain=explain,
+            with_tesseract=with_tesseract,
         )
         for m in r.get("matches", []):
             m["archive_path"] = str(arch)
@@ -979,6 +1011,7 @@ def search_archives(
         "max_files_chunk_folded": max_files_chunk_folded,
         "group_by": group_by,
         "explain": explain,
+        "with_tesseract": with_tesseract,
     }
     if explain:
         for m in all_matches:
@@ -1062,6 +1095,8 @@ def _append_match_line(lines: list[str], m: dict[str, Any], result: dict[str, An
             lines.append(f"  detail: {str(m['detail'])[:80]}")
     if m.get("match_explain"):
         lines.append(f"  explain: {m['match_explain']}")
+    if m.get("tesseract_summary"):
+        lines.append(f"  tesseract: {m['tesseract_summary']}")
     lines.append("")
 
 
@@ -1813,6 +1848,14 @@ def explain_to_text(info: dict[str, Any]) -> str:
         lines.append(f"  unique_paths: {mtf.get('metadata_table_unique_paths', 0)}")
         lines.append(f"  table_size_bytes: {mtf.get('metadata_table_table_size_bytes', 0):,}")
         lines.append(f"  net_bytes_saved: {mtf.get('metadata_table_net_bytes_saved', 0):,}")
+    tess_dim = info.get("tesseract_families_by_dimension", {})
+    if tess_dim:
+        lines.append("")
+        lines.append("Tesseract (multi-dimensional family identity):")
+        lines.append(f"  Families: {info.get('tesseract_family_count', 0)}")
+        for dim, ops in sorted(tess_dim.items()):
+            label = {"structure": "mainly structural", "byte": "byte reuse", "metadata": "metadata reuse", "time": "temporal persistence"}.get(dim, dim)
+            lines.append(f"  {label}: {', '.join(ops)}")
     lines.append("")
     lines.append("Reconstruction guarantees:")
     for g in info.get("reconstruction_guarantees", []):

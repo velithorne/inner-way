@@ -388,6 +388,7 @@ def sync_search(
     created_after: str | None = None,
     created_before: str | None = None,
     with_lineage: bool = False,
+    with_tesseract: bool = False,
     **search_kw: Any,
 ) -> dict[str, Any]:
     """
@@ -430,7 +431,7 @@ def sync_search(
             "summary": {"total_archives_searched": 0, "total_matches": 0, "matches_by_operator": {}, "matches_by_family": {}},
         }
 
-    result = search_archives(paths, **search_kw)
+    result = search_archives(paths, with_tesseract=with_tesseract, **search_kw)
     sorted_snaps = sorted(
         [s for s in lineage.get("snapshots", []) if isinstance(s, dict) and s.get("created")],
         key=lambda x: x.get("created", ""),
@@ -465,6 +466,33 @@ def sync_search(
                 m["last_seen"] = entry.get("last_seen_snapshot")
                 m["snapshots_seen_in"] = sorted(entry.get("snapshots_seen_in", []))
                 m["snapshot_count"] = entry.get("snapshot_count", 0)
+                if with_tesseract and m.get("tesseract"):
+                    from infold.tesseract.signature import build_tesseract_signature, tesseract_summary
+                    tess = m["tesseract"]
+                    dims = list(tess.get("dimensions_present", []))
+                    if "time" not in dims:
+                        first = entry.get("first_seen_snapshot", "")
+                        last = entry.get("last_seen_snapshot", "")
+                        count = entry.get("snapshot_count", 0)
+                        present = entry.get("present_in_latest", False)
+                        time_parts = [first or "", last or "", str(count), "1" if present else "0"]
+                        time_sig = hashlib.sha256(json.dumps(time_parts).encode()).hexdigest()[:12]
+                        time_strength = min(1.0, 0.3 + (count * 0.1)) if count else 0.2
+                        tess = build_tesseract_signature(
+                            family_type=tess.get("family_type", "?"),
+                            operator=tess.get("operator", "?"),
+                            structure_sig=tess.get("structure_sig"),
+                            byte_sig=tess.get("byte_sig"),
+                            metadata_sig=tess.get("metadata_sig"),
+                            time_sig=time_sig,
+                            structure_strength=tess.get("structure_strength"),
+                            byte_strength=tess.get("byte_strength"),
+                            metadata_strength=tess.get("metadata_strength"),
+                            time_strength=time_strength,
+                        )
+                        m["tesseract"] = tess
+                        m["dimensions_present"] = tess.get("dimensions_present", [])
+                        m["tesseract_summary"] = tesseract_summary(tess)
     return result
 
 
@@ -554,12 +582,15 @@ def sync_trace(
         target_op = op_map.get(family, family)
     elif operator:
         target_op = operator
+    from infold.tesseract import build_tesseract_from_lineage_entry, tesseract_summary
+
     items: list[dict[str, Any]] = []
     for op, sig_map in ops.items():
         if target_op and op != target_op:
             continue
         for sig, entry in sig_map.items():
-            items.append({
+            tess = build_tesseract_from_lineage_entry(op, sig, entry)
+            item = {
                 "operator": op,
                 "signature": sig,
                 "first_seen_snapshot": entry.get("first_seen_snapshot"),
@@ -567,7 +598,10 @@ def sync_trace(
                 "snapshot_count": entry.get("snapshot_count", 0),
                 "present_in_latest": entry.get("present_in_latest", False),
                 "snapshots_seen_in": sorted(entry.get("snapshots_seen_in", [])),
-            })
+                "tesseract": tess,
+                "tesseract_summary": tesseract_summary(tess),
+            }
+            items.append(item)
     items.sort(key=lambda x: (x["operator"], x["signature"]))
     return {
         "sync_dir": str(sync),
@@ -590,7 +624,8 @@ def sync_trace_to_text(data: dict[str, Any]) -> str:
         "",
     ]
     for item in data.get("items", [])[:20]:
-        lines.append(f"  [{item.get('operator','?')}] sig={item.get('signature','?')[:12]}... first={item.get('first_seen_snapshot')} last={item.get('last_seen_snapshot')} count={item.get('snapshot_count')} in_latest={item.get('present_in_latest')}")
+        tess_sum = item.get("tesseract_summary", "")
+        lines.append(f"  [{item.get('operator','?')}] sig={item.get('signature','?')[:12]}... first={item.get('first_seen_snapshot')} last={item.get('last_seen_snapshot')} count={item.get('snapshot_count')} in_latest={item.get('present_in_latest')} dims=[{tess_sum}]")
     if len(data.get("items", [])) > 20:
         lines.append(f"  ... +{len(data['items']) - 20} more")
     return "\n".join(lines)

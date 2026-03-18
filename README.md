@@ -91,6 +91,24 @@ Profiles are extended with a bounded adaptive strategy layer. Each profile becom
 
 Creature info is recorded in manifest, report, and archive explain. Use `--no-creature` to disable adaptation.
 
+## Tesseract Fold (Phase 10)
+
+Multi-dimensional family identity layer: structure, byte reuse, metadata reuse, temporal persistence. Enriches search, sync trace, and explain without changing operators or archive format.
+
+```bash
+# Search with tesseract (structure, byte, metadata, time dimensions)
+python3 -m infold.cli archive search archive.infold --with-tesseract
+
+# Sync search with tesseract (+ lineage for temporal dimension)
+python3 -m infold.cli archive sync search --dir .infold-sync --with-tesseract --with-lineage
+
+# Sync trace (always includes tesseract)
+python3 -m infold.cli archive sync trace --dir .infold-sync
+
+# Archive explain (includes Tesseract section)
+python3 -m infold.cli archive explain archive.infold
+```
+
 ## Quick Workflows (Phase 8)
 
 ```bash
@@ -143,6 +161,7 @@ python3 -m infold.cli archive compare archive1.infold archive2.infold
 # Search within archive(s) (Infold Search v1.0)
 # Path: .infold file or directory of .infold archives
 python3 -m infold.cli archive search archive.infold --operator template_skeleton
+python3 -m infold.cli archive search archive.infold --with-tesseract  # multi-dimensional family identity
 python3 -m infold.cli archive search archive.infold --path foo.py --explain
 python3 -m infold.cli archive search ./archives_dir --group-by operator
 python3 -m infold.cli archive search ./archives_dir --source-path template --min-logical-gain 50
