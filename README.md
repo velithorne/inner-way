@@ -168,6 +168,16 @@ python3 -m infold.cli archive create --source . --output archive.infold --no-tes
 
 Manifest records `creature_enabled`, `tesseract_planner_enabled`, `tesseract_cooperation_enabled`. Use `archive explain` to see which features were used.
 
+## Competitive Benchmark Matrix (Phase 12)
+
+Compare Infold against ZIP, gzip, zstd across dataset categories:
+
+```bash
+python3 -m infold.cli --competitive-matrix --competitive-matrix-output results/competitive_matrix
+```
+
+Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matrix.md`, `competitive_summary.md`, `feature_matrix.md`. Unavailable tools (e.g. zstd) are skipped cleanly. Research slots (cmix, nncp, paq) recorded as future comparison.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

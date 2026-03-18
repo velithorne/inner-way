@@ -19,6 +19,14 @@ from infold.benchmark.creature_comparison import (
     run_creature_comparison,
     creature_comparison_to_markdown,
 )
+from infold.benchmark.competitive_matrix import (
+    run_competitive_matrix,
+    export_matrix_csv,
+    export_matrix_json,
+    export_matrix_markdown,
+    build_competitive_summary,
+    build_feature_matrix,
+)
 
 __all__ = [
     "run_benchmark_campaign",
@@ -36,4 +44,10 @@ __all__ = [
     "ensure_stress_datasets",
     "run_creature_comparison",
     "creature_comparison_to_markdown",
+    "run_competitive_matrix",
+    "export_matrix_csv",
+    "export_matrix_json",
+    "export_matrix_markdown",
+    "build_competitive_summary",
+    "build_feature_matrix",
 ]

@@ -226,6 +226,47 @@ def run_tesseract_evaluate_cmd(args) -> int:
     return 0
 
 
+def run_competitive_matrix_cmd(args) -> int:
+    """Run competitive benchmark: Infold vs ZIP/gzip/zstd."""
+    from infold.benchmark.competitive_matrix import (
+        run_competitive_matrix,
+        export_matrix_csv,
+        export_matrix_json,
+        export_matrix_markdown,
+        build_feature_matrix,
+        build_competitive_summary,
+        export_competitive_summary_markdown,
+    )
+    from infold.benchmark.pack import ensure_stress_datasets, get_benchmark_datasets
+
+    config = load_config()
+    base = Path(__file__).parent.parent
+    ensure_stress_datasets(base)
+    datasets = get_benchmark_datasets(base)
+    if not datasets:
+        print("No benchmark datasets found")
+        return 1
+    matrix = run_competitive_matrix(datasets, config, base)
+    summary = build_competitive_summary(matrix)
+    feature_dict, feature_md = build_feature_matrix(matrix)
+    out = Path(getattr(args, "output", "results/competitive_matrix"))
+    out.mkdir(parents=True, exist_ok=True)
+    export_matrix_csv(matrix, out / "competitive_matrix.csv")
+    export_matrix_json(matrix, out / "competitive_matrix.json")
+    export_matrix_markdown(matrix, out / "competitive_matrix.md")
+    (out / "competitive_summary.md").write_text(
+        export_competitive_summary_markdown(summary, matrix),
+        encoding="utf-8",
+    )
+    (out / "feature_matrix.md").write_text(feature_md, encoding="utf-8")
+    with open(out / "competitive_summary.json", "w", encoding="utf-8") as f:
+        json.dump(summary, f, indent=2)
+    print(f"Exported to {out}/")
+    print(f"Tools available: {summary.get('tools_available', {})}")
+    print(f"Infold wins: {summary.get('infold_wins_count', 0)} | ZIP: {summary.get('zip_wins_count', 0)} | gzip: {summary.get('gzip_wins_count', 0)} | zstd: {summary.get('zstd_wins_count', 0)}")
+    return 0
+
+
 def archive_showcase_cmd(args) -> int:
     """Full workflow: create, validate, reconstruct, save results."""
     from infold.workflows import real_project_showcase
@@ -775,6 +816,8 @@ def main() -> int:
     parser.add_argument("--creature-compare-output", dest="creature_compare_output", help="Output dir for creature comparison results")
     parser.add_argument("--tesseract-evaluate", action="store_true", help="Run Tesseract evaluation (baseline vs planner vs cooperation)")
     parser.add_argument("--tesseract-evaluate-output", dest="tesseract_evaluate_output", help="Output dir for Tesseract evaluation results")
+    parser.add_argument("--competitive-matrix", action="store_true", help="Run competitive benchmark (Infold vs ZIP/gzip/zstd)")
+    parser.add_argument("--competitive-matrix-output", dest="competitive_matrix_output", help="Output dir for competitive matrix results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     analyze_p = subparsers.add_parser("analyze", help="Analyze project: fold + concise summary (no archive)")
@@ -1001,6 +1044,12 @@ def main() -> int:
         tea.output = getattr(args, "tesseract_evaluate_output", None) or "results/tesseract_evaluate"
         tea.archives = getattr(args, "archives", True)  # --no-archives sets False
         return run_tesseract_evaluate_cmd(tea)
+    if getattr(args, "competitive_matrix", False):
+        class CompetitiveMatrixArgs:
+            pass
+        cma = CompetitiveMatrixArgs()
+        cma.output = getattr(args, "competitive_matrix_output", None) or "results/competitive_matrix"
+        return run_competitive_matrix_cmd(cma)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)
