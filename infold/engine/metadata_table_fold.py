@@ -186,6 +186,16 @@ def apply_metadata_table_fold(
     """
     cfg = config.get("thresholds", {}).get("metadata_table_fold", {})
     min_net = cfg.get("min_net_gain_bytes", MIN_NET_GAIN_BYTES)
+
+    paths = _collect_paths_from_package(pkg_dir)
+    if not paths:
+        return None
+
+    path_table = _build_path_table(paths)
+    # Phase 15: Large-project metadata efficiency - lower threshold when many paths
+    if len(path_table) >= 150:
+        min_net = min(min_net, 24)
+
     if config.get("_tesseract_cooperation", True):
         plan = config.get("_tesseract_execution_plan")
         if plan:
@@ -197,11 +207,7 @@ def apply_metadata_table_fold(
     if not enabled:
         return None
 
-    paths = _collect_paths_from_package(pkg_dir)
-    if not paths:
-        return None
-
-    path_table = _build_path_table(paths)
+    # paths/path_table already computed above for scale-aware min_net
     path_to_ref = {p: i for i, p in enumerate(path_table)}
     occurrences = _compute_occurrences(pkg_dir)
 

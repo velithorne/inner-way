@@ -191,6 +191,8 @@ Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matri
 
 **Phase 14D (Last-Mile Micro Density)**: Compact ledger and report encoding in micro mode (~1 KB savings). See `docs/PHASE14D_LAST_MILE_MICRO_DENSITY_RESULTS.md`.
 
+**Phase 15 (Large Structure-Heavy Dominance)**: Dragon profile improvements (template min_lines 4, hierarchy 0.82), scale-aware metadata fold (path count ≥ 150), large-project comparison and showcase report. See `docs/PHASE15_LARGE_STRUCTURE_HEAVY_RESULTS.md`.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

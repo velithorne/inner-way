@@ -43,6 +43,7 @@ def get_profile_config(profile_name: str) -> dict[str, Any]:
         }
 
     # Dragon: large structure-rich - broader analysis, aggressive metadata fold
+    # Phase 15: min_lines 4 for more template families, hierarchy 0.82 for repeated layouts
     if profile_name == "dragon":
         return {
             "package_export": {
@@ -55,7 +56,8 @@ def get_profile_config(profile_name: str) -> dict[str, Any]:
                 "metadata_penalty_weight": -0.0005,
             },
             "thresholds": {
-                "template_skeleton": {"min_scaffold_similarity": 0.78, "max_slot_ratio": 0.38},
+                "template_skeleton": {"min_scaffold_similarity": 0.78, "max_slot_ratio": 0.38, "min_lines": 4},
+                "hierarchy_mirror": {"min_structure_similarity": 0.82},
                 "metadata_table_fold": {"min_net_gain_bytes": 16},
             },
         }

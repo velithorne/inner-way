@@ -839,6 +839,8 @@ def main() -> int:
     parser.add_argument("--tesseract-evaluate-output", dest="tesseract_evaluate_output", help="Output dir for Tesseract evaluation results")
     parser.add_argument("--competitive-matrix", action="store_true", help="Run competitive benchmark (Infold vs ZIP/gzip/zstd)")
     parser.add_argument("--competitive-matrix-output", dest="competitive_matrix_output", help="Output dir for competitive matrix results")
+    parser.add_argument("--large-project-comparison", action="store_true", help="Run competitive comparison on medium/large structure-heavy datasets only (Phase 15)")
+    parser.add_argument("--large-project-output", dest="large_project_output", help="Output dir for large-project comparison results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     analyze_p = subparsers.add_parser("analyze", help="Analyze project: fold + concise summary (no archive)")
@@ -1075,6 +1077,15 @@ def main() -> int:
         cma = CompetitiveMatrixArgs()
         cma.output = getattr(args, "competitive_matrix_output", None) or "results/competitive_matrix"
         return run_competitive_matrix_cmd(cma)
+    if getattr(args, "large_project_comparison", False):
+        from infold.benchmark.large_project_audit import run_large_project_comparison
+        base = Path(".").resolve()
+        config = load_config()
+        out = Path(getattr(args, "large_project_output", None) or "results/large_project_comparison")
+        result = run_large_project_comparison(base, config, out)
+        print(f"Large-project comparison: {result['summary'].get('datasets_compared', 0)} datasets, Infold wins: {result['summary'].get('infold_wins_count', 0)}")
+        print(f"Output: {out}")
+        return 0
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)
