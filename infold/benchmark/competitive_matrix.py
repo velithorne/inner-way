@@ -41,6 +41,7 @@ def get_matrix_category(dataset_id: str, pack_category: str) -> str:
 INFOLD_MODES = [
     ("infold_default", "default", {"_creature_adaptive": True, "_tesseract_planner": True, "_tesseract_cooperation": True}),
     ("infold_lean", "lean", {"_lean_mode": True, "_creature_adaptive": False, "_tesseract_planner": False, "_tesseract_cooperation": False}),
+    ("infold_micro", "micro", {"_micro_mode": True, "_lean_mode": True, "_creature_adaptive": False, "_tesseract_planner": False, "_tesseract_cooperation": False}),
     ("infold_golem_static", "golem_static", {"_fold_profile": "golem", "_creature_adaptive": False, "_tesseract_planner": False, "_tesseract_cooperation": False}),
 ]
 
@@ -79,6 +80,14 @@ TOOL_FEATURES: dict[str, dict[str, bool | str]] = {
         "metadata_aware": True,
     },
     "infold_lean": {
+        "exact_reconstruction": True,
+        "searchable": True,
+        "lineage_aware": True,
+        "explainable": True,
+        "structure_aware": True,
+        "metadata_aware": True,
+    },
+    "infold_micro": {
         "exact_reconstruction": True,
         "searchable": True,
         "lineage_aware": True,
@@ -368,7 +377,7 @@ def export_matrix_markdown(matrix: dict[str, Any], out_path: Path) -> None:
 
 def build_feature_matrix(matrix: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """Build feature-value matrix and return (dict, markdown)."""
-    tools = ["zip", "gzip", "zstd", "infold_default", "infold_lean", "infold_golem_static"]
+    tools = ["zip", "gzip", "zstd", "infold_default", "infold_lean", "infold_micro", "infold_golem_static"]
     features = ["exact_reconstruction", "searchable", "lineage_aware", "explainable", "structure_aware", "metadata_aware"]
     out: dict[str, dict[str, bool]] = {}
     for t in tools:
@@ -400,6 +409,7 @@ def build_competitive_summary(matrix: dict[str, Any]) -> dict[str, Any]:
     gzip_wins = 0
     zstd_wins = 0
     best_infold_by_cat: dict[str, str] = {}
+    best_infold_mode_by_cat: dict[str, tuple[str, int]] = {}  # cat -> (mode, size)
     for did, rs in by_ds.items():
         valid = [r for r in rs if isinstance(r.get("compressed_size_bytes"), (int, float))]
         if not valid:
@@ -416,12 +426,20 @@ def build_competitive_summary(matrix: dict[str, Any]) -> dict[str, Any]:
             gzip_wins += 1
         elif best_tool == "zstd":
             zstd_wins += 1
+        # Best Infold mode per category (smallest Infold size) regardless of overall winner
+        infold_rows = [r for r in rs if "infold" in str(r.get("tool", "")) and isinstance(r.get("compressed_size_bytes"), (int, float))]
+        if infold_rows and mat_cat:
+            best_infold = min(infold_rows, key=lambda x: x.get("compressed_size_bytes") or 999999999)
+            prev = best_infold_mode_by_cat.get(mat_cat, (None, 999999999))
+            if (best_infold.get("compressed_size_bytes") or 999999999) < prev[1]:
+                best_infold_mode_by_cat[mat_cat] = (best_infold.get("tool", ""), best_infold.get("compressed_size_bytes") or 0)
     return {
         "infold_wins_count": infold_wins,
         "zip_wins_count": zip_wins,
         "gzip_wins_count": gzip_wins,
         "zstd_wins_count": zstd_wins,
         "best_infold_by_category": best_infold_by_cat,
+        "best_infold_mode_by_category": {k: v[0] for k, v in best_infold_mode_by_cat.items()},
         "tools_available": matrix.get("tools_available", {}),
         "dataset_count": len(by_ds),
     }
@@ -450,6 +468,13 @@ def export_competitive_summary_markdown(summary: dict[str, Any], matrix: dict[st
         "",
     ])
     for cat, mode in sorted(summary.get("best_infold_by_category", {}).items()):
+        lines.append(f"- {cat}: {mode}")
+    lines.extend([
+        "",
+        "## Best Infold Mode by Category (smallest Infold size)",
+        "",
+    ])
+    for cat, mode in sorted(summary.get("best_infold_mode_by_category", {}).items()):
         lines.append(f"- {cat}: {mode}")
     lines.extend([
         "",

@@ -115,9 +115,9 @@ def test_build_competitive_summary():
     matrix = {
         "matrix": [
             {"dataset_id": "a", "tool": "infold_lean", "compressed_size_bytes": 50, "matrix_category": "small"},
-            {"dataset_id": "a", "tool": "gzip", "compressed_size_bytes": 100},
+            {"dataset_id": "a", "tool": "gzip", "compressed_size_bytes": 100, "matrix_category": "small"},
             {"dataset_id": "b", "tool": "gzip", "compressed_size_bytes": 80, "matrix_category": "medium"},
-            {"dataset_id": "b", "tool": "infold_lean", "compressed_size_bytes": 120},
+            {"dataset_id": "b", "tool": "infold_lean", "compressed_size_bytes": 120, "matrix_category": "medium"},
         ],
         "tools_available": {"zip": True, "gzip": True, "zstd": False},
     }
@@ -125,6 +125,9 @@ def test_build_competitive_summary():
     assert "infold_wins_count" in summary
     assert "gzip_wins_count" in summary
     assert "best_infold_by_category" in summary
+    assert "best_infold_mode_by_category" in summary
+    assert summary["best_infold_mode_by_category"]["small"] == "infold_lean"
+    assert summary["best_infold_mode_by_category"]["medium"] == "infold_lean"
 
 
 def test_build_feature_matrix():
@@ -139,7 +142,13 @@ def test_build_feature_matrix():
 
 def test_export_competitive_summary_markdown():
     """Summary markdown exports."""
-    summary = {"tools_available": {"zip": True}, "infold_wins_count": 1, "gzip_wins_count": 2, "best_infold_by_category": {"small": "infold_lean"}}
+    summary = {
+        "tools_available": {"zip": True},
+        "infold_wins_count": 1,
+        "gzip_wins_count": 2,
+        "best_infold_by_category": {"small": "infold_lean"},
+        "best_infold_mode_by_category": {"small": "infold_lean"},
+    }
     md = export_competitive_summary_markdown(summary, {"matrix": []})
     assert "Competitive" in md
     assert "Infold wins" in md

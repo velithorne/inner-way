@@ -156,6 +156,9 @@ python3 -m infold.cli archive create --source . --output archive.infold --lean
 # Size-first with explicit profile
 python3 -m infold.cli archive create --source . --output archive.infold --profile golem --no-creature --no-tesseract
 
+# Micro-archive: minimal overhead for tiny archives (implies --lean)
+python3 -m infold.cli archive create --source . --output archive.infold --micro
+
 # Analysis-rich: default (full creature + Tesseract)
 python3 -m infold.cli archive create --source . --output archive.infold
 
@@ -177,6 +180,8 @@ python3 -m infold.cli --competitive-matrix --competitive-matrix-output results/c
 ```
 
 Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matrix.md`, `competitive_summary.md`, `feature_matrix.md`. Unavailable tools (e.g. zstd) are skipped cleanly. Research slots (cmix, nncp, paq) recorded as future comparison.
+
+**Phase 13B (zstd-era retest)**: Summary now includes best Infold mode per category. On large structure-heavy codebases, Infold micro can beat zstd. See `docs/PHASE13B_ZSTD_ERA_COMPETITIVE_RETEST.md` for full guidance.
 
 ## Quick Workflows (Phase 8)
 
