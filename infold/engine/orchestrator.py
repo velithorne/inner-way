@@ -160,24 +160,32 @@ def run_fold(
         config["_fold_creature_info"] = None
 
     # Phase 10B: Tesseract Planner (meta-planning from dimension strengths)
-    if config.get("_tesseract_planner", True):
+    # Phase 10C: Tesseract Cooperation (execution plans, metadata follow-up)
+    tesseract_planner = config.get("_tesseract_planner", True)
+    tesseract_cooperation = config.get("_tesseract_cooperation", True)
+    if tesseract_planner:
         from infold.profiles.creatures import compute_signals
         from infold.tesseract.planner import compute_tesseract_planner_profile
         from infold.tesseract.execution_plan import generate_execution_plan
 
         signals = compute_signals(sheet, source_path)
         profile = compute_tesseract_planner_profile(signals)
-        plan = generate_execution_plan(profile)
-        from infold.tesseract.execution_plan import execution_plan_allows_metadata_followup
-        if execution_plan_allows_metadata_followup(plan):
-            profile["planner_bias"] = dict(profile.get("planner_bias", {}))
-            profile["planner_bias"]["favor_compactness"] = min(
-                0.08,
-                profile["planner_bias"].get("favor_compactness", 0) + 0.03,
-            )
-            profile["planner_bias"]["favor_compactness"] = round(
-                profile["planner_bias"]["favor_compactness"], 4
-            )
+        meta_cutoff = config.get("_tesseract_metadata_strength_cutoff", 0.25)
+        plan = generate_execution_plan(profile, metadata_strength_cutoff=meta_cutoff)
+        if tesseract_cooperation:
+            from infold.tesseract.execution_plan import execution_plan_allows_metadata_followup
+            if execution_plan_allows_metadata_followup(plan):
+                profile["planner_bias"] = dict(profile.get("planner_bias", {}))
+                profile["planner_bias"]["favor_compactness"] = min(
+                    0.08,
+                    profile["planner_bias"].get("favor_compactness", 0)
+                    + config.get("_tesseract_compactness_bias_increment", 0.03),
+                )
+                profile["planner_bias"]["favor_compactness"] = round(
+                    profile["planner_bias"]["favor_compactness"], 4
+                )
+        else:
+            plan = {**plan, "cooperation_mode": "primary_only", "execution_steps": ["primary"]}
         config["_tesseract_planner_info"] = profile
         config["_tesseract_execution_plan"] = plan
     else:

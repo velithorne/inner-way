@@ -129,6 +129,17 @@ Conservative orchestration: short execution plans for structural→metadata and 
 
 Shown in archive explain, report, manifest.
 
+## Tesseract Evaluation (Phase 10D)
+
+Measure the effect of Tesseract Planner and Cooperation on physical size, logical gain, and metadata cleanup:
+
+```bash
+# Run Tesseract evaluation: baseline vs planner vs cooperation
+python3 -m infold.cli --tesseract-evaluate --tesseract-evaluate-output results/tesseract_evaluate
+```
+
+Exports JSON, CSV, and Markdown with cooperation win summary, per-dataset per-mode metrics, and recommendations.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

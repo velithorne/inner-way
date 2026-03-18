@@ -183,6 +183,49 @@ def run_creature_compare_cmd(args) -> int:
     return 0
 
 
+def run_tesseract_evaluate_cmd(args) -> int:
+    """Run Tesseract evaluation: baseline vs planner vs cooperation."""
+    from infold.benchmark.tesseract_evaluation import (
+        run_tesseract_comparison,
+        compute_cooperation_wins,
+        build_recommendation,
+        export_evaluation_csv,
+        export_evaluation_markdown,
+    )
+    from infold.benchmark.pack import ensure_stress_datasets, get_benchmark_datasets
+
+    config = load_config()
+    base = Path(__file__).parent.parent
+    ensure_stress_datasets(base)
+    datasets = get_benchmark_datasets(base)
+    if not datasets:
+        print("No benchmark datasets found")
+        return 1
+    create_archives = getattr(args, "archives", True)
+    comparison = run_tesseract_comparison(datasets, config, base, create_archives=create_archives)
+    cooperation_wins = compute_cooperation_wins(comparison)
+    recommendation = build_recommendation(comparison, cooperation_wins)
+    out = Path(getattr(args, "output", "results/tesseract_evaluate"))
+    out.mkdir(parents=True, exist_ok=True)
+    with open(out / "tesseract_evaluation.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "comparison": comparison,
+            "cooperation_wins": cooperation_wins,
+            "recommendation": recommendation,
+        }, f, indent=2)
+    export_evaluation_csv(comparison, out / "tesseract_evaluation.csv")
+    (out / "tesseract_evaluation.md").write_text(
+        export_evaluation_markdown(comparison, cooperation_wins, recommendation),
+        encoding="utf-8",
+    )
+    print(f"Exported to {out}/tesseract_evaluation.json, .csv, .md")
+    s = cooperation_wins
+    print(f"Cooperation improved: {s.get('cooperation_improved_count', 0)} datasets")
+    print(f"Cooperation hurt: {s.get('cooperation_hurt_count', 0)} datasets")
+    print(f"Bytes saved by cooperation: {s.get('total_bytes_saved_by_cooperation', 0):,}")
+    return 0
+
+
 def archive_showcase_cmd(args) -> int:
     """Full workflow: create, validate, reconstruct, save results."""
     from infold.workflows import real_project_showcase
@@ -710,6 +753,8 @@ def main() -> int:
     parser.add_argument("--profile-compare-output", dest="profile_compare_output", help="Output dir for profile comparison results")
     parser.add_argument("--creature-compare", action="store_true", help="Run creature comparison (static vs adaptive)")
     parser.add_argument("--creature-compare-output", dest="creature_compare_output", help="Output dir for creature comparison results")
+    parser.add_argument("--tesseract-evaluate", action="store_true", help="Run Tesseract evaluation (baseline vs planner vs cooperation)")
+    parser.add_argument("--tesseract-evaluate-output", dest="tesseract_evaluate_output", help="Output dir for Tesseract evaluation results")
     parser.add_argument("--profile", default="auto", help="Fold profile for create/campaign: auto, sparrow, fox, dragon, golem, serpent")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     analyze_p = subparsers.add_parser("analyze", help="Analyze project: fold + concise summary (no archive)")
@@ -920,6 +965,13 @@ def main() -> int:
         cca.output = getattr(args, "creature_compare_output", None) or "results/creature_compare"
         cca.archives = getattr(args, "archives", True)
         return run_creature_compare_cmd(cca)
+    if getattr(args, "tesseract_evaluate", False):
+        class TesseractEvaluateArgs:
+            pass
+        tea = TesseractEvaluateArgs()
+        tea.output = getattr(args, "tesseract_evaluate_output", None) or "results/tesseract_evaluate"
+        tea.archives = getattr(args, "archives", True)  # --no-archives sets False
+        return run_tesseract_evaluate_cmd(tea)
     if args.command == "archive":
         if hasattr(args, "func") and args.func is not None:
             return args.func(args)

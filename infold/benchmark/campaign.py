@@ -93,6 +93,8 @@ def run_benchmark_campaign(
         row["fold_profile"] = pfi.get("fold_profile")
         row["fold_profile_mode"] = pfi.get("fold_profile_mode")
         row["fold_profile_reason"] = pfi.get("fold_profile_reason")
+        row["_tesseract_planner_info"] = cfg.get("_tesseract_planner_info")
+        row["_tesseract_execution_plan"] = cfg.get("_tesseract_execution_plan")
 
         if create_archives:
             with tempfile.TemporaryDirectory(prefix="infold_campaign_") as tmp:
@@ -104,9 +106,15 @@ def run_benchmark_campaign(
                     ok, errors = validate_archive(archive_path)
                     row["archive_validate_status"] = "ok" if ok else f"failed:{len(errors)}"
                     row["integrity_status"] = "ok" if ok and not any("integrity" in e.lower() for e in errors) else "failed"
-                    # Package overhead (full audit)
+                    # Package overhead (full audit) and metadata_table_fold metrics
                     import zipfile
                     with zipfile.ZipFile(archive_path, "r") as zf:
+                        try:
+                            rj = json.loads(zf.read("reports/report.json").decode("utf-8"))
+                            mtf = rj.get("metadata_table_fold_metrics") or {}
+                            row["metadata_table_fold_net_bytes"] = mtf.get("metadata_table_net_bytes_saved")
+                        except (KeyError, json.JSONDecodeError):
+                            row["metadata_table_fold_net_bytes"] = None
                         overhead: dict[str, int] = {}
                         total_archive = 0
                         for info in zf.infolist():
@@ -130,7 +138,7 @@ def run_benchmark_campaign(
                         row["package_overhead"] = overhead
                         row["archive_size_bytes"] = total_archive
                         row["tuning_report"] = build_tuning_report(result, cfg, overhead, total_archive)
-                    # Reconstruction time
+                    # Reconstruction time (outside zip context)
                     out_dir = Path(tmp) / "restored"
                     t0_recon = time.perf_counter()
                     reconstruct_archive(archive_path, out_dir)

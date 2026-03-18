@@ -11,8 +11,15 @@ from typing import Any
 
 COOPERATION_MODES = ("structural_then_metadata", "byte_then_metadata", "primary_only", "balanced")
 
+# Default metadata strength cutoff for cooperation (configurable for tuning)
+DEFAULT_METADATA_STRENGTH_CUTOFF = 0.25
 
-def generate_execution_plan(profile: dict[str, Any]) -> dict[str, Any]:
+
+def generate_execution_plan(
+    profile: dict[str, Any],
+    *,
+    metadata_strength_cutoff: float = DEFAULT_METADATA_STRENGTH_CUTOFF,
+) -> dict[str, Any]:
     """
     Generate safe execution plan from Tesseract profile.
     Deterministic. No long chains, no recursion.
@@ -39,11 +46,11 @@ def generate_execution_plan(profile: dict[str, Any]) -> dict[str, Any]:
         execution_steps = ["primary"]
         cooperation_mode = "primary_only"
         plan_reason = "time_dominant_conservative"
-    elif dominant == "structure" and secondary == "metadata" and m >= 0.25:
+    elif dominant == "structure" and secondary == "metadata" and m >= metadata_strength_cutoff:
         execution_steps = ["structural", "metadata"]
         cooperation_mode = "structural_then_metadata"
         plan_reason = "structure_metadata_cooperation"
-    elif dominant == "byte" and secondary == "metadata" and m >= 0.25:
+    elif dominant == "byte" and secondary == "metadata" and m >= metadata_strength_cutoff:
         execution_steps = ["byte", "metadata"]
         cooperation_mode = "byte_then_metadata"
         plan_reason = "byte_metadata_cooperation"
