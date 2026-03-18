@@ -338,6 +338,24 @@ def _apply_create_flags(config: dict, args) -> dict:
         cfg["_tesseract_cooperation"] = False
     if micro:
         cfg["_micro_mode"] = True
+        # Phase 14C: Ruthless micro thresholds
+        cfg.setdefault("planner", {})
+        cfg["planner"] = {**cfg["planner"], "min_net_value": 0.5}
+        cfg.setdefault("thresholds", {})
+        cfg["thresholds"].setdefault("metadata_table_fold", {})
+        cfg["thresholds"]["metadata_table_fold"] = {
+            **cfg["thresholds"]["metadata_table_fold"],
+            "min_net_gain_bytes": 64,
+        }
+        cfg["_micro_path_dna_min_bytes_saved"] = 100
+    fair_scope = getattr(args, "fair_scope", False)
+    if fair_scope:
+        cfg["_fair_scope"] = True
+        base = list(cfg.get("project", {}).get("include_extensions", [".py", ".js", ".ts", ".json", ".yaml", ".yml", ".md", ".txt"]))
+        extra = [e for e in [".csv", ".html", ".toml", ".cfg", ".ini"] if e not in base]
+        if extra:
+            cfg.setdefault("project", {})
+            cfg["project"] = {**cfg["project"], "include_extensions": base + extra}
     if not lean:
         if getattr(args, "compact", False):
             cfg["package_export"] = {
@@ -841,6 +859,7 @@ def main() -> int:
     create_p.add_argument("--no-tesseract-cooperation", dest="no_tesseract_cooperation", action="store_true", help="Disable Tesseract Cooperation only (planner stays on)")
     create_p.add_argument("--lean", action="store_true", help="Size-first mode: compact, no creature, no Tesseract, minimal metadata")
     create_p.add_argument("--micro", action="store_true", help="Micro-archive mode: minimal overhead for tiny archives (implies --lean)")
+    create_p.add_argument("--fair-scope", dest="fair_scope", action="store_true", help="Include more extensions (.csv, .html, .toml) for staged benchmark fairness")
     create_p.set_defaults(func=archive_create)
     workflow_p = archive_sub.add_parser("workflow", help="Create + validate + summary in one command")
     workflow_p.add_argument("--source", required=True, help="Source path")

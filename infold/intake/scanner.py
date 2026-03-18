@@ -5,6 +5,7 @@ Intake layer: scans folders, classifies files, loads text, builds project invent
 import fnmatch
 import hashlib
 from pathlib import Path
+from typing import Any
 
 from infold.models.file_node import FileNode
 from infold.models.project_sheet import ProjectSheet
@@ -128,3 +129,75 @@ def scan_project(
             "original_size_bytes": sum(len(n.raw_text.encode("utf-8")) for n in file_nodes.values()),
         },
     )
+
+
+def compute_scope_metrics(
+    source_path: Path | str,
+    *,
+    include_extensions: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Phase 14C: Compute scope accounting for archive creation.
+    Returns source/included/excluded file counts and bytes.
+    Deterministic. Does not load file content.
+    """
+    source_path = Path(source_path).resolve()
+    if not source_path.is_dir():
+        return {
+            "source_file_count": 0,
+            "source_bytes": 0,
+            "included_file_count": 0,
+            "included_bytes": 0,
+            "excluded_file_count": 0,
+            "excluded_bytes": 0,
+            "excluded_by_extension": [],
+            "excluded_by_pattern": [],
+        }
+
+    if include_extensions is None:
+        include_extensions = [".py", ".js", ".ts", ".json", ".yaml", ".yml", ".md", ".txt"]
+    if exclude_patterns is None:
+        exclude_patterns = [".git", "__pycache__", "*.pyc", ".venv", "venv", "node_modules", ".tox", "dist", "build"]
+
+    source_file_count = 0
+    source_bytes = 0
+    included_file_count = 0
+    included_bytes = 0
+    excluded_by_extension: list[str] = []
+    excluded_by_pattern: list[str] = []
+    excluded_ext_bytes = 0
+    excluded_pattern_bytes = 0
+
+    for item in source_path.rglob("*"):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(source_path)
+        try:
+            size = item.stat().st_size
+        except OSError:
+            size = 0
+        source_file_count += 1
+        source_bytes += size
+
+        if _should_exclude(rel, exclude_patterns):
+            excluded_by_pattern.append(str(rel))
+            excluded_pattern_bytes += size
+            continue
+        if not _should_include(item, include_extensions):
+            excluded_by_extension.append(str(rel))
+            excluded_ext_bytes += size
+            continue
+        included_file_count += 1
+        included_bytes += size
+
+    return {
+        "source_file_count": source_file_count,
+        "source_bytes": source_bytes,
+        "included_file_count": included_file_count,
+        "included_bytes": included_bytes,
+        "excluded_file_count": len(excluded_by_extension) + len(excluded_by_pattern),
+        "excluded_bytes": excluded_ext_bytes + excluded_pattern_bytes,
+        "excluded_by_extension": sorted(excluded_by_extension),
+        "excluded_by_pattern": sorted(excluded_by_pattern),
+    }

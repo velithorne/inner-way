@@ -187,6 +187,8 @@ Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matri
 
 **Phase 14B (Encode Density)**: Compact micro manifest, reconstruction, inventory, and path_table in `--micro` mode. See `docs/PHASE14B_TINY_ARCHIVE_ENCODE_DENSITY_RESULTS.md`.
 
+**Phase 14C (Ruthless Micro + Scope)**: Stricter micro thresholds (min_net_value 0.5, metadata_table_fold 64 bytes, path_dna min 100 bytes), scope accounting (source/included/excluded), and `--fair-scope` for staged benchmark fairness. See `docs/PHASE14C_RUTHLESS_MICRO_SCOPE_RESULTS.md`.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

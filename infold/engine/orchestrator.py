@@ -79,6 +79,15 @@ def run_fold(
     profile = config.get("_profile") if isinstance(config.get("_profile"), dict) else None
     t0_total = time.perf_counter()
 
+    # Phase 14C: Scope accounting
+    from infold.intake.scanner import compute_scope_metrics
+    config["_scope_metrics"] = compute_scope_metrics(
+        source_path,
+        exclude_patterns=config.get("project", {}).get("exclude_patterns"),
+        include_extensions=config.get("project", {}).get("include_extensions"),
+    )
+    config.setdefault("_micro_skip_diagnostics", [])
+
     t0_scan = time.perf_counter()
     sheet = scan_project(
         source_path,

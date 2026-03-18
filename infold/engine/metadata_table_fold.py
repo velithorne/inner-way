@@ -213,6 +213,7 @@ def apply_metadata_table_fold(
             gross_saved += orig_bytes - ref_bytes
 
     # Phase 14A: Path DNA - use compact path encoding when micro mode and it saves bytes
+    # Phase 14C: Ruthless micro - skip path_dna if savings below threshold
     table_json_normal = json.dumps({"paths": path_table}, separators=(",", ":"))
     table_overhead_normal = len(table_json_normal.encode("utf-8"))
     path_dna = None
@@ -222,13 +223,33 @@ def apply_metadata_table_fold(
         path_dna = build_path_dna(path_table)
         if path_dna is not None:
             table_json_dna = json.dumps({"path_dna": path_dna}, separators=(",", ":"))
-            if len(table_json_dna.encode("utf-8")) < table_overhead_normal:
+            dna_overhead = len(table_json_dna.encode("utf-8"))
+            dna_saved = table_overhead_normal - dna_overhead
+            min_dna_saved = config.get("_micro_path_dna_min_bytes_saved", 0)
+            if dna_saved >= min_dna_saved and dna_overhead < table_overhead_normal:
                 table_json = table_json_dna
+            else:
+                path_dna = None
+                if dna_saved > 0 and min_dna_saved > 0:
+                    config.setdefault("_micro_skip_diagnostics", []).append({
+                        "reason": "path_dna",
+                        "detail": f"dna_saved {dna_saved} < min {min_dna_saved}",
+                        "dna_saved": dna_saved,
+                        "min_required": min_dna_saved,
+                    })
 
     table_overhead = len(table_json.encode("utf-8"))
     net_saved = gross_saved - table_overhead
 
     if net_saved < min_net:
+        if config.get("_micro_mode"):
+            config.setdefault("_micro_skip_diagnostics", []).append({
+                "reason": "metadata_table_fold",
+                "detail": f"net_saved {net_saved} < min_net {min_net}",
+                "gross_saved": gross_saved,
+                "table_overhead": table_overhead,
+                "net_saved": net_saved,
+            })
         return None
 
     mt_dir = pkg_dir / "shared" / METADATA_TABLES_DIR

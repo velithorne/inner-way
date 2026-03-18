@@ -311,6 +311,8 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "fold_species_reason": manifest.get("fold_species_reason"),
             "fold_creature_traits_final": manifest.get("fold_creature_traits_final"),
             "fold_creature_adapt_reasons": manifest.get("fold_creature_adapt_reasons"),
+            "scope_accounting": manifest.get("scope_accounting") or report.get("scope_accounting"),
+            "micro_skip_diagnostics": report.get("micro_skip_diagnostics"),
         }
     # Phase 10: Tesseract multi-dimensional summary (after with block; archive path still valid)
     try:
@@ -1937,6 +1939,21 @@ def explain_to_text(info: dict[str, Any]) -> str:
     if info.get("family_membranes"):
         lines.append("")
         lines.append("Family Membranes (Phase 14A): used")
+    scope = info.get("scope_accounting")
+    if scope and scope.get("excluded_file_count", 0) > 0:
+        lines.append("")
+        lines.append("Scope accounting (Phase 14C):")
+        lines.append(f"  source: {scope.get('source_file_count', 0)} files, {scope.get('source_bytes', 0):,} bytes")
+        lines.append(f"  included: {scope.get('included_file_count', 0)} files, {scope.get('included_bytes', 0):,} bytes")
+        lines.append(f"  excluded: {scope.get('excluded_file_count', 0)} files, {scope.get('excluded_bytes', 0):,} bytes")
+    skip_diag = info.get("micro_skip_diagnostics", [])
+    if skip_diag:
+        lines.append("")
+        lines.append("Micro skip diagnostics:")
+        for s in skip_diag[:5]:
+            lines.append(f"  {s.get('reason', '?')}: {s.get('detail', '')[:60]}")
+        if len(skip_diag) > 5:
+            lines.append(f"  ... and {len(skip_diag) - 5} more")
     tess_dim = info.get("tesseract_families_by_dimension", {})
     if tess_dim:
         lines.append("")

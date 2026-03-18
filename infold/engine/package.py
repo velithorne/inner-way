@@ -55,6 +55,7 @@ def export_package(
     physical_folded = raw_size - ledger.total_bytes_saved
     pfi = config.get("_fold_profile_info") or {}
     lean = config.get("_lean_mode", False)
+    micro = config.get("_micro_mode", False)
     creature_enabled = config.get("_creature_adaptive", True)
     tesseract_planner_enabled = config.get("_tesseract_planner", True)
     tesseract_cooperation_enabled = config.get("_tesseract_cooperation", True) and tesseract_planner_enabled
@@ -72,15 +73,16 @@ def export_package(
         "fold_count": ledger.total_folds,
         "logical_gain_bytes": ledger.total_bytes_saved,
         "physical_folded_size_bytes": physical_folded,
-        "required_files": ["manifest.json", "ledger.json"],
-        "required_dirs": ["shared", "maps", "reports", "snapshots"],
         "fold_profile": pfi.get("fold_profile"),
-        "fold_profile_mode": pfi.get("fold_profile_mode"),
-        "fold_profile_reason": pfi.get("fold_profile_reason"),
         "creature_enabled": creature_enabled,
         "tesseract_planner_enabled": tesseract_planner_enabled,
         "tesseract_cooperation_enabled": tesseract_cooperation_enabled,
     }
+    if not micro:
+        manifest["required_files"] = ["manifest.json", "ledger.json"]
+        manifest["required_dirs"] = ["shared", "maps", "reports", "snapshots"]
+        manifest["fold_profile_mode"] = pfi.get("fold_profile_mode")
+        manifest["fold_profile_reason"] = pfi.get("fold_profile_reason")
     ci = config.get("_fold_creature_info")
     if ci and creature_enabled and not lean:
         manifest["fold_species"] = ci.get("fold_species")
@@ -99,6 +101,16 @@ def export_package(
         manifest["tesseract_execution_steps"] = ep.get("execution_steps", [])
         manifest["tesseract_cooperation_mode"] = ep.get("cooperation_mode")
         manifest["tesseract_plan_reason"] = ep.get("plan_reason")
+    scope = config.get("_scope_metrics", {})
+    if scope and scope.get("source_file_count") != scope.get("included_file_count"):
+        manifest["scope_accounting"] = {
+            "source_file_count": scope.get("source_file_count"),
+            "included_file_count": scope.get("included_file_count"),
+            "excluded_file_count": scope.get("excluded_file_count"),
+            "source_bytes": scope.get("source_bytes"),
+            "included_bytes": scope.get("included_bytes"),
+            "excluded_bytes": scope.get("excluded_bytes"),
+        }
     (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 
     # ledger.json
@@ -226,9 +238,10 @@ def export_package(
             folded_paths.add(str(p).replace("\\", "/"))
         for p in recipe.get("reconstruction", {}).keys():
             folded_paths.add(str(p).replace("\\", "/"))
+    inv_min = inventory_minimal or micro
     inventory = {
         "files": [
-            {"path": str(p), "size": len(n.raw_text.encode("utf-8")), **({} if inventory_minimal else {"language": n.language})}
+            {"path": str(p), "size": len(n.raw_text.encode("utf-8")), **({} if inv_min else {"language": n.language})}
             for p, n in sheet.file_nodes.items()
         ],
     }

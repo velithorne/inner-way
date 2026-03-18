@@ -34,6 +34,7 @@ _MANIFEST_DECODE = {
     "fm": "family_membranes",
     "pd": "path_dna_folding",
     "pdb": "path_dna_bytes_saved",
+    "sc": "scope_accounting",
 }
 _MANIFEST_ENCODE = {v: k for k, v in _MANIFEST_DECODE.items()}
 

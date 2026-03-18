@@ -112,6 +112,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     byte_fold_families = [r for r in ledger.fold_records if r.operator_id == "byte_fold"]
 
     lean = config.get("_lean_mode", False)
+    micro = config.get("_micro_mode", False)
     report: dict[str, Any] = {
         "project_id": config.get("project", {}).get("id"),
         "source_path": str(sheet.source_path),
@@ -128,19 +129,35 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "reconstruction_status": "ok" if not result.errors and getattr(result, "exact_reconstruction_ok", True) else "errors",
         "errors": result.errors,
         "validation_failures": len(result.errors),
-        "duplicate_families": [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families],
-        "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
-        "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
-        "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
-        "byte_fold_families": [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families],
-        "per_operator_gain_share": per_operator_gain,
-        "fold_profile": config.get("_fold_profile_info", {}).get("fold_profile"),
-        "fold_profile_mode": config.get("_fold_profile_info", {}).get("fold_profile_mode"),
-        "fold_profile_reason": config.get("_fold_profile_info", {}).get("fold_profile_reason"),
         "creature_enabled": config.get("_creature_adaptive", True),
         "tesseract_planner_enabled": config.get("_tesseract_planner", True),
         "tesseract_cooperation_enabled": config.get("_tesseract_cooperation", True) and config.get("_tesseract_planner", True),
     }
+    if not micro:
+        report["duplicate_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families]
+        report["shared_symbol_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families]
+        report["hierarchy_templates"] = [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates]
+        report["dependency_motifs"] = [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs]
+        report["byte_fold_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families]
+        report["per_operator_gain_share"] = per_operator_gain
+        report["fold_profile"] = config.get("_fold_profile_info", {}).get("fold_profile")
+        report["fold_profile_mode"] = config.get("_fold_profile_info", {}).get("fold_profile_mode")
+        report["fold_profile_reason"] = config.get("_fold_profile_info", {}).get("fold_profile_reason")
+    if micro:
+        report["rejected_candidates_count"] = len(getattr(result, "rejected_candidates", []))
+        skip_diag = config.get("_micro_skip_diagnostics", [])
+        if skip_diag:
+            report["micro_skip_diagnostics"] = skip_diag
+    scope = config.get("_scope_metrics", {})
+    if scope:
+        report["scope_accounting"] = {
+            "source_file_count": scope.get("source_file_count"),
+            "source_bytes": scope.get("source_bytes"),
+            "included_file_count": scope.get("included_file_count"),
+            "included_bytes": scope.get("included_bytes"),
+            "excluded_file_count": scope.get("excluded_file_count"),
+            "excluded_bytes": scope.get("excluded_bytes"),
+        }
     if not lean:
         report["candidate_counts"] = getattr(result, "candidate_counts", {})
         report["template_skeleton_metrics"] = template_metrics if template_metrics else None
@@ -186,7 +203,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             report["fold_creature_behavior_changes"] = ci.get("fold_creature_behavior_changes")
         report["tesseract_planner"] = config.get("_tesseract_planner_info")
         report["tesseract_execution_plan"] = config.get("_tesseract_execution_plan")
-    else:
+    elif lean:
         report["rejected_candidates_count"] = len(getattr(result, "rejected_candidates", []))
     return report
 

@@ -197,6 +197,16 @@ def filter_candidates_v2(
         all_decisions.append(record)
         if record.planner_decision == ACCEPT:
             accepted.append(c)
+        elif config.get("_micro_mode"):
+            # Phase 14C: Micro skip accounting
+            config.setdefault("_micro_skip_diagnostics", []).append({
+                "reason": "planner",
+                "decision": record.planner_decision,
+                "detail": record.planner_reason,
+                "operator_id": c.operator_id,
+                "target_count": len(c.targets),
+                "net_value": record.final_net_value,
+            })
     return accepted, all_decisions
 
 
