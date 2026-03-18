@@ -18,11 +18,15 @@ MIN_NET_GAIN_BYTES = 32
 
 
 def load_path_table(root: Path) -> list[str] | None:
-    """Load path table from package if present. Returns None if not using metadata table fold."""
+    """Load path table from package if present. Returns None if not using metadata table fold.
+    Supports Path DNA format (Phase 14A): when path_dna key exists, expands to full paths."""
     pt_path = root / "shared" / METADATA_TABLES_DIR / PATH_TABLE_FILENAME
     if not pt_path.exists():
         return None
     data = json.loads(pt_path.read_text(encoding="utf-8"))
+    if "path_dna" in data:
+        from infold.engine.path_dna import expand_path_dna
+        return expand_path_dna(data["path_dna"])
     return data.get("paths", [])
 
 
@@ -118,6 +122,59 @@ def _compute_occurrences(pkg_dir: Path) -> dict[str, int]:
     return counts
 
 
+def apply_family_membranes(
+    pkg_dir: Path,
+    config: dict[str, Any],
+    metadata_table_applied: bool = False,
+) -> dict[str, Any] | None:
+    """
+    Phase 14A: Compact operator_id in reconstruction.json when micro mode.
+    When metadata_table_applied, Family Membranes are already applied.
+    When not, apply membranes-only compaction.
+    """
+    if not config.get("_micro_mode", False) or metadata_table_applied:
+        return None
+    maps_dir = pkg_dir / "maps"
+    recon_path = maps_dir / "reconstruction.json"
+    if not recon_path.exists():
+        return None
+    data = json.loads(recon_path.read_text(encoding="utf-8"))
+    records = data.get("records", [])
+    if not records or data.get("family_membranes"):
+        return None
+    op_to_idx: dict[str, int] = {}
+    op_ids: list[str] = []
+    for rec in records:
+        op = rec.get("operator_id", "")
+        if op not in op_to_idx:
+            op_to_idx[op] = len(op_ids)
+            op_ids.append(op)
+        rec["o"] = op_to_idx[op]
+        del rec["operator_id"]
+    data["operator_ids"] = op_ids
+    data["family_membranes"] = True
+    recon_path.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+    manifest_path = pkg_dir / "manifest.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["family_membranes"] = True
+        compact = config.get("package_export", {}).get("compact", False)
+        manifest_path.write_text(
+            json.dumps(manifest, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": ")),
+            encoding="utf-8",
+        )
+    report_path = pkg_dir / "reports" / "report.json"
+    if report_path.exists():
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["phase14a_tiny_archive"] = {"path_dna_folding": False, "family_membranes": True}
+        compact = config.get("package_export", {}).get("compact", False)
+        report_path.write_text(
+            json.dumps(report, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": ")),
+            encoding="utf-8",
+        )
+    return {"family_membranes": True}
+
+
 def apply_metadata_table_fold(
     pkg_dir: Path,
     config: dict[str, Any],
@@ -155,7 +212,19 @@ def apply_metadata_table_fold(
             ref_bytes = len(str(path_to_ref[p]).encode("utf-8")) * cnt
             gross_saved += orig_bytes - ref_bytes
 
-    table_json = json.dumps({"paths": path_table}, separators=(",", ":"))
+    # Phase 14A: Path DNA - use compact path encoding when micro mode and it saves bytes
+    table_json_normal = json.dumps({"paths": path_table}, separators=(",", ":"))
+    table_overhead_normal = len(table_json_normal.encode("utf-8"))
+    path_dna = None
+    table_json = table_json_normal
+    if config.get("_micro_mode", False):
+        from infold.engine.path_dna import build_path_dna
+        path_dna = build_path_dna(path_table)
+        if path_dna is not None:
+            table_json_dna = json.dumps({"path_dna": path_dna}, separators=(",", ":"))
+            if len(table_json_dna.encode("utf-8")) < table_overhead_normal:
+                table_json = table_json_dna
+
     table_overhead = len(table_json.encode("utf-8"))
     net_saved = gross_saved - table_overhead
 
@@ -172,11 +241,27 @@ def apply_metadata_table_fold(
 
     if (maps_dir / "reconstruction.json").exists():
         data = json.loads((maps_dir / "reconstruction.json").read_text(encoding="utf-8"))
-        for rec in data.get("records", []):
+        records = data.get("records", [])
+        for rec in records:
             targets = rec.get("targets", [])
             rec["targets_refs"] = [path_to_ref[str(t)] for t in targets if str(t) in path_to_ref]
             del rec["targets"]
         data["path_table_ref"] = True
+
+        # Phase 14A: Family Membranes - compact operator_id when micro mode
+        if config.get("_micro_mode", False) and records:
+            op_to_idx: dict[str, int] = {}
+            op_ids: list[str] = []
+            for rec in records:
+                op = rec.get("operator_id", "")
+                if op not in op_to_idx:
+                    op_to_idx[op] = len(op_ids)
+                    op_ids.append(op)
+                rec["o"] = op_to_idx[op]
+                del rec["operator_id"]
+            data["operator_ids"] = op_ids
+            data["family_membranes"] = True
+
         (maps_dir / "reconstruction.json").write_text(
             json.dumps(data, separators=(",", ":")),
             encoding="utf-8",
@@ -231,6 +316,11 @@ def apply_metadata_table_fold(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["metadata_table_fold"] = True
         manifest["metadata_table_fold_net_bytes_saved"] = net_saved
+        if path_dna is not None and "path_dna" in table_json:
+            manifest["path_dna_folding"] = True
+            manifest["path_dna_bytes_saved"] = table_overhead_normal - table_overhead
+        if config.get("_micro_mode", False):
+            manifest["family_membranes"] = True
         compact = config.get("package_export", {}).get("compact", False)
         manifest_path.write_text(
             json.dumps(manifest, indent=None if compact else 2, separators=(",", ":") if compact else (", ", ": ")),
@@ -244,6 +334,9 @@ def apply_metadata_table_fold(
             "metadata_table_fold_count": 1,
             "metadata_table_unique_paths": len(path_table),
             "metadata_table_reused_refs": sum(occurrences.get(p, 0) for p in path_table) - len(path_table),
+            "path_dna_folding": path_dna is not None and "path_dna" in table_json,
+            "path_dna_bytes_saved": (table_overhead_normal - table_overhead) if path_dna and "path_dna" in table_json else 0,
+            "family_membranes": config.get("_micro_mode", False),
             "metadata_table_table_size_bytes": table_overhead,
             "metadata_table_gross_saved_bytes": gross_saved,
             "metadata_table_net_bytes_saved": net_saved,

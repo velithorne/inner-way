@@ -31,6 +31,27 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _load_reconstruction_data(root: Path) -> dict[str, Any]:
+    """
+    Load maps/reconstruction.json and expand Family Membranes (Phase 14A) if present.
+    Returns data with records having operator_id (expanded from o when family_membranes).
+    """
+    maps_path = root / "maps" / "reconstruction.json"
+    if not maps_path.exists():
+        return {}
+    data = json.loads(maps_path.read_text(encoding="utf-8"))
+    records = data.get("records", [])
+    op_ids = data.get("operator_ids", [])
+    if data.get("family_membranes") and op_ids:
+        for rec in records:
+            o = rec.get("o", -1)
+            if 0 <= o < len(op_ids):
+                rec["operator_id"] = op_ids[o]
+            if "o" in rec:
+                del rec["o"]
+    return data
+
+
 def create_archive(
     source_path: Path | str,
     output_path: Path | str,
@@ -60,8 +81,9 @@ def create_archive(
     pkg_dir = Path(tempfile.mkdtemp(prefix="infold_pkg_"))
     try:
         export_package(result, config, pkg_dir)
-        from infold.engine.metadata_table_fold import apply_metadata_table_fold
-        apply_metadata_table_fold(pkg_dir, config)
+        from infold.engine.metadata_table_fold import apply_metadata_table_fold, apply_family_membranes
+        mt_result = apply_metadata_table_fold(pkg_dir, config)
+        apply_family_membranes(pkg_dir, config, metadata_table_applied=mt_result is not None)
         _write_integrity_checksums(pkg_dir, config)
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for f in sorted(pkg_dir.rglob("*")):
@@ -206,7 +228,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
         report = {}
         if (root / "reports" / "report.json").exists():
             report = json.loads((root / "reports" / "report.json").read_text(encoding="utf-8"))
-        maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        maps_data = _load_reconstruction_data(root)
         records = maps_data.get("records", [])
 
         fold_by_op: dict[str, int] = {}
@@ -259,6 +281,9 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "byte_fold_families": report.get("byte_fold_families", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
+            "path_dna_folding": manifest.get("path_dna_folding", False),
+            "path_dna_bytes_saved": manifest.get("path_dna_bytes_saved", 0),
+            "family_membranes": manifest.get("family_membranes", False),
             "creature_enabled": manifest.get("creature_enabled", True),
             "tesseract_planner_enabled": manifest.get("tesseract_planner_enabled", True),
             "tesseract_cooperation_enabled": manifest.get("tesseract_cooperation_enabled", True),
@@ -321,7 +346,7 @@ def list_archive(archive_path: Path | str) -> dict[str, Any]:
             zf.extractall(tmp)
         root = _extract_root(Path(tmp))
         shared_dir = root / "shared"
-        maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        maps_data = _load_reconstruction_data(root)
         records = maps_data.get("records", [])
         from infold.engine.metadata_table_fold import load_path_table
         _pt = load_path_table(root)
@@ -722,7 +747,7 @@ def search_archive(
         path_lower = (path or "").lower().replace("\\", "/")
 
         if not diagnostics_only:
-            maps_data = json.loads((root / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+            maps_data = _load_reconstruction_data(root)
             records = maps_data.get("records", [])
             from infold.engine.metadata_table_fold import load_path_table
             _path_table = load_path_table(root)
@@ -1395,7 +1420,7 @@ def validate_archive(
 
         maps_path = root / "maps" / "reconstruction.json"
         if maps_path.exists() and mode == "strict":
-            maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
+            maps_data = _load_reconstruction_data(root)
             if maps_data.get("path_table_ref"):
                 pt_path = root / "shared" / "metadata_tables" / "path_table.json"
                 if not pt_path.exists():
@@ -1478,7 +1503,7 @@ def reconstruct_archive(
         maps_path = root / "maps" / "reconstruction.json"
         if not maps_path.exists():
             raise ValueError("Invalid archive: missing maps/reconstruction.json")
-        maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
+        maps_data = _load_reconstruction_data(root)
         records = maps_data.get("records", [])
         shared_dir = root / "shared"
         from infold.engine.metadata_table_fold import load_path_table
@@ -1628,7 +1653,7 @@ def _family_signatures(root: Path, records: list) -> dict[str, dict[str, set[str
     maps_path = root / "maps" / "reconstruction.json"
     path_table = None
     if maps_path.exists():
-        maps_data = json.loads(maps_path.read_text(encoding="utf-8"))
+        maps_data = _load_reconstruction_data(root)
         if maps_data.get("path_table_ref"):
             path_table = _load_pt(root)
     sigs: dict[str, dict[str, set[str]]] = {
@@ -1767,14 +1792,14 @@ def compare_archives(
         with zipfile.ZipFile(a, "r") as zf:
             zf.extractall(tmp)
         root_a = _extract_root(Path(tmp))
-        maps_a = json.loads((root_a / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        maps_a = _load_reconstruction_data(root_a)
         recs_a = maps_a.get("records", [])
         sigs_a = _family_signatures(root_a, recs_a)
     with tempfile.TemporaryDirectory(prefix="infold_") as tmp:
         with zipfile.ZipFile(b, "r") as zf:
             zf.extractall(tmp)
         root_b = _extract_root(Path(tmp))
-        maps_b = json.loads((root_b / "maps" / "reconstruction.json").read_text(encoding="utf-8"))
+        maps_b = _load_reconstruction_data(root_b)
         recs_b = maps_b.get("records", [])
         sigs_b = _family_signatures(root_b, recs_b)
 
@@ -1885,6 +1910,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
         lines.append(f"  unique_paths: {mtf.get('metadata_table_unique_paths', 0)}")
         lines.append(f"  table_size_bytes: {mtf.get('metadata_table_table_size_bytes', 0):,}")
         lines.append(f"  net_bytes_saved: {mtf.get('metadata_table_net_bytes_saved', 0):,}")
+    if info.get("path_dna_folding"):
+        lines.append("")
+        lines.append("Path DNA Folding (Phase 14A):")
+        lines.append(f"  bytes_saved: {info.get('path_dna_bytes_saved', 0):,}")
+    if info.get("family_membranes"):
+        lines.append("")
+        lines.append("Family Membranes (Phase 14A): used")
     tess_dim = info.get("tesseract_families_by_dimension", {})
     if tess_dim:
         lines.append("")

@@ -183,6 +183,8 @@ Exports: `competitive_matrix.csv`, `competitive_matrix.json`, `competitive_matri
 
 **Phase 13B (zstd-era retest)**: Summary now includes best Infold mode per category. On large structure-heavy codebases, Infold micro can beat zstd. See `docs/PHASE13B_ZSTD_ERA_COMPETITIVE_RETEST.md` for full guidance.
 
+**Phase 14A (Tiny Archive Attack)**: Path DNA Folding and Family Membranes reduce small-archive overhead in `--micro` mode. See `docs/PHASE14A_TINY_ARCHIVE_ATTACK_RESULTS.md`.
+
 ## Quick Workflows (Phase 8)
 
 ```bash
