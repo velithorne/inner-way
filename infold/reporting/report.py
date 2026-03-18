@@ -111,7 +111,8 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     dependency_motifs = [r for r in ledger.fold_records if r.operator_id == "dependency_motif"]
     byte_fold_families = [r for r in ledger.fold_records if r.operator_id == "byte_fold"]
 
-    return {
+    lean = config.get("_lean_mode", False)
+    report: dict[str, Any] = {
         "project_id": config.get("project", {}).get("id"),
         "source_path": str(sheet.source_path),
         "file_count": metrics.get("file_count", 0),
@@ -122,19 +123,32 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "total_bytes_saved": logical_gain,
         "logical_gain_bytes": logical_gain,
         "physical_folded_size_bytes": physical_folded_size,
-        "candidate_counts": getattr(result, "candidate_counts", {}),
         "exact_reconstruction_ok": getattr(result, "exact_reconstruction_ok", True),
         "fold_records": ledger.to_dict().get("fold_records", []),
         "reconstruction_status": "ok" if not result.errors and getattr(result, "exact_reconstruction_ok", True) else "errors",
         "errors": result.errors,
         "validation_failures": len(result.errors),
-        "template_skeleton_metrics": template_metrics if template_metrics else None,
-        "symbol_table_metrics": symbol_table_metrics if symbol_table_metrics else None,
-        "hierarchy_metrics": hierarchy_metrics if hierarchy_metrics else None,
-        "dependency_metrics": dependency_metrics if dependency_metrics else None,
-        "byte_fold_metrics": byte_fold_metrics if byte_fold_metrics else None,
         "duplicate_families": [{"targets": len(r.targets), "gain": r.gain} for r in duplicate_families],
-        "template_families": [
+        "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
+        "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
+        "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
+        "byte_fold_families": [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families],
+        "per_operator_gain_share": per_operator_gain,
+        "fold_profile": config.get("_fold_profile_info", {}).get("fold_profile"),
+        "fold_profile_mode": config.get("_fold_profile_info", {}).get("fold_profile_mode"),
+        "fold_profile_reason": config.get("_fold_profile_info", {}).get("fold_profile_reason"),
+        "creature_enabled": config.get("_creature_adaptive", True),
+        "tesseract_planner_enabled": config.get("_tesseract_planner", True),
+        "tesseract_cooperation_enabled": config.get("_tesseract_cooperation", True) and config.get("_tesseract_planner", True),
+    }
+    if not lean:
+        report["candidate_counts"] = getattr(result, "candidate_counts", {})
+        report["template_skeleton_metrics"] = template_metrics if template_metrics else None
+        report["symbol_table_metrics"] = symbol_table_metrics if symbol_table_metrics else None
+        report["hierarchy_metrics"] = hierarchy_metrics if hierarchy_metrics else None
+        report["dependency_metrics"] = dependency_metrics if dependency_metrics else None
+        report["byte_fold_metrics"] = byte_fold_metrics if byte_fold_metrics else None
+        report["template_families"] = [
             {
                 "targets": len(r.targets),
                 "gain": r.gain,
@@ -145,40 +159,36 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
                 "reject_reason": None,
             }
             for r in template_families
-        ],
-        "template_rejected_families": config.get("_run_diagnostics", {}).get("template_rejected", []),
-        "template_thresholds": config.get("thresholds", {}).get("template_skeleton", {}),
-        "shared_symbol_families": [{"targets": len(r.targets), "gain": r.gain} for r in shared_symbol_families],
-        "hierarchy_templates": [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates],
-        "dependency_motifs": [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs],
-        "byte_fold_families": [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families],
-        "per_operator_gain_share": per_operator_gain,
-        "rejected_candidates_summary": getattr(result, "rejected_candidates", []),
-        "symbol_table_conflict_blocked": [
+        ]
+        report["template_rejected_families"] = config.get("_run_diagnostics", {}).get("template_rejected", [])
+        report["template_thresholds"] = config.get("thresholds", {}).get("template_skeleton", {})
+        report["rejected_candidates_summary"] = getattr(result, "rejected_candidates", [])
+        report["symbol_table_conflict_blocked"] = [
             rc for rc in getattr(result, "rejected_candidates", [])
             if rc.get("operator_id") == "symbol_table"
             and (rc.get("reason") == "conflict" or rc.get("planner_decision") == "reject_conflict")
-        ],
-        "planner_decisions": getattr(result, "planner_decisions", []),
-        "interaction_diagnostics": _interaction_diagnostics_to_dict(
+        ]
+        report["planner_decisions"] = getattr(result, "planner_decisions", [])
+        report["interaction_diagnostics"] = _interaction_diagnostics_to_dict(
             getattr(result, "interaction_diagnostics", None)
-        ),
-        "byte_fold_routing": config.get("_run_diagnostics", {}).get("byte_fold_routing"),
-        "fold_profile": config.get("_fold_profile_info", {}).get("fold_profile"),
-        "fold_profile_mode": config.get("_fold_profile_info", {}).get("fold_profile_mode"),
-        "fold_profile_reason": config.get("_fold_profile_info", {}).get("fold_profile_reason"),
-        "fold_profile_factors": config.get("_fold_profile_info", {}).get("fold_profile_factors"),
-        "fold_species": config.get("_fold_creature_info", {}).get("fold_species") if config.get("_fold_creature_info") else None,
-        "fold_species_mode": config.get("_fold_creature_info", {}).get("fold_species_mode") if config.get("_fold_creature_info") else None,
-        "fold_species_reason": config.get("_fold_creature_info", {}).get("fold_species_reason") if config.get("_fold_creature_info") else None,
-        "fold_creature_signals": config.get("_fold_creature_info", {}).get("fold_creature_signals") if config.get("_fold_creature_info") else None,
-        "fold_creature_traits_initial": config.get("_fold_creature_info", {}).get("fold_creature_traits_initial") if config.get("_fold_creature_info") else None,
-        "fold_creature_traits_final": config.get("_fold_creature_info", {}).get("fold_creature_traits_final") if config.get("_fold_creature_info") else None,
-        "fold_creature_adapt_reasons": config.get("_fold_creature_info", {}).get("fold_creature_adapt_reasons") if config.get("_fold_creature_info") else None,
-        "fold_creature_behavior_changes": config.get("_fold_creature_info", {}).get("fold_creature_behavior_changes") if config.get("_fold_creature_info") else None,
-        "tesseract_planner": config.get("_tesseract_planner_info"),
-        "tesseract_execution_plan": config.get("_tesseract_execution_plan"),
-    }
+        )
+        report["byte_fold_routing"] = config.get("_run_diagnostics", {}).get("byte_fold_routing")
+        report["fold_profile_factors"] = config.get("_fold_profile_info", {}).get("fold_profile_factors")
+        ci = config.get("_fold_creature_info")
+        if ci:
+            report["fold_species"] = ci.get("fold_species")
+            report["fold_species_mode"] = ci.get("fold_species_mode")
+            report["fold_species_reason"] = ci.get("fold_species_reason")
+            report["fold_creature_signals"] = ci.get("fold_creature_signals")
+            report["fold_creature_traits_initial"] = ci.get("fold_creature_traits_initial")
+            report["fold_creature_traits_final"] = ci.get("fold_creature_traits_final")
+            report["fold_creature_adapt_reasons"] = ci.get("fold_creature_adapt_reasons")
+            report["fold_creature_behavior_changes"] = ci.get("fold_creature_behavior_changes")
+        report["tesseract_planner"] = config.get("_tesseract_planner_info")
+        report["tesseract_execution_plan"] = config.get("_tesseract_execution_plan")
+    else:
+        report["rejected_candidates_count"] = len(getattr(result, "rejected_candidates", []))
+    return report
 
 
 def _interaction_diagnostics_to_dict(diag: Any) -> dict[str, Any] | None:

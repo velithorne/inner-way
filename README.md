@@ -140,6 +140,34 @@ python3 -m infold.cli --tesseract-evaluate --tesseract-evaluate-output results/t
 
 Exports JSON, CSV, and Markdown with cooperation win summary, per-dataset per-mode metrics, and recommendations.
 
+## Lean Mode and Operating Styles (Phase 11)
+
+Infold supports two operating styles:
+
+| Style | Use case | Flags |
+|-------|----------|-------|
+| **Size-first** | Smallest archive, production | `--lean` or `--profile golem --no-creature --no-tesseract` |
+| **Analysis-rich** | Full diagnostics, research | Default (auto, creature, Tesseract on) |
+
+```bash
+# Size-first: smallest archive (compact, no creature, no Tesseract)
+python3 -m infold.cli archive create --source . --output archive.infold --lean
+
+# Size-first with explicit profile
+python3 -m infold.cli archive create --source . --output archive.infold --profile golem --no-creature --no-tesseract
+
+# Analysis-rich: default (full creature + Tesseract)
+python3 -m infold.cli archive create --source . --output archive.infold
+
+# Disable only Tesseract (keep creature)
+python3 -m infold.cli archive create --source . --output archive.infold --no-tesseract
+
+# Disable only Tesseract Cooperation (planner stays on)
+python3 -m infold.cli archive create --source . --output archive.infold --no-tesseract-cooperation
+```
+
+Manifest records `creature_enabled`, `tesseract_planner_enabled`, `tesseract_cooperation_enabled`. Use `archive explain` to see which features were used.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

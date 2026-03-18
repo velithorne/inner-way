@@ -229,7 +229,7 @@ def run_tesseract_evaluate_cmd(args) -> int:
 def archive_showcase_cmd(args) -> int:
     """Full workflow: create, validate, reconstruct, save results."""
     from infold.workflows import real_project_showcase
-    config = load_config()
+    config = _apply_create_flags(load_config(), args)
     try:
         r = real_project_showcase(
             getattr(args, "source", "."),
@@ -252,7 +252,7 @@ def archive_showcase_cmd(args) -> int:
 def archive_workflow_cmd(args) -> int:
     """Create + validate + summary in one command."""
     from infold.workflows import archive_workflow
-    config = load_config()
+    config = _apply_create_flags(load_config(), args)
     try:
         r = archive_workflow(
             getattr(args, "source", "."),
@@ -279,20 +279,40 @@ def archive_workflow_cmd(args) -> int:
         return 1
 
 
-def archive_create(args) -> int:
-    """Create Infold archive."""
-    from infold.archive import create_archive
-    config = load_config()
-    if getattr(args, "compact", False):
-        config = {**config}
-        config["package_export"] = {
-            **config.get("package_export", {}),
+def _apply_create_flags(config: dict, args) -> dict:
+    """Apply archive create flags (compact, lean, creature, tesseract) to config."""
+    cfg = dict(config)
+    lean = getattr(args, "lean", False)
+    if lean:
+        cfg["_lean_mode"] = True
+        cfg["package_export"] = {
+            **cfg.get("package_export", {}),
             "compact": True,
             "report_text": False,
             "inventory_minimal": True,
         }
+        cfg["_creature_adaptive"] = False
+        cfg["_tesseract_planner"] = False
+        cfg["_tesseract_cooperation"] = False
+    else:
+        if getattr(args, "compact", False):
+            cfg["package_export"] = {
+                **cfg.get("package_export", {}),
+                "compact": True,
+                "report_text": False,
+                "inventory_minimal": True,
+            }
+        cfg["_creature_adaptive"] = getattr(args, "creature", True)
+        cfg["_tesseract_planner"] = not getattr(args, "no_tesseract", False)
+        cfg["_tesseract_cooperation"] = not getattr(args, "no_tesseract_cooperation", False) if cfg.get("_tesseract_planner", True) else False
+    return cfg
+
+
+def archive_create(args) -> int:
+    """Create Infold archive."""
+    from infold.archive import create_archive
+    config = _apply_create_flags(load_config(), args)
     profile = getattr(args, "profile", "auto")
-    config["_creature_adaptive"] = getattr(args, "creature", True)
     out = create_archive(args.source, args.output, config, profile=profile)
     print(f"Created: {out}")
     return 0
@@ -771,17 +791,26 @@ def main() -> int:
     create_p.add_argument("--profile", default="auto", dest="profile", help="Fold profile: auto, sparrow, fox, dragon, golem, serpent")
     create_p.add_argument("--compact", action="store_true", help="Use compact package format (smaller archive)")
     create_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation (static profile only)")
+    create_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract Planner and Cooperation (size-first)")
+    create_p.add_argument("--no-tesseract-cooperation", dest="no_tesseract_cooperation", action="store_true", help="Disable Tesseract Cooperation only (planner stays on)")
+    create_p.add_argument("--lean", action="store_true", help="Size-first mode: compact, no creature, no Tesseract, minimal metadata")
     create_p.set_defaults(func=archive_create)
     workflow_p = archive_sub.add_parser("workflow", help="Create + validate + summary in one command")
     workflow_p.add_argument("--source", required=True, help="Source path")
     workflow_p.add_argument("--output", required=True, help="Output .infold path")
     workflow_p.add_argument("--profile", default="auto", help="Fold profile")
+    workflow_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation")
+    workflow_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract (size-first)")
+    workflow_p.add_argument("--lean", action="store_true", help="Size-first mode")
     workflow_p.add_argument("--json", action="store_true", help="JSON output")
     workflow_p.set_defaults(func=archive_workflow_cmd)
     showcase_p = archive_sub.add_parser("showcase", help="Full workflow: create, validate, reconstruct, save results")
     showcase_p.add_argument("--source", required=True, help="Source path")
     showcase_p.add_argument("--output-dir", dest="output_dir", required=True, help="Output directory for archive, restored, summary")
     showcase_p.add_argument("--profile", default="auto", help="Fold profile")
+    showcase_p.add_argument("--no-creature", dest="creature", action="store_false", default=True, help="Disable creature adaptation")
+    showcase_p.add_argument("--no-tesseract", dest="no_tesseract", action="store_true", help="Disable Tesseract (size-first)")
+    showcase_p.add_argument("--lean", action="store_true", help="Size-first mode")
     showcase_p.set_defaults(func=archive_showcase_cmd)
     inspect_p = archive_sub.add_parser("inspect", help="Inspect archive")
     inspect_p.add_argument("archive", help="Archive path")

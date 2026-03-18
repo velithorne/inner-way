@@ -259,6 +259,9 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "byte_fold_families": report.get("byte_fold_families", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
+            "creature_enabled": manifest.get("creature_enabled", True),
+            "tesseract_planner_enabled": manifest.get("tesseract_planner_enabled", True),
+            "tesseract_cooperation_enabled": manifest.get("tesseract_cooperation_enabled", True),
             "fold_species": manifest.get("fold_species"),
             "fold_species_mode": manifest.get("fold_species_mode"),
             "fold_species_reason": manifest.get("fold_species_reason"),
@@ -280,7 +283,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
         out["tesseract_families_by_dimension"] = {}
         out["tesseract_family_count"] = 0
     tp = report.get("tesseract_planner")
-    if not tp and manifest:
+    if not tp and manifest and manifest.get("tesseract_planner_enabled", True):
         route = manifest.get("tesseract_planner_route")
         if route:
             tp = {
@@ -292,7 +295,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             }
     out["tesseract_planner"] = tp
     ep = report.get("tesseract_execution_plan")
-    if not ep and manifest:
+    if not ep and manifest and manifest.get("tesseract_cooperation_enabled", True):
         steps = manifest.get("tesseract_execution_steps")
         if steps is not None:
             ep = {
@@ -1819,6 +1822,9 @@ def explain_to_text(info: dict[str, Any]) -> str:
             lines.append(f"  Selected score: {factors.get('selected_score')}")
         lines.append("")
     species = info.get("fold_species")
+    creature_enabled = info.get("creature_enabled", True)
+    tesseract_planner_enabled = info.get("tesseract_planner_enabled", True)
+    tesseract_cooperation_enabled = info.get("tesseract_cooperation_enabled", True)
     if species:
         mode = info.get("fold_species_mode", "?")
         reason = info.get("fold_species_reason", "?")
@@ -1831,6 +1837,15 @@ def explain_to_text(info: dict[str, Any]) -> str:
         traits = info.get("fold_creature_traits_final") or {}
         if traits:
             lines.append(f"  Final traits: {traits}")
+        lines.append("")
+    elif creature_enabled is False:
+        lines.append("Creature: disabled")
+        lines.append("")
+    if tesseract_planner_enabled is False:
+        lines.append("Tesseract: disabled")
+        lines.append("")
+    elif tesseract_cooperation_enabled is False and tesseract_planner_enabled:
+        lines.append("Tesseract: planner only (cooperation disabled)")
         lines.append("")
     lines.append("Package summary:")
     pkg = info.get("package_summary", {})

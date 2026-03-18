@@ -54,6 +54,11 @@ def export_package(
     raw_size = sheet.metrics.get("original_size_bytes", 0)
     physical_folded = raw_size - ledger.total_bytes_saved
     pfi = config.get("_fold_profile_info") or {}
+    lean = config.get("_lean_mode", False)
+    creature_enabled = config.get("_creature_adaptive", True)
+    tesseract_planner_enabled = config.get("_tesseract_planner", True)
+    tesseract_cooperation_enabled = config.get("_tesseract_cooperation", True) and tesseract_planner_enabled
+
     manifest = {
         "version": PACKAGE_SPEC_VERSION,
         "package_spec": "1.0",
@@ -72,22 +77,25 @@ def export_package(
         "fold_profile": pfi.get("fold_profile"),
         "fold_profile_mode": pfi.get("fold_profile_mode"),
         "fold_profile_reason": pfi.get("fold_profile_reason"),
+        "creature_enabled": creature_enabled,
+        "tesseract_planner_enabled": tesseract_planner_enabled,
+        "tesseract_cooperation_enabled": tesseract_cooperation_enabled,
     }
     ci = config.get("_fold_creature_info")
-    if ci:
+    if ci and creature_enabled and not lean:
         manifest["fold_species"] = ci.get("fold_species")
         manifest["fold_species_mode"] = ci.get("fold_species_mode")
         manifest["fold_species_reason"] = ci.get("fold_species_reason")
         manifest["fold_creature_traits_final"] = ci.get("fold_creature_traits_final")
         manifest["fold_creature_adapt_reasons"] = ci.get("fold_creature_adapt_reasons")
     tpi = config.get("_tesseract_planner_info")
-    if tpi:
+    if tpi and tesseract_planner_enabled and not lean:
         manifest["tesseract_planner_route"] = tpi.get("route")
         manifest["tesseract_planner_route_reason"] = tpi.get("route_reason")
         manifest["tesseract_planner_dominant"] = tpi.get("dominant_dimension")
         manifest["tesseract_planner_operator_priority"] = tpi.get("operator_family_priority")
     ep = config.get("_tesseract_execution_plan")
-    if ep:
+    if ep and tesseract_cooperation_enabled and not lean:
         manifest["tesseract_execution_steps"] = ep.get("execution_steps", [])
         manifest["tesseract_cooperation_mode"] = ep.get("cooperation_mode")
         manifest["tesseract_plan_reason"] = ep.get("plan_reason")
