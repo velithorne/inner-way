@@ -176,6 +176,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         "fold_creature_traits_final": config.get("_fold_creature_info", {}).get("fold_creature_traits_final") if config.get("_fold_creature_info") else None,
         "fold_creature_adapt_reasons": config.get("_fold_creature_info", {}).get("fold_creature_adapt_reasons") if config.get("_fold_creature_info") else None,
         "fold_creature_behavior_changes": config.get("_fold_creature_info", {}).get("fold_creature_behavior_changes") if config.get("_fold_creature_info") else None,
+        "tesseract_planner": config.get("_tesseract_planner_info"),
     }
 
 
@@ -238,6 +239,18 @@ def report_to_text(result: FoldResult, config: dict[str, Any]) -> str:
             lines.append("  Trait shifts:")
             for c in changes:
                 lines.append(f"    - {c}")
+        lines.append("")
+    tp = report.get("tesseract_planner")
+    if tp:
+        from infold.tesseract.planner import tesseract_planner_summary
+        lines.append(f"Tesseract Planner: {tesseract_planner_summary(tp)}")
+        lines.append(f"  route={tp.get('route')} ({tp.get('route_reason')})")
+        lines.append(f"  dominant={tp.get('dominant_dimension')} secondary={tp.get('secondary_dimension')}")
+        lines.append(f"  operator_priority={'>'.join(tp.get('operator_family_priority', []))}")
+        bias = tp.get("planner_bias", {})
+        active = [f"{k}={v}" for k, v in bias.items() if v and v > 0]
+        if active:
+            lines.append(f"  planner_bias={', '.join(active)}")
         lines.append("")
     lines.extend([
         f"Folds: {report['fold_count']}",

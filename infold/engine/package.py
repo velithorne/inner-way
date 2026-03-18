@@ -80,6 +80,12 @@ def export_package(
         manifest["fold_species_reason"] = ci.get("fold_species_reason")
         manifest["fold_creature_traits_final"] = ci.get("fold_creature_traits_final")
         manifest["fold_creature_adapt_reasons"] = ci.get("fold_creature_adapt_reasons")
+    tpi = config.get("_tesseract_planner_info")
+    if tpi:
+        manifest["tesseract_planner_route"] = tpi.get("route")
+        manifest["tesseract_planner_route_reason"] = tpi.get("route_reason")
+        manifest["tesseract_planner_dominant"] = tpi.get("dominant_dimension")
+        manifest["tesseract_planner_operator_priority"] = tpi.get("operator_family_priority")
     (out / "manifest.json").write_text(_json_dump(manifest, compact), encoding="utf-8")
 
     # ledger.json

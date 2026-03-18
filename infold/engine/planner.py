@@ -18,6 +18,12 @@ from typing import Any
 from infold.engine.interaction_policy import conflicts_with_committed
 from infold.models.candidate import CandidateCrease
 from infold.models.estimates import GainEstimate, StressEstimate
+from infold.tesseract.planner import OPERATOR_TO_FAMILY
+
+
+def _operator_family_for_priority(operator_id: str) -> str | None:
+    """Map operator to family for Tesseract priority."""
+    return OPERATOR_TO_FAMILY.get(operator_id)
 
 # Planner decision types
 ACCEPT = "accept"
@@ -108,6 +114,22 @@ def score_candidate_v2(
     min_net_value = planner_config.get("min_net_value", -0.5)
     max_stress = planner_config.get("max_stress", 1.0)
 
+    tesseract_bonus = 0.0
+    tp = config.get("_tesseract_planner_info")
+    if tp:
+        bias = tp.get("planner_bias", {})
+        tesseract_bonus = (
+            (bias.get("favor_physical_size", 0) or 0) * min(1.0, physical_gain / 1000)
+            + (bias.get("favor_logical_gain", 0) or 0) * min(1.0, logical_gain / 1000)
+            + (bias.get("favor_compactness", 0) or 0) * 0.1
+            + (bias.get("favor_lineage_continuity", 0) or 0) * 0.1
+        )
+        op_family = _operator_family_for_priority(candidate.operator_id)
+        priority_order = tp.get("operator_family_priority", [])
+        if op_family and priority_order and op_family in priority_order:
+            rank = priority_order.index(op_family)
+            tesseract_bonus += 0.01 * (3 - rank)
+
     final_net_value = (
         logical_weight * logical_gain
         + physical_weight * physical_gain
@@ -119,6 +141,7 @@ def score_candidate_v2(
         + stress_penalty
         + conflict_penalty
         + redundancy_penalty
+        + tesseract_bonus
     )
 
     if has_conflict:

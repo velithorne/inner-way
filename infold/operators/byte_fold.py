@@ -71,10 +71,15 @@ class ByteFoldOperator(BaseOperator):
         eligible, path_to_route = get_chunk_eligible_paths_with_diagnostics(
             project_sheet.file_nodes, committed, config
         )
-        config.setdefault("_run_diagnostics", {})["byte_fold_routing"] = {
+        diag = config.setdefault("_run_diagnostics", {})
+        diag["byte_fold_routing"] = {
             str(p).replace("\\", "/"): {"route": r.route, "reason": r.reason}
             for p, r in path_to_route.items()
         }
+        tp = config.get("_tesseract_planner_info")
+        if tp:
+            diag["tesseract_planner_route"] = tp.get("route")
+            diag["tesseract_planner_route_reason"] = tp.get("route_reason")
         if not eligible:
             return []
 

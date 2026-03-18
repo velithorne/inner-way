@@ -109,6 +109,16 @@ python3 -m infold.cli archive sync trace --dir .infold-sync
 python3 -m infold.cli archive explain archive.infold
 ```
 
+## Tesseract Planner (Phase 10B)
+
+Meta-planning layer using multi-dimensional identity to guide routing, operator priority, and planner biases:
+
+- **Routes**: structural_first, byte_first, metadata_sensitive, lineage_sensitive, balanced
+- **Operator family priority**: structural > metadata > byte (or variants by dominant dimension)
+- **Planner bias**: favor_physical_size, favor_logical_gain, favor_compactness, favor_lineage_continuity
+
+Shown in archive explain, report, and manifest.
+
 ## Quick Workflows (Phase 8)
 
 ```bash

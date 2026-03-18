@@ -114,6 +114,14 @@ def route_file_v2(
                 f"parser_confidence_{conf:.2f}_below_{low_conf}",
             )
 
+        # Phase 10B: Tesseract routing nudge for borderline (conf 0.45-0.65)
+        tp = (cfg or {}).get("_tesseract_planner_info")
+        if tp and 0.45 <= conf <= 0.65 and tp.get("route") == "byte_first":
+            return RouteResult(
+                "chunk_first",
+                f"tesseract_byte_first_borderline_conf_{conf:.2f}",
+            )
+
         # High confidence, many lines -> structural-first (let template/symbol try first)
         if conf >= 0.8 and lines >= MIN_STRUCTURED_LINES:
             return RouteResult(

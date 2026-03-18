@@ -159,6 +159,16 @@ def run_fold(
     else:
         config["_fold_creature_info"] = None
 
+    # Phase 10B: Tesseract Planner (meta-planning from dimension strengths)
+    if config.get("_tesseract_planner", True):
+        from infold.profiles.creatures import compute_signals
+        from infold.tesseract.planner import compute_tesseract_planner_profile
+
+        signals = compute_signals(sheet, source_path)
+        config["_tesseract_planner_info"] = compute_tesseract_planner_profile(signals)
+    else:
+        config["_tesseract_planner_info"] = None
+
     ledger = FoldLedger(
         project_id=config.get("project", {}).get("id"),
         config_snapshot=config,

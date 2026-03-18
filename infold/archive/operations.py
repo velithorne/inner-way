@@ -279,6 +279,18 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
     except Exception:
         out["tesseract_families_by_dimension"] = {}
         out["tesseract_family_count"] = 0
+    tp = report.get("tesseract_planner")
+    if not tp and manifest:
+        route = manifest.get("tesseract_planner_route")
+        if route:
+            tp = {
+                "route": route,
+                "route_reason": manifest.get("tesseract_planner_route_reason", ""),
+                "dominant_dimension": manifest.get("tesseract_planner_dominant", "?"),
+                "operator_family_priority": manifest.get("tesseract_planner_operator_priority", []),
+                "planner_bias": {},
+            }
+    out["tesseract_planner"] = tp
     return out
 
 
@@ -1856,6 +1868,17 @@ def explain_to_text(info: dict[str, Any]) -> str:
         for dim, ops in sorted(tess_dim.items()):
             label = {"structure": "mainly structural", "byte": "byte reuse", "metadata": "metadata reuse", "time": "temporal persistence"}.get(dim, dim)
             lines.append(f"  {label}: {', '.join(ops)}")
+    tp = info.get("tesseract_planner")
+    if tp:
+        lines.append("")
+        lines.append("Tesseract Planner:")
+        lines.append(f"  route={tp.get('route')} ({tp.get('route_reason')})")
+        lines.append(f"  dominant={tp.get('dominant_dimension')} secondary={tp.get('secondary_dimension')}")
+        lines.append(f"  operator_priority={'>'.join(tp.get('operator_family_priority', []))}")
+        bias = tp.get("planner_bias", {})
+        active = [f"{k}={v}" for k, v in bias.items() if v and v > 0]
+        if active:
+            lines.append(f"  planner_bias={', '.join(active)}")
     lines.append("")
     lines.append("Reconstruction guarantees:")
     for g in info.get("reconstruction_guarantees", []):
