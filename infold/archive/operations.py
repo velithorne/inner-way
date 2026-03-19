@@ -319,6 +319,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "dependency_motifs": report.get("dependency_motifs", []),
             "byte_fold_families": report.get("byte_fold_families", []),
             "mutation_chain_families": report.get("mutation_chain_families", []),
+            "mutation_chain_metrics": report.get("mutation_chain_metrics"),
             "fold_echo_families": report.get("fold_echo_families", []),
             "anchor_families": report.get("anchor_families", []),
             "anchor_metrics": report.get("anchor_metrics"),
@@ -2012,15 +2013,28 @@ def explain_to_text(info: dict[str, Any]) -> str:
         lines.append("")
         lines.append("Family Membranes (Phase 14A): used")
     mc_fams = info.get("mutation_chain_families", [])
+    mc_metrics = info.get("mutation_chain_metrics") or {}
     if mc_fams:
         lines.append("")
-        lines.append("Mutation Chains (Phase 16A/16B):")
+        lines.append("Mutation Chains (Phase 16A/16B/16C):")
         total_members = sum(f.get("targets", 0) for f in mc_fams)
         total_gain = sum(f.get("gain", 0) for f in mc_fams)
         avg_changed = [f.get("avg_changed_lines") for f in mc_fams if f.get("avg_changed_lines") is not None]
         lines.append(f"  families: {len(mc_fams)}, members: {total_members}, gain: {total_gain:,} bytes")
         if avg_changed:
             lines.append(f"  avg changed lines per chain: {sum(avg_changed) / len(avg_changed):.1f}")
+        anc = mc_metrics.get("anchor_assisted_count", 0)
+        mic = mc_metrics.get("microscope_assisted_count", 0)
+        tpl = mc_metrics.get("template_handoff_count", 0)
+        if anc or mic or tpl:
+            parts = []
+            if anc:
+                parts.append(f"anchor-assisted: {anc}")
+            if mic:
+                parts.append(f"microscope-assisted: {mic}")
+            if tpl:
+                parts.append(f"template-handoff: {tpl}")
+            lines.append(f"  context-aware: {', '.join(parts)}")
     fe_fams = info.get("fold_echo_families", [])
     if fe_fams:
         lines.append("")

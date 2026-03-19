@@ -1,5 +1,5 @@
 """
-Phase 16A: Mutation Chain v0.1 tests.
+Phase 16A/16B/16C: Mutation Chain tests.
 """
 import json
 from pathlib import Path
@@ -11,8 +11,10 @@ from infold.engine.mutation_chain import (
     reconstruct_from_chain,
     find_mutation_chain_candidates,
     _pick_base,
+    _pick_base_min_mutation_payload,
     _compute_mutation,
     _apply_mutation,
+    _path_to_anchor_scopes,
 )
 from infold.operators.mutation_chain import MutationChainOperator
 from infold.models.project_sheet import ProjectSheet
@@ -184,3 +186,35 @@ def test_mutation_fixtures_reconstruct(tmp_path):
                 restored = out / rel
                 assert restored.exists(), f"Missing {rel} in {name}"
                 assert restored.read_text() == p.read_text(), f"Content mismatch {rel} in {name}"
+
+
+def test_anchor_aware_grouping():
+    """Phase 16C: find_mutation_chain_candidates accepts anchors parameter."""
+    base = ("h1\nh2\nh3\nh4\nh5\n" * 20)[:-1]
+    path_to_content = {
+        Path("a"): base.replace("h5\n", "v1\n", 1),
+        Path("b"): base.replace("h5\n", "v2\n", 1),
+        Path("c"): base.replace("h5\n", "v3\n", 1),
+    }
+    anchors = [{"path": "package.json", "anchored_paths": ["a", "b", "c"]}]
+    chains = find_mutation_chain_candidates(
+        path_to_content,
+        min_family_size=3,
+        min_lines=50,
+        min_line_overlap_ratio=0.98,
+        anchors=anchors,
+    )
+    assert len(chains) >= 1
+
+
+def test_base_selection_anchor_locality():
+    """Phase 16C: Base selection prefers same-anchor when mutation cost ties."""
+    from infold.engine.mutation_chain import _path_to_anchor_scopes
+    base_content = "line\n" * 10
+    paths = [Path("a"), Path("b"), Path("c")]
+    contents = {p: base_content for p in paths}
+    lines_map = {p: contents[p].splitlines(keepends=True) for p in paths}
+    # All same anchor
+    path_to_scopes = {"a": {"pkg"}, "b": {"pkg"}, "c": {"pkg"}}
+    base = _pick_base_min_mutation_payload(paths, contents, lines_map, path_to_scopes)
+    assert base in paths

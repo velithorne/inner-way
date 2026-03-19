@@ -1,17 +1,38 @@
 """
-Phase 16A/16B: Mutation Chain — base + compact mutations for similar files.
+Phase 16A/16B/16C: Mutation Chain — base + compact mutations for similar files.
 
 Conservative, deterministic representation for closely related text files.
 - base member: one full file
 - mutated members: compact line-based diffs (single or contiguous blocks)
 - net-positive only
 - Phase 16B: better grouping, cost-aware base selection, compact encoding
+- Phase 16C: anchor-aware grouping, microscope-aware activation, template handoff
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+
+
+def _path_to_anchor_scopes(anchors: list[dict[str, Any]]) -> dict[str, set[str]]:
+    """Map path to set of anchor path ids that scope it."""
+    out: dict[str, set[str]] = {}
+    for a in anchors:
+        aid = a.get("path", "")
+        for p in a.get("anchored_paths", []):
+            out.setdefault(p, set()).add(aid)
+    return out
+
+
+def _paths_share_anchor(paths: list[Path], path_to_scopes: dict[str, set[str]]) -> str | None:
+    """Return anchor id if all paths share at least one anchor scope, else None."""
+    if not paths or not path_to_scopes:
+        return None
+    common = path_to_scopes.get(str(paths[0]).replace("\\", "/"), set())
+    for p in paths[1:]:
+        common &= path_to_scopes.get(str(p).replace("\\", "/"), set())
+    return min(common) if common else None
 
 
 def _compute_mutation(base_lines: list[str], member_lines: list[str]) -> list:
@@ -75,26 +96,40 @@ def _pick_base(paths: list[Path], contents: dict[Path, str]) -> Path:
     return min(paths, key=lambda p: (len(contents.get(p, "").encode("utf-8")), str(p)))
 
 
-def _pick_base_min_mutation_payload(paths: list[Path], contents: dict[Path, str], lines_map: dict[Path, list[str]]) -> Path:
+def _pick_base_min_mutation_payload(
+    paths: list[Path],
+    contents: dict[Path, str],
+    lines_map: dict[Path, list[str]],
+    path_to_anchor_scopes: dict[str, set[str]] | None = None,
+) -> Path:
     """
-    Phase 16B: Choose base that minimizes total mutation payload to the rest.
-    Deterministic tie-break: smallest base size, then first by path.
+    Phase 16B/16C: Choose base that minimizes total mutation payload.
+    Tie-breakers: (1) total mutation cost lower, (2) same-anchor locality preferred,
+    (3) smallest base size, (4) first path lexicographically.
     """
-    def total_mutation_if_base(base: Path) -> tuple[int, int, str]:
+    def score(base: Path) -> tuple[int, int, int, int, str]:
         base_lines = lines_map[base]
-        total = 0
+        total_mut = 0
         for p in paths:
             if p == base:
                 continue
             member_lines = lines_map[p]
             if len(member_lines) != len(base_lines):
-                return (999999, 999999, str(base))
+                return (999999, 999999, 999999, 999999, str(base))
             mut = _compute_mutation(base_lines, member_lines)
-            total += _mutation_payload_bytes(mut)
+            total_mut += _mutation_payload_bytes(mut)
         base_size = len(contents[base].encode("utf-8"))
-        return (total, base_size, str(base))
+        # Anchor locality: 0 if base shares anchor with all, else 1
+        anchor_ok = 0
+        if path_to_anchor_scopes and paths:
+            common = path_to_anchor_scopes.get(str(base).replace("\\", "/"), set())
+            for p in paths:
+                if p != base:
+                    common &= path_to_anchor_scopes.get(str(p).replace("\\", "/"), set())
+            anchor_ok = 0 if common else 1
+        return (total_mut, anchor_ok, base_size, 0, str(base))
 
-    return min(paths, key=lambda p: total_mutation_if_base(p))
+    return min(paths, key=lambda p: score(p))
 
 
 def build_mutation_chain(
@@ -104,10 +139,11 @@ def build_mutation_chain(
     min_lines: int = 5,
     min_line_overlap_ratio: float = 0.85,
     use_cost_aware_base: bool = True,
+    path_to_anchor_scopes: dict[str, set[str]] | None = None,
 ) -> dict[str, Any] | None:
     """
     Build mutation chain for a group of similar files.
-    Phase 16B: cost-aware base selection, compact block encoding.
+    Phase 16B/16C: cost-aware base selection, anchor locality tie-breaker.
     Returns None if not net-positive.
     """
     if len(paths) < min_family_size:
@@ -123,7 +159,7 @@ def build_mutation_chain(
         lines_map[p] = lines
 
     if use_cost_aware_base:
-        base = _pick_base_min_mutation_payload(paths, contents, lines_map)
+        base = _pick_base_min_mutation_payload(paths, contents, lines_map, path_to_anchor_scopes)
     else:
         base = min(paths, key=lambda p: (len(contents[p].encode("utf-8")), str(p)))
 
@@ -215,6 +251,8 @@ def mutation_chain_to_unfold_recipe(chain: dict[str, Any]) -> dict[str, Any]:
         out["avg_changed_lines"] = chain["avg_changed_lines"]
     if "total_changed_lines" in chain:
         out["total_changed_lines"] = chain["total_changed_lines"]
+    if "_source" in chain:
+        out["_source"] = chain["_source"]  # for reporting only
     return out
 
 
@@ -232,48 +270,124 @@ def find_mutation_chain_candidates(
     min_lines: int = 5,
     min_line_overlap_ratio: float = 0.85,
     group_by_extension: bool = True,
+    anchors: list[dict[str, Any]] | None = None,
+    template_rejected_groups: list[tuple[list[Path], str]] | None = None,
+    microscope_groups: list[tuple[list[Path], list[list[str]]]] | None = None,
+    committed_paths: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Find groups of similar files that could form mutation chains.
-    Phase 16B: Group by (extension, line_count) when group_by_extension; cost-aware base.
+    Phase 16C: Anchor-aware grouping, microscope groups, template rejection handoff.
     """
-    # Build (extension, line_count) -> paths
-    buckets: dict[tuple[str, int], list[Path]] = {}
+    committed = committed_paths or set()
+    path_to_scopes = _path_to_anchor_scopes(anchors) if anchors else None
+
+    def _try_chain(
+        paths: list[Path],
+        relaxed_min_lines: int,
+        source: str,
+    ) -> dict[str, Any] | None:
+        paths = [p for p in paths if str(p).replace("\\", "/") not in committed and p in path_to_content]
+        if len(paths) < min_family_size:
+            return None
+        contents = {p: path_to_content[p] for p in paths}
+        lines_map_local = {p: path_to_content[p].splitlines(keepends=True) for p in paths}
+        base = _pick_base_min_mutation_payload(paths, contents, lines_map_local, path_to_scopes)
+        base_lines = contents[base].splitlines(keepends=True)
+        similar = [p for p in paths if _line_overlap_ratio(base_lines, contents[p].splitlines(keepends=True)) >= min_line_overlap_ratio]
+        if len(similar) < min_family_size:
+            return None
+        sub_contents = {p: contents[p] for p in similar}
+        chain = build_mutation_chain(
+            similar,
+            sub_contents,
+            min_family_size=min_family_size,
+            min_lines=relaxed_min_lines,
+            min_line_overlap_ratio=min_line_overlap_ratio,
+            use_cost_aware_base=True,
+            path_to_anchor_scopes=path_to_scopes,
+        )
+        if chain:
+            chain["_source"] = source
+        return chain
+
+    chains: list[dict[str, Any]] = []
+    seen_paths: set[Path] = set()
+
+    # 1. Template rejection handoff: try rejected groups with relaxed min_lines
+    if template_rejected_groups:
+        for paths, reason in template_rejected_groups:
+            if "exact_duplicates" in reason:
+                continue
+            if len(paths) < min_family_size:
+                continue
+            path_objs = [Path(p) if isinstance(p, str) else p for p in paths]
+            chain = _try_chain(path_objs, 2, "template_rejected")
+            if chain:
+                for p in chain["paths"]:
+                    seen_paths.add(Path(p))
+                chains.append(chain)
+
+    # 2. Microscope groups: tiny files with relaxed min_lines
+    if microscope_groups:
+        for paths, lines_list in microscope_groups:
+            path_objs = [Path(p) if isinstance(p, str) else p for p in paths]
+            chain = _try_chain(path_objs, 2, "microscope")
+            if chain:
+                for p in chain["paths"]:
+                    seen_paths.add(Path(p))
+                chains.append(chain)
+
+    # 3. Anchor-aware buckets: (ext, line_count, anchor_id) for same-scope grouping
+    buckets: dict[tuple[str, int, str | None], list[Path]] = {}
     for p, text in path_to_content.items():
-        if not text or not text.strip():
+        if p in seen_paths or not text or not text.strip():
+            continue
+        if str(p).replace("\\", "/") in committed:
+            continue
+        lines = text.splitlines(keepends=True)
+        if len(lines) < min_lines:
+            continue
+        ext = p.suffix.lower() if group_by_extension else ""
+        anchor_id = None
+        if path_to_scopes:
+            scopes = path_to_scopes.get(str(p).replace("\\", "/"), set())
+            anchor_id = min(scopes) if scopes else None
+        key = (ext, len(lines), anchor_id)
+        buckets.setdefault(key, []).append(p)
+
+    for key, paths in buckets.items():
+        paths = [p for p in paths if p not in seen_paths]
+        if len(paths) < min_family_size:
+            continue
+        chain = _try_chain(paths, min_lines, "anchor" if key[2] else "default")
+        if chain:
+            for p in chain["paths"]:
+                seen_paths.add(Path(p))
+            chains.append(chain)
+
+    # 4. Fallback: (ext, line_count) without anchor split for remaining paths
+    fallback_buckets: dict[tuple[str, int], list[Path]] = {}
+    for p, text in path_to_content.items():
+        if p in seen_paths or not text or not text.strip():
+            continue
+        if str(p).replace("\\", "/") in committed:
             continue
         lines = text.splitlines(keepends=True)
         if len(lines) < min_lines:
             continue
         ext = p.suffix.lower() if group_by_extension else ""
         key = (ext, len(lines))
-        buckets.setdefault(key, []).append(p)
+        fallback_buckets.setdefault(key, []).append(p)
 
-    chains: list[dict[str, Any]] = []
-    seen_paths: set[Path] = set()
-
-    for key, paths in buckets.items():
+    for key, paths in fallback_buckets.items():
         paths = [p for p in paths if p not in seen_paths]
         if len(paths) < min_family_size:
             continue
-        contents = {p: path_to_content[p] for p in paths}
-        lines_map_local = {p: path_to_content[p].splitlines(keepends=True) for p in paths}
-        base = _pick_base_min_mutation_payload(paths, contents, lines_map_local)
-        base_lines = contents[base].splitlines(keepends=True)
-        similar = [p for p in paths if _line_overlap_ratio(base_lines, contents[p].splitlines(keepends=True)) >= min_line_overlap_ratio]
-        if len(similar) < min_family_size:
-            continue
-        sub_contents = {p: contents[p] for p in similar}
-        chain = build_mutation_chain(
-            similar,
-            sub_contents,
-            min_family_size=min_family_size,
-            min_lines=min_lines,
-            min_line_overlap_ratio=min_line_overlap_ratio,
-            use_cost_aware_base=True,
-        )
+        chain = _try_chain(paths, min_lines, "fallback")
         if chain:
-            for p in similar:
-                seen_paths.add(p)
+            for p in chain["paths"]:
+                seen_paths.add(Path(p))
             chains.append(chain)
+
     return chains

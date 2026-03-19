@@ -30,6 +30,7 @@ def _find_template_families(
     min_lines: int = 5,
     max_family_size: int | None = None,
     diagnostics: list[dict[str, Any]] | None = None,
+    rejected_groups: list[tuple[list[Path], str]] | None = None,
 ) -> list[tuple[list[Path], list[str], list[list[str]], float, float]]:
     """
     Find families of files with same line count, high line-level similarity.
@@ -67,13 +68,17 @@ def _find_template_families(
 
         for n_lines, group in by_line_count.items():
             if len(group) < min_family:
+                rej_paths = [p for p, _ in group]
+                reason = f"file_count {len(group)} < min_family_size {min_family}"
                 diag.append({
                     "file_count": len(group),
                     "scaffold_similarity": None,
                     "slot_ratio": None,
                     "family_purity": None,
-                    "reject_reason": f"file_count {len(group)} < min_family_size {min_family}",
+                    "reject_reason": reason,
                 })
+                if rejected_groups is not None:
+                    rejected_groups.append((rej_paths, reason))
                 continue
             # Cap family size for echo-friendly datasets (leaves excess as passthrough)
             group = sorted(group, key=lambda x: str(x[0]))
@@ -112,13 +117,16 @@ def _find_template_families(
                     reason.append(f"scaffold_similarity {similarity:.3f} < {min_similarity}")
                 if slot_ratio > max_slot_ratio:
                     reason.append(f"slot_ratio {slot_ratio:.3f} > {max_slot_ratio}")
+                reason_str = "; ".join(reason)
                 diag.append({
                     "file_count": len(paths),
                     "scaffold_similarity": round(similarity, 4),
                     "slot_ratio": round(slot_ratio, 4),
                     "family_purity": round(similarity, 4),
-                    "reject_reason": "; ".join(reason),
+                    "reject_reason": reason_str,
                 })
+                if rejected_groups is not None:
+                    rejected_groups.append((paths, reason_str))
                 continue
             if slot_ratio == 0:
                 diag.append({
@@ -144,13 +152,16 @@ def _find_template_families(
 
             for j in range(len(paths)):
                 if reconstruct(j) != project_sheet.file_nodes[paths[j]].raw_text:
+                    reason = "reconstruction_fidelity_failed"
                     diag.append({
                         "file_count": len(paths),
                         "scaffold_similarity": round(similarity, 4),
                         "slot_ratio": round(slot_ratio, 4),
                         "family_purity": round(similarity, 4),
-                        "reject_reason": "reconstruction_fidelity_failed",
+                        "reject_reason": reason,
                     })
+                    if rejected_groups is not None:
+                        rejected_groups.append((paths, reason))
                     break
             else:
                 families.append((paths, const_blocks, slot_groups, similarity, slot_ratio))
@@ -256,10 +267,13 @@ class TemplateSkeletonOperator(BaseOperator):
         max_family_size = thresh.get("max_family_size")
 
         diag_list = config.get("_run_diagnostics", {}).get("template_rejected", [])
+        rejected_groups: list[tuple[list[Path], str]] = []
         families = _find_template_families(
             project_sheet, min_family, min_similarity, max_slot_ratio,
-            min_lines=min_lines, max_family_size=max_family_size, diagnostics=diag_list
+            min_lines=min_lines, max_family_size=max_family_size, diagnostics=diag_list,
+            rejected_groups=rejected_groups,
         )
+        config["_template_rejected_groups"] = rejected_groups
         committed_paths = config.get("_committed_paths", set())
         seen_paths = {str(p).replace("\\", "/") for fam in families for p in fam[0]}
 

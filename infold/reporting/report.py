@@ -81,6 +81,14 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             mutation_chain_metrics["gain_bytes"] = mutation_chain_metrics.get("gain_bytes", 0) + r.gain
             if recipe.get("avg_changed_lines") is not None:
                 mutation_chain_metrics.setdefault("avg_changed_lines", []).append(recipe["avg_changed_lines"])
+            # Phase 16C: anchor/microscope/template handoff counts
+            src = recipe.get("_source", "")
+            if src == "anchor":
+                mutation_chain_metrics["anchor_assisted_count"] = mutation_chain_metrics.get("anchor_assisted_count", 0) + 1
+            elif src == "microscope":
+                mutation_chain_metrics["microscope_assisted_count"] = mutation_chain_metrics.get("microscope_assisted_count", 0) + 1
+            elif src == "template_rejected":
+                mutation_chain_metrics["template_handoff_count"] = mutation_chain_metrics.get("template_handoff_count", 0) + 1
         if r.operator_id == "byte_fold":
             recipe = getattr(r, "unfold_recipe", {}) or {}
             chunk_dict = recipe.get("chunk_dict_b64", {})

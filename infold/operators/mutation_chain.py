@@ -52,6 +52,7 @@ class MutationChainOperator(BaseOperator):
         min_family = thresh.get("min_family_size", 3)
         min_lines = thresh.get("min_lines", 5)
         min_overlap = thresh.get("min_line_overlap_ratio", 0.85)
+        committed_paths = config.get("_committed_paths", set())
 
         path_to_content: dict[Path, str] = {}
         for path, node in project_sheet.file_nodes.items():
@@ -59,11 +60,46 @@ class MutationChainOperator(BaseOperator):
                 continue
             path_to_content[path] = node.raw_text
 
+        # Phase 16C: Anchor-aware, microscope-aware, template handoff
+        anchors: list[dict[str, Any]] | None = None
+        if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+            try:
+                from infold.engine.anchor_file import find_anchor_files
+                anchors = find_anchor_files(project_sheet, project_sheet.source_path)
+            except Exception:
+                pass
+
+        template_rejected = config.get("_template_rejected_groups", [])
+
+        microscope_groups: list[tuple[list[Path], list[list[str]]]] | None = None
+        if config.get("operators", {}).get("structural_microscope", {}).get("enabled", True):
+            try:
+                from infold.engine.structural_microscope import find_microscope_assisted_groups
+                scope_thresh = config.get("thresholds", {}).get("structural_microscope", {})
+                micro_groups = find_microscope_assisted_groups(
+                    project_sheet,
+                    max_bytes=scope_thresh.get("max_bytes", 512),
+                    max_lines=scope_thresh.get("max_lines", 10),
+                    min_family=min_family,
+                )
+                # Exclude paths already committed
+                microscope_groups = [
+                    (paths, lines_list)
+                    for paths, lines_list in micro_groups
+                    if not any(str(p).replace("\\", "/") in committed_paths for p in paths)
+                ] or None
+            except Exception:
+                pass
+
         chains = find_mutation_chain_candidates(
             path_to_content,
             min_family_size=min_family,
             min_lines=min_lines,
             min_line_overlap_ratio=min_overlap,
+            anchors=anchors,
+            template_rejected_groups=template_rejected,
+            microscope_groups=microscope_groups,
+            committed_paths=committed_paths,
         )
 
         candidates: list[CandidateCrease] = []
