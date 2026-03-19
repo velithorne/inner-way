@@ -9,10 +9,10 @@ from infold.engine.fold_echo import (
     _extract_slot_values_for_file,
     _anchor_scope_match,
     _path_proximity,
-    _build_path_to_anchor_scopes,
     find_template_echo_candidates,
     reconstruct_echo_from_template,
 )
+from infold.engine.anchor_file import build_path_to_anchor_scopes
 from infold.archive import create_archive, validate_archive, reconstruct_archive, explain_archive
 from infold.archive.operations import explain_to_text
 
@@ -116,7 +116,7 @@ def test_anchor_scope_match():
         {"path": "package.json", "anchored_paths": ["src/a.py", "src/b.py", "src/echo.py"]},
         {"path": "other/README.md", "anchored_paths": ["other/x.py"]},
     ]
-    path_to_scopes = _build_path_to_anchor_scopes(anchors)
+    path_to_scopes = build_path_to_anchor_scopes(anchors)
     assert _anchor_scope_match("src/echo.py", ["src/a.py"], path_to_scopes) is True
     assert _anchor_scope_match("src/echo.py", ["other/x.py"], path_to_scopes) is False
 

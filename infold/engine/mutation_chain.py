@@ -16,23 +16,15 @@ from typing import Any
 
 
 def _path_to_anchor_scopes(anchors: list[dict[str, Any]]) -> dict[str, set[str]]:
-    """Map path to set of anchor path ids that scope it."""
-    out: dict[str, set[str]] = {}
-    for a in anchors:
-        aid = a.get("path", "")
-        for p in a.get("anchored_paths", []):
-            out.setdefault(p, set()).add(aid)
-    return out
+    """Map path to set of anchor path ids. Delegates to shared anchor utilities."""
+    from infold.engine.anchor_file import build_path_to_anchor_scopes
+    return build_path_to_anchor_scopes(anchors)
 
 
 def _paths_share_anchor(paths: list[Path], path_to_scopes: dict[str, set[str]]) -> str | None:
-    """Return anchor id if all paths share at least one anchor scope, else None."""
-    if not paths or not path_to_scopes:
-        return None
-    common = path_to_scopes.get(str(paths[0]).replace("\\", "/"), set())
-    for p in paths[1:]:
-        common &= path_to_scopes.get(str(p).replace("\\", "/"), set())
-    return min(common) if common else None
+    """Return anchor id if all paths share at least one anchor scope. Uses shared utilities."""
+    from infold.engine.anchor_file import paths_share_anchor
+    return paths_share_anchor(paths, path_to_scopes)
 
 
 def _compute_mutation(base_lines: list[str], member_lines: list[str]) -> list:

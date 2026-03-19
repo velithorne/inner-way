@@ -1,5 +1,5 @@
 """
-Phase 18A: Anchor Files v0.1 tests.
+Phase 18A/18B: Anchor Files tests.
 """
 from pathlib import Path
 
@@ -8,6 +8,11 @@ import pytest
 from infold.engine.anchor_file import (
     find_anchor_files,
     _is_anchor_filename,
+    build_path_to_anchor_scopes,
+    paths_share_anchor,
+    path_in_anchor_scope,
+    anchor_relative_path,
+    expand_anchor_relative_path,
 )
 from infold.intake import scan_project
 from infold.archive import create_archive, validate_archive, explain_archive
@@ -75,3 +80,37 @@ def test_explain_shows_anchors():
     assert "Archive Explain" in text
     if info.get("anchor_families"):
         assert "Anchor" in text
+
+
+def test_build_path_to_anchor_scopes():
+    """Phase 18B: build_path_to_anchor_scopes maps paths to anchor ids."""
+    anchors = [
+        {"path": "package.json", "anchored_paths": ["src/a.py", "src/b.py"]},
+        {"path": "other/README.md", "anchored_paths": ["other/x.py"]},
+    ]
+    scopes = build_path_to_anchor_scopes(anchors)
+    assert "package.json" in scopes.get("src/a.py", set())
+    assert "other/README.md" in scopes.get("other/x.py", set())
+    assert "src/a.py" not in scopes.get("other/x.py", set())
+
+
+def test_paths_share_anchor():
+    """Phase 18B: paths_share_anchor returns common anchor or None."""
+    scopes = {"a": {"pkg"}, "b": {"pkg"}, "c": {"other"}}
+    assert paths_share_anchor(["a", "b"], scopes) == "pkg"
+    assert paths_share_anchor(["a", "c"], scopes) is None
+
+
+def test_anchor_relative_path_reversible():
+    """Phase 18B: anchor_relative_path and expand_anchor_relative_path are reversible."""
+    rel = anchor_relative_path("src/foo.py", Path("."))
+    assert rel == "src/foo.py"
+    expanded = expand_anchor_relative_path(rel, "package.json")
+    assert "foo.py" in expanded
+
+
+def test_path_in_anchor_scope():
+    """Phase 18B: path_in_anchor_scope checks membership."""
+    scopes = {"src/a.py": {"pkg"}, "src/b.py": {"pkg"}}
+    assert path_in_anchor_scope("src/a.py", "pkg", scopes) is True
+    assert path_in_anchor_scope("other/x.py", "pkg", scopes) is False

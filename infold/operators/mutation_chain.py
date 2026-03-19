@@ -60,9 +60,12 @@ class MutationChainOperator(BaseOperator):
                 continue
             path_to_content[path] = node.raw_text
 
-        # Phase 16C: Anchor-aware, microscope-aware, template handoff
+        # Phase 16C/18B: Anchor-aware (use shared anchor context)
         anchors: list[dict[str, Any]] | None = None
-        if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+        anchor_ctx = config.get("_anchor_context", {})
+        if anchor_ctx.get("anchors"):
+            anchors = anchor_ctx["anchors"]
+        elif config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
             try:
                 from infold.engine.anchor_file import find_anchor_files
                 anchors = find_anchor_files(project_sheet, project_sheet.source_path)

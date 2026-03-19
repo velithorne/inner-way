@@ -2052,11 +2052,17 @@ def explain_to_text(info: dict[str, Any]) -> str:
         if len(micro_assisted) > 3:
             lines.append(f"    ... and {len(micro_assisted) - 3} more")
     anchor_fams = info.get("anchor_families", [])
+    anchor_metrics = info.get("anchor_metrics") or {}
     if anchor_fams:
         lines.append("")
-        lines.append("Anchor Files (Phase 18A):")
+        lines.append("Anchor Files (Phase 18A/18B):")
         total_anchored = sum(f.get("anchored_count", 0) for f in anchor_fams)
         lines.append(f"  anchors: {len(anchor_fams)}, anchored members: {total_anchored}")
+        if anchor_metrics.get("metadata_reduction_estimate"):
+            lines.append(f"  metadata reduction estimate: {anchor_metrics['metadata_reduction_estimate']} bytes")
+        anc_mc = anchor_metrics.get("anchor_assisted_mutation_chain", 0)
+        if anc_mc:
+            lines.append(f"  operator guidance: mutation_chain used anchor scope ({anc_mc} families)")
         for a in anchor_fams[:5]:
             lines.append(f"    {a.get('path', '?')} ({a.get('type', '?')}): {a.get('anchored_count', 0)} members")
         if len(anchor_fams) > 5:

@@ -40,23 +40,9 @@ def _anchor_scope_match(
     host_paths: list[str],
     path_to_anchor_scopes: dict[str, set[str]],
 ) -> bool:
-    """True if echo and host share at least one anchor scope."""
-    echo_anchors = path_to_anchor_scopes.get(echo_path, set())
-    for hp in host_paths:
-        host_anchors = path_to_anchor_scopes.get(hp, set())
-        if echo_anchors & host_anchors:
-            return True
-    return False
-
-
-def _build_path_to_anchor_scopes(anchors: list[dict[str, Any]]) -> dict[str, set[str]]:
-    """Map each path to set of anchor path identifiers that scope it."""
-    path_to_scopes: dict[str, set[str]] = {}
-    for anchor in anchors:
-        anchor_id = anchor.get("path", "")
-        for p in anchor.get("anchored_paths", []):
-            path_to_scopes.setdefault(p, set()).add(anchor_id)
-    return path_to_scopes
+    """True if echo and host share at least one anchor scope. Uses shared anchor utilities."""
+    from infold.engine.anchor_file import paths_share_anchor
+    return paths_share_anchor([echo_path] + host_paths, path_to_anchor_scopes) is not None
 
 
 def _extract_slot_values_for_file(
@@ -135,7 +121,8 @@ def find_template_echo_candidates(
     if not passthrough:
         return candidates
 
-    path_to_anchor_scopes = _build_path_to_anchor_scopes(anchors) if anchors else {}
+    from infold.engine.anchor_file import build_path_to_anchor_scopes
+    path_to_anchor_scopes = build_path_to_anchor_scopes(anchors) if anchors else {}
 
     # Build list of template hosts with their recipes
     template_hosts: list[tuple[int, Any, list[str], list, list[str]]] = []

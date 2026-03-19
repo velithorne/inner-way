@@ -212,16 +212,20 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
                 "operators_benefited": list({m.get("operator", "?") for m in micro_assisted}),
             }
             report["microscope_assisted"] = micro_assisted
-        # Phase 18A: Anchor files (metadata only)
+        # Phase 18A/18B: Anchor files (metadata, context compression, operator guidance)
         if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
             try:
-                from infold.engine.anchor_file import find_anchor_files
+                from infold.engine.anchor_file import find_anchor_files, build_path_to_anchor_scopes
                 anchors = find_anchor_files(sheet, sheet.source_path)
                 if anchors:
                     anchor_metrics["anchors_detected"] = len(anchors)
                     anchor_metrics["anchor_types"] = list({a["anchor_type"] for a in anchors})
                     anchor_metrics["total_anchored_count"] = sum(a["anchored_count"] for a in anchors)
                     anchor_metrics["metadata_reduction_estimate"] = sum(a["metadata_reduction_estimate"] for a in anchors)
+                    # Phase 18B: operator guidance usage
+                    anc_mc = mutation_chain_metrics.get("anchor_assisted_count", 0) if mutation_chain_metrics else 0
+                    if anc_mc:
+                        anchor_metrics["anchor_assisted_mutation_chain"] = anc_mc
                     report["anchor_metrics"] = anchor_metrics
                     report["anchor_families"] = [{"path": a["path"], "type": a["anchor_type"], "anchored_count": a["anchored_count"]} for a in anchors]
             except Exception:

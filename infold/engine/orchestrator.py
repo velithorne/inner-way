@@ -210,6 +210,17 @@ def run_fold(
         config_snapshot=config,
     )
     config.setdefault("_run_diagnostics", {})["template_rejected"] = []
+    # Phase 18B: Shared anchor context for operators
+    if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+        try:
+            from infold.engine.anchor_file import find_anchor_files, build_path_to_anchor_scopes
+            anchors = find_anchor_files(sheet, sheet.source_path)
+            config["_anchor_context"] = {
+                "anchors": anchors,
+                "path_to_scopes": build_path_to_anchor_scopes(anchors) if anchors else {},
+            }
+        except Exception:
+            config["_anchor_context"] = {"anchors": [], "path_to_scopes": {}}
     folded_state: dict[str, Any] = {"canonicals": [], "references": []}
     errors: list[str] = []
     candidate_counts: dict[str, int] = {}
