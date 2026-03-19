@@ -12,6 +12,7 @@ CORRECTNESS_FIXTURES = [
     ("tests/fixtures/duplicate_python", "duplicate-heavy-python"),
     ("tests/fixtures/template_heavy", "template-heavy"),
     ("tests/fixtures/config_heavy", "config-heavy"),
+    ("tests/fixtures/mutation_chain", "mutation-chain"),
     ("tests/fixtures/mixed_project", "mixed-small"),
     ("tests/fixtures/hierarchy_mirror", "hierarchy-mirror"),
     ("tests/fixtures/dependency_motif", "dependency-motif"),

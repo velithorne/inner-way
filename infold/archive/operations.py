@@ -318,6 +318,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "hierarchy_templates": report.get("hierarchy_templates", []),
             "dependency_motifs": report.get("dependency_motifs", []),
             "byte_fold_families": report.get("byte_fold_families", []),
+            "mutation_chain_families": report.get("mutation_chain_families", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
             "path_dna_folding": manifest.get("path_dna_folding", False),
@@ -1489,6 +1490,9 @@ def validate_archive(
                 elif op_id == "dependency_motif":
                     if not (shared_dir / f"dependency_motif_{i}.json").exists():
                         errors.append(f"Missing shared artifact: shared/dependency_motif_{i}.json for record {i}")
+                elif op_id == "mutation_chain":
+                    if not (shared_dir / f"mutation_chain_{i}.json").exists():
+                        errors.append(f"Missing shared artifact: shared/mutation_chain_{i}.json for record {i}")
             if records:
                 indices = [r.get("index", -1) for r in records]
                 for j, idx in enumerate(indices):
@@ -1588,6 +1592,31 @@ def reconstruct_archive(
                                 else:
                                     out_parts.append(sg[j] if j < len(sg) else "")
                         content = "".join(out_parts)
+                        p = out_root / path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(content, encoding="utf-8")
+                        result[path_str] = content
+            elif op_id == "mutation_chain":
+                mc_path = shared_dir / f"mutation_chain_{idx}.json"
+                if mc_path.exists():
+                    data = json.loads(mc_path.read_text(encoding="utf-8"))
+                    base_path_str = data.get("base_path", "")
+                    base_content = data.get("base_content", "")
+                    base_lines = base_content.splitlines(keepends=True)
+                    mutations = data.get("mutations", {})
+                    if base_path_str and base_path_str not in result:
+                        p = out_root / base_path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(base_content, encoding="utf-8")
+                        result[base_path_str] = base_content
+                    for path_str, mut_list in mutations.items():
+                        lines = list(base_lines)
+                        for line_idx, line_content in mut_list:
+                            if line_idx < len(lines):
+                                lines[line_idx] = line_content
+                            else:
+                                lines.append(line_content)
+                        content = "".join(lines)
                         p = out_root / path_str
                         p.parent.mkdir(parents=True, exist_ok=True)
                         p.write_text(content, encoding="utf-8")
@@ -1959,6 +1988,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
     if info.get("family_membranes"):
         lines.append("")
         lines.append("Family Membranes (Phase 14A): used")
+    mc_fams = info.get("mutation_chain_families", [])
+    if mc_fams:
+        lines.append("")
+        lines.append("Mutation Chains (Phase 16A):")
+        total_members = sum(f.get("targets", 0) for f in mc_fams)
+        total_gain = sum(f.get("gain", 0) for f in mc_fams)
+        lines.append(f"  families: {len(mc_fams)}, members: {total_members}, gain: {total_gain:,} bytes")
     scope = info.get("scope_accounting")
     if scope and scope.get("excluded_file_count", 0) > 0:
         lines.append("")

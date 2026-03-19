@@ -110,6 +110,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     hierarchy_templates = [r for r in ledger.fold_records if r.operator_id == "hierarchy_mirror"]
     dependency_motifs = [r for r in ledger.fold_records if r.operator_id == "dependency_motif"]
     byte_fold_families = [r for r in ledger.fold_records if r.operator_id == "byte_fold"]
+    mutation_chain_families = [r for r in ledger.fold_records if r.operator_id == "mutation_chain"]
 
     lean = config.get("_lean_mode", False)
     micro = config.get("_micro_mode", False)
@@ -139,6 +140,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["hierarchy_templates"] = [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates]
         report["dependency_motifs"] = [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs]
         report["byte_fold_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families]
+        report["mutation_chain_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in mutation_chain_families]
         report["per_operator_gain_share"] = per_operator_gain
         report["fold_profile"] = config.get("_fold_profile_info", {}).get("fold_profile")
         report["fold_profile_mode"] = config.get("_fold_profile_info", {}).get("fold_profile_mode")

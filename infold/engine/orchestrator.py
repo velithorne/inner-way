@@ -26,6 +26,7 @@ from infold.operators.exact_repetition import ExactRepetitionOperator
 from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.dependency_motif import DependencyMotifOperator
 from infold.operators.hierarchy_mirror import HierarchyMirrorOperator
+from infold.operators.mutation_chain import MutationChainOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
 from infold.parsers import parse_project
 from infold.validation import validate_candidate
@@ -53,6 +54,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
         ("exact_repetition", ExactRepetitionOperator),
         ("symbol_table", SymbolTableOperator),
         ("template_skeleton", TemplateSkeletonOperator),
+        ("mutation_chain", MutationChainOperator),
         ("hierarchy_mirror", HierarchyMirrorOperator),
         ("dependency_motif", DependencyMotifOperator),
         ("byte_fold", ByteFoldOperator),

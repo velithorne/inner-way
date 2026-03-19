@@ -168,6 +168,17 @@ def export_package(
                 }, compact),
                 encoding="utf-8",
             )
+        elif record.operator_id == "mutation_chain":
+            recipe = record.unfold_recipe
+            (shared_dir / f"mutation_chain_{i}.json").write_text(
+                _json_dump({
+                    "base_path": recipe.get("base_path"),
+                    "base_content": recipe.get("base_content"),
+                    "mutations": recipe.get("mutations", {}),
+                    "paths": recipe.get("paths", [str(t) for t in record.targets]),
+                }, compact),
+                encoding="utf-8",
+            )
         elif record.operator_id == "byte_fold":
             import base64
             recipe = record.unfold_recipe

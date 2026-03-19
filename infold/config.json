@@ -19,6 +19,7 @@
   "operators": {
     "exact_repetition": {"enabled": true},
     "template_skeleton": {"enabled": true},
+    "mutation_chain": {"enabled": true},
     "symbol_table": {"enabled": true},
     "hierarchy_mirror": {"enabled": true},
     "dependency_motif": {"enabled": true},
@@ -36,6 +37,11 @@
       "min_scaffold_similarity": 0.80,
       "max_slot_ratio": 0.35,
       "min_lines": 5
+    },
+    "mutation_chain": {
+      "min_family_size": 3,
+      "min_lines": 5,
+      "min_line_overlap_ratio": 0.85
     },
     "symbol_table": {
       "min_symbol_reuse_count": 5,
