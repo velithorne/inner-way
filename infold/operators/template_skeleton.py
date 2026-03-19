@@ -158,6 +158,70 @@ def _find_template_families(
     return families
 
 
+def _try_template_family_from_group(
+    paths: list[Path],
+    lines_list: list[list[str]],
+    project_sheet: ProjectSheet,
+    min_similarity: float,
+    max_slot_ratio: float,
+    diagnostics: list[dict[str, Any]] | None,
+) -> tuple[list[Path], list[str], list[list[str]], float, float] | None:
+    """
+    Try to extract a template family from a pre-grouped (paths, lines_list).
+    Returns family tuple or None if rejected.
+    """
+    if len(paths) < 2 or len(lines_list) != len(paths):
+        return None
+    n_lines = len(lines_list[0])
+    if any(len(ll) != n_lines for ll in lines_list):
+        return None
+    diag = diagnostics or []
+    const_blocks: list[str] = []
+    slot_groups: list[list[str]] = []
+    current_const: list[str] = []
+    current_slots: list[list[str]] = []
+    for i in range(n_lines):
+        line_vals = [ll[i] for ll in lines_list]
+        if len(set(line_vals)) == 1:
+            if current_slots:
+                slot_groups.append(current_slots)
+                current_slots = []
+            current_const.append(line_vals[0])
+        else:
+            if current_const:
+                const_blocks.append("".join(current_const))
+                current_const = []
+            current_slots.append(line_vals)
+    if current_const:
+        const_blocks.append("".join(current_const))
+    if current_slots:
+        slot_groups.append(current_slots)
+    total_slot_lines = sum(len(sg) for sg in slot_groups)
+    slot_ratio = total_slot_lines / n_lines if n_lines else 0
+    similarity = 1.0 - slot_ratio
+    if similarity < min_similarity or slot_ratio > max_slot_ratio:
+        return None
+    if slot_ratio == 0:
+        return None
+
+    def reconstruct(j: int) -> str:
+        out: list[str] = []
+        for bi, const in enumerate(const_blocks):
+            out.append(const)
+            if bi < len(slot_groups):
+                slot_block = slot_groups[bi]
+                if isinstance(slot_block[0], list):
+                    out.append("".join(slot_block[k][j] for k in range(len(slot_block))))
+                else:
+                    out.append(slot_block[j])
+        return "".join(out)
+
+    for j in range(len(paths)):
+        if reconstruct(j) != project_sheet.file_nodes[paths[j]].raw_text:
+            return None
+    return (paths, const_blocks, slot_groups, similarity, slot_ratio)
+
+
 class TemplateSkeletonOperator(BaseOperator):
     """Extract shared scaffold + variable slots from similar files."""
 
@@ -196,6 +260,42 @@ class TemplateSkeletonOperator(BaseOperator):
             project_sheet, min_family, min_similarity, max_slot_ratio,
             min_lines=min_lines, max_family_size=max_family_size, diagnostics=diag_list
         )
+        committed_paths = config.get("_committed_paths", set())
+        seen_paths = {str(p).replace("\\", "/") for fam in families for p in fam[0]}
+
+        # Phase 19A: Structural Microscope - assist tiny files
+        if config.get("operators", {}).get("structural_microscope", {}).get("enabled", True):
+            try:
+                from infold.engine.structural_microscope import find_microscope_assisted_groups
+                scope_thresh = config.get("thresholds", {}).get("structural_microscope", {})
+                scope_max_bytes = scope_thresh.get("max_bytes", 512)
+                scope_max_lines = scope_thresh.get("max_lines", 6)
+                micro_groups = find_microscope_assisted_groups(
+                    project_sheet,
+                    max_bytes=scope_max_bytes,
+                    max_lines=scope_max_lines,
+                    min_family=min_family,
+                )
+                for paths, lines_list in micro_groups:
+                    path_strs = {str(p).replace("\\", "/") for p in paths}
+                    if path_strs & seen_paths or path_strs & committed_paths:
+                        continue
+                    # Relaxed thresholds for microscope-assisted tiny files
+                    micro_sim = max(0.70, min_similarity - 0.05)
+                    micro_slot = min(0.40, max_slot_ratio + 0.05)
+                    fam = _try_template_family_from_group(
+                        paths, lines_list, project_sheet,
+                        micro_sim, micro_slot, diag_list,
+                    )
+                    if fam:
+                        families.append(fam)
+                        seen_paths |= path_strs
+                        config.setdefault("_microscope_assisted", []).append(
+                            {"operator": "template_skeleton", "paths": list(path_strs)},
+                        )
+            except Exception:
+                pass
+
         candidates: list[CandidateCrease] = []
         for paths, const_blocks, slot_groups, sim, slot_ratio in families:
             total_raw = sum(len(project_sheet.file_nodes[p].raw_text.encode("utf-8")) for p in paths)

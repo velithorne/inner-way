@@ -26,6 +26,7 @@
     "byte_fold": {"enabled": true},
     "fold_echo": {"enabled": true},
     "anchor_file": {"enabled": true},
+    "structural_microscope": {"enabled": true},
     "metadata_table_fold": {"enabled": true}
   },
   "thresholds": {
@@ -73,6 +74,10 @@
     "fold_echo": {
       "min_net_gain": 16,
       "min_echo_similarity": 0.85
+    },
+    "structural_microscope": {
+      "max_bytes": 512,
+      "max_lines": 10
     },
     "metadata_table_fold": {
       "min_net_gain_bytes": 32

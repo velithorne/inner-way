@@ -196,6 +196,14 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["byte_fold_metrics"] = byte_fold_metrics if byte_fold_metrics else None
         report["mutation_chain_metrics"] = mutation_chain_metrics if mutation_chain_metrics else None
         report["fold_echo_metrics"] = fold_echo_metrics if fold_echo_metrics else None
+        # Phase 19A: Structural Microscope
+        micro_assisted = config.get("_microscope_assisted", [])
+        if micro_assisted:
+            report["microscope_metrics"] = {
+                "assisted_matches": len(micro_assisted),
+                "operators_benefited": list({m.get("operator", "?") for m in micro_assisted}),
+            }
+            report["microscope_assisted"] = micro_assisted
         # Phase 18A: Anchor files (metadata only)
         if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
             try:

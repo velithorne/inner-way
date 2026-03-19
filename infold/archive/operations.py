@@ -322,6 +322,8 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "fold_echo_families": report.get("fold_echo_families", []),
             "anchor_families": report.get("anchor_families", []),
             "anchor_metrics": report.get("anchor_metrics"),
+            "microscope_metrics": report.get("microscope_metrics"),
+            "microscope_assisted": report.get("microscope_assisted", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
             "path_dna_folding": manifest.get("path_dna_folding", False),
@@ -2026,6 +2028,15 @@ def explain_to_text(info: dict[str, Any]) -> str:
         total_echoes = sum(f.get("targets", 0) for f in fe_fams)
         total_gain = sum(f.get("gain", 0) for f in fe_fams)
         lines.append(f"  echoes: {total_echoes}, gain: {total_gain:,} bytes")
+    micro_assisted = info.get("microscope_assisted", [])
+    if micro_assisted:
+        lines.append("")
+        lines.append("Structural Microscope (Phase 19A):")
+        lines.append(f"  assisted matches: {len(micro_assisted)}")
+        for m in micro_assisted[:3]:
+            lines.append(f"    {m.get('operator', '?')}: {len(m.get('paths', []))} files")
+        if len(micro_assisted) > 3:
+            lines.append(f"    ... and {len(micro_assisted) - 3} more")
     anchor_fams = info.get("anchor_families", [])
     if anchor_fams:
         lines.append("")
