@@ -1,5 +1,5 @@
 """
-Phase 17A: Fold Echo v0.1 tests.
+Phase 17A/17B: Fold Echo v0.1/v0.2 tests.
 """
 from pathlib import Path
 
@@ -7,6 +7,9 @@ import pytest
 
 from infold.engine.fold_echo import (
     _extract_slot_values_for_file,
+    _anchor_scope_match,
+    _path_proximity,
+    _build_path_to_anchor_scopes,
     find_template_echo_candidates,
     reconstruct_echo_from_template,
 )
@@ -105,3 +108,21 @@ def test_fold_echo_explain_shows_echoes():
     # May or may not have echoes depending on template acceptance; explain should run
     assert "Archive Explain" in text
     assert "fold_count" in text or "Fold" in text or "gain" in text.lower()
+
+
+def test_anchor_scope_match():
+    """Phase 17B: Anchor scope match when paths share an anchor."""
+    anchors = [
+        {"path": "package.json", "anchored_paths": ["src/a.py", "src/b.py", "src/echo.py"]},
+        {"path": "other/README.md", "anchored_paths": ["other/x.py"]},
+    ]
+    path_to_scopes = _build_path_to_anchor_scopes(anchors)
+    assert _anchor_scope_match("src/echo.py", ["src/a.py"], path_to_scopes) is True
+    assert _anchor_scope_match("src/echo.py", ["other/x.py"], path_to_scopes) is False
+
+
+def test_path_proximity():
+    """Phase 17B: Path proximity prefers closer paths."""
+    assert _path_proximity("src/a/echo.py", ["src/a/host.py"]) >= 2
+    assert _path_proximity("src/a/echo.py", ["src/b/host.py"]) == 1
+    assert _path_proximity("x/echo.py", ["y/host.py"]) == 0

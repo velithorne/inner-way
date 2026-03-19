@@ -55,12 +55,28 @@ class FoldEchoOperator(BaseOperator):
         min_net_gain = thresh.get("min_net_gain", 16)
         min_similarity = thresh.get("min_echo_similarity", 0.85)
 
+        # Phase 17B: Anchor-aware and microscope-aware host selection
+        anchors: list[dict[str, Any]] | None = None
+        if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+            try:
+                from infold.engine.anchor_file import find_anchor_files
+                anchors = find_anchor_files(project_sheet, project_sheet.source_path)
+            except Exception:
+                pass
+
+        microscope_assisted_paths: set[str] = set()
+        for m in config.get("_microscope_assisted", []):
+            if m.get("operator") == "template_skeleton":
+                microscope_assisted_paths.update(m.get("paths", []))
+
         candidates_raw = find_template_echo_candidates(
             project_sheet,
             ledger.fold_records,
             committed_paths,
             min_echo_similarity=min_similarity,
             min_net_gain=min_net_gain,
+            anchors=anchors,
+            microscope_assisted_paths=microscope_assisted_paths or None,
         )
 
         candidates: list[CandidateCrease] = []
