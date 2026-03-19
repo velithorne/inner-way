@@ -179,6 +179,17 @@ def export_package(
                 }, compact),
                 encoding="utf-8",
             )
+        elif record.operator_id == "fold_echo":
+            recipe = record.unfold_recipe
+            (shared_dir / f"echo_{i}.json").write_text(
+                _json_dump({
+                    "host_operator": recipe.get("host_operator"),
+                    "host_idx": recipe.get("host_idx"),
+                    "echo_path": recipe.get("echo_path"),
+                    "slot_values": recipe.get("slot_values", []),
+                }, compact),
+                encoding="utf-8",
+            )
         elif record.operator_id == "byte_fold":
             import base64
             recipe = record.unfold_recipe
@@ -249,6 +260,8 @@ def export_package(
             folded_paths.add(str(p).replace("\\", "/"))
         for p in recipe.get("reconstruction", {}).keys():
             folded_paths.add(str(p).replace("\\", "/"))
+        if recipe.get("echo_path"):
+            folded_paths.add(str(recipe["echo_path"]).replace("\\", "/"))
     inv_min = inventory_minimal or micro
     inventory = {
         "files": [

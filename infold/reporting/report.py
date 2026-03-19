@@ -25,6 +25,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     dependency_metrics: dict[str, Any] = {}
     byte_fold_metrics: dict[str, Any] = {}
     mutation_chain_metrics: dict[str, Any] = {}
+    fold_echo_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -101,6 +102,13 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             byte_fold_metrics["chunk_dictionary_size_bytes"] = byte_fold_metrics.get("chunk_dictionary_size_bytes", 0) + recipe.get("chunk_dictionary_size_bytes", 0)
             byte_fold_metrics.setdefault("chunk_folded_paths", [])
             byte_fold_metrics["chunk_folded_paths"].extend(list(reconstruction.keys()))
+        if r.operator_id == "fold_echo":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            fold_echo_metrics.setdefault("echo_count", 0)
+            fold_echo_metrics["echo_count"] += 1
+            fold_echo_metrics.setdefault("gain_bytes", 0)
+            fold_echo_metrics["gain_bytes"] = fold_echo_metrics.get("gain_bytes", 0) + r.gain
+            fold_echo_metrics.setdefault("host_operators", []).append(recipe.get("host_operator", ""))
 
     raw = metrics.get("original_size_bytes", 0)
     logical_gain = ledger.total_bytes_saved  # bytes saved by deduplication
@@ -121,6 +129,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     dependency_motifs = [r for r in ledger.fold_records if r.operator_id == "dependency_motif"]
     byte_fold_families = [r for r in ledger.fold_records if r.operator_id == "byte_fold"]
     mutation_chain_families = [r for r in ledger.fold_records if r.operator_id == "mutation_chain"]
+    fold_echo_families = [r for r in ledger.fold_records if r.operator_id == "fold_echo"]
 
     lean = config.get("_lean_mode", False)
     micro = config.get("_micro_mode", False)
@@ -154,6 +163,10 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             {"targets": len(r.targets), "gain": r.gain, "avg_changed_lines": (r.unfold_recipe or {}).get("avg_changed_lines")}
             for r in mutation_chain_families
         ]
+        report["fold_echo_families"] = [
+            {"targets": len(r.targets), "gain": r.gain, "host_operator": (r.unfold_recipe or {}).get("host_operator")}
+            for r in fold_echo_families
+        ]
         report["per_operator_gain_share"] = per_operator_gain
         report["fold_profile"] = config.get("_fold_profile_info", {}).get("fold_profile")
         report["fold_profile_mode"] = config.get("_fold_profile_info", {}).get("fold_profile_mode")
@@ -181,6 +194,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["dependency_metrics"] = dependency_metrics if dependency_metrics else None
         report["byte_fold_metrics"] = byte_fold_metrics if byte_fold_metrics else None
         report["mutation_chain_metrics"] = mutation_chain_metrics if mutation_chain_metrics else None
+        report["fold_echo_metrics"] = fold_echo_metrics if fold_echo_metrics else None
         report["template_families"] = [
             {
                 "targets": len(r.targets),

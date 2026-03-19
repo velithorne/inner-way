@@ -16,6 +16,7 @@ CORRECTNESS_FIXTURES = [
     ("tests/fixtures/mutation_version_like", "mutation-version-like"),
     ("tests/fixtures/mutation_config_heavy", "mutation-config-heavy"),
     ("tests/fixtures/mutation_script_like", "mutation-script-like"),
+    ("tests/fixtures/fold_echo", "fold-echo"),
     ("tests/fixtures/mixed_project", "mixed-small"),
     ("tests/fixtures/hierarchy_mirror", "hierarchy-mirror"),
     ("tests/fixtures/dependency_motif", "dependency-motif"),

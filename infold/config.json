@@ -24,6 +24,7 @@
     "hierarchy_mirror": {"enabled": true},
     "dependency_motif": {"enabled": true},
     "byte_fold": {"enabled": true},
+    "fold_echo": {"enabled": true},
     "metadata_table_fold": {"enabled": true}
   },
   "thresholds": {
@@ -67,6 +68,10 @@
       "min_chunk_reuse_count": 2,
       "max_chunks_per_file": 1024,
       "low_structure_confidence": 0.5
+    },
+    "fold_echo": {
+      "min_net_gain": 16,
+      "min_echo_similarity": 0.85
     },
     "metadata_table_fold": {
       "min_net_gain_bytes": 32

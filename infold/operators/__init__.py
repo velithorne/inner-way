@@ -7,6 +7,7 @@ from infold.operators.hierarchy_mirror import HierarchyMirrorOperator
 from infold.operators.noop_operator import NoOpOperator
 from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
+from infold.operators.fold_echo import FoldEchoOperator
 from infold.operators.mutation_chain import MutationChainOperator
 
-__all__ = ["BaseOperator", "NoOpOperator", "ExactRepetitionOperator", "SymbolTableOperator", "TemplateSkeletonOperator", "MutationChainOperator", "HierarchyMirrorOperator", "DependencyMotifOperator"]
+__all__ = ["BaseOperator", "NoOpOperator", "ExactRepetitionOperator", "SymbolTableOperator", "TemplateSkeletonOperator", "MutationChainOperator", "FoldEchoOperator", "HierarchyMirrorOperator", "DependencyMotifOperator"]

@@ -319,6 +319,7 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "dependency_motifs": report.get("dependency_motifs", []),
             "byte_fold_families": report.get("byte_fold_families", []),
             "mutation_chain_families": report.get("mutation_chain_families", []),
+            "fold_echo_families": report.get("fold_echo_families", []),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
             "path_dna_folding": manifest.get("path_dna_folding", False),
@@ -1493,6 +1494,9 @@ def validate_archive(
                 elif op_id == "mutation_chain":
                     if not (shared_dir / f"mutation_chain_{i}.json").exists():
                         errors.append(f"Missing shared artifact: shared/mutation_chain_{i}.json for record {i}")
+                elif op_id == "fold_echo":
+                    if not (shared_dir / f"echo_{i}.json").exists():
+                        errors.append(f"Missing shared artifact: shared/echo_{i}.json for record {i}")
             if records:
                 indices = [r.get("index", -1) for r in records]
                 for j, idx in enumerate(indices):
@@ -1596,6 +1600,24 @@ def reconstruct_archive(
                         p.parent.mkdir(parents=True, exist_ok=True)
                         p.write_text(content, encoding="utf-8")
                         result[path_str] = content
+            elif op_id == "fold_echo":
+                echo_path = shared_dir / f"echo_{idx}.json"
+                if echo_path.exists():
+                    echo_data = json.loads(echo_path.read_text(encoding="utf-8"))
+                    host_idx = echo_data.get("host_idx", 0)
+                    echo_path_str = echo_data.get("echo_path", "")
+                    slot_values = echo_data.get("slot_values", [])
+                    tmpl_path = shared_dir / f"template_{host_idx}.json"
+                    if tmpl_path.exists() and echo_path_str:
+                        tmpl_data = json.loads(tmpl_path.read_text(encoding="utf-8"))
+                        const_blocks = tmpl_data.get("const_blocks", [])
+                        slot_groups = tmpl_data.get("slot_groups", [])
+                        from infold.engine.fold_echo import reconstruct_echo_from_template
+                        content = reconstruct_echo_from_template(const_blocks, slot_groups, slot_values)
+                        p = out_root / echo_path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(content, encoding="utf-8")
+                        result[echo_path_str] = content
             elif op_id == "mutation_chain":
                 mc_path = shared_dir / f"mutation_chain_{idx}.json"
                 if mc_path.exists():
@@ -1995,6 +2017,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
         lines.append(f"  families: {len(mc_fams)}, members: {total_members}, gain: {total_gain:,} bytes")
         if avg_changed:
             lines.append(f"  avg changed lines per chain: {sum(avg_changed) / len(avg_changed):.1f}")
+    fe_fams = info.get("fold_echo_families", [])
+    if fe_fams:
+        lines.append("")
+        lines.append("Fold Echoes (Phase 17A):")
+        total_echoes = sum(f.get("targets", 0) for f in fe_fams)
+        total_gain = sum(f.get("gain", 0) for f in fe_fams)
+        lines.append(f"  echoes: {total_echoes}, gain: {total_gain:,} bytes")
     scope = info.get("scope_accounting")
     if scope and scope.get("excluded_file_count", 0) > 0:
         lines.append("")

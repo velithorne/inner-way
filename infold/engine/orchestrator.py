@@ -26,6 +26,7 @@ from infold.operators.exact_repetition import ExactRepetitionOperator
 from infold.operators.symbol_table import SymbolTableOperator
 from infold.operators.dependency_motif import DependencyMotifOperator
 from infold.operators.hierarchy_mirror import HierarchyMirrorOperator
+from infold.operators.fold_echo import FoldEchoOperator
 from infold.operators.mutation_chain import MutationChainOperator
 from infold.operators.template_skeleton import TemplateSkeletonOperator
 from infold.parsers import parse_project
@@ -55,6 +56,7 @@ def _get_enabled_operators(config: dict[str, Any]) -> list[BaseOperator]:
         ("symbol_table", SymbolTableOperator),
         ("template_skeleton", TemplateSkeletonOperator),
         ("mutation_chain", MutationChainOperator),
+        ("fold_echo", FoldEchoOperator),
         ("hierarchy_mirror", HierarchyMirrorOperator),
         ("dependency_motif", DependencyMotifOperator),
         ("byte_fold", ByteFoldOperator),
@@ -220,6 +222,7 @@ def run_fold(
     for op in _get_enabled_operators(config):
         op_id = op.operator_id()
         config["_committed_paths"] = committed_paths
+        config["_ledger"] = ledger
         sim_apply_s = 0.0
         t0 = time.perf_counter()
         candidates = op.detect_candidates(sheet, config)
