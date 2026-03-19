@@ -1,0 +1,8 @@
+{
+  "version": "1.0.2",
+  "name": "myapp",
+  "env": "prod",
+  "host": "api.example.com",
+  "port": 443,
+  "timeout": 30
+}

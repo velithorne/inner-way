@@ -132,3 +132,55 @@ def test_explain_shows_mutation_chain(tmp_path):
     if info.get("fold_counts_by_operator", {}).get("mutation_chain", 0) > 0:
         assert "mutation_chain" in info.get("fold_counts_by_operator", {})
         assert info.get("mutation_chain_families")
+
+
+def test_contiguous_block_encoding():
+    """Phase 16B: Contiguous block encoding for 2+ adjacent differing lines."""
+    from infold.engine.mutation_chain import _compute_mutation, _apply_mutation
+    base = ["a\n", "b\n", "c\n", "d\n", "e\n"]
+    member = ["a\n", "X\n", "Y\n", "d\n", "e\n"]
+    mut = _compute_mutation(base, member)
+    assert len(mut) == 1
+    assert mut[0][0] == 1
+    assert isinstance(mut[0][1], list)
+    assert mut[0][1] == ["X\n", "Y\n"]
+    recon = _apply_mutation(base, mut)
+    assert recon == member
+
+
+def test_cost_aware_base_selection():
+    """Phase 16B: Base selection is deterministic and chain builds when net-positive."""
+    from pathlib import Path
+    from infold.engine.mutation_chain import _pick_base_min_mutation_payload, build_mutation_chain
+    base_content = "header_line_here\n" * 30 + "slot\n"
+    contents = {
+        Path("a"): base_content.replace("slot\n", "v1\n"),
+        Path("b"): base_content.replace("slot\n", "v2\n"),
+        Path("c"): base_content.replace("slot\n", "v3\n"),
+    }
+    lines_map = {p: contents[p].splitlines(keepends=True) for p in contents}
+    base = _pick_base_min_mutation_payload(list(contents.keys()), contents, lines_map)
+    assert base in contents
+    chain = build_mutation_chain(list(contents.keys()), contents, min_family_size=3, min_lines=30, min_line_overlap_ratio=0.96)
+    assert chain is not None
+
+
+def test_mutation_fixtures_reconstruct(tmp_path):
+    """Phase 16B: All mutation-friendly fixtures reconstruct exactly."""
+    base = Path(__file__).parent.parent
+    for name in ["mutation_chain", "mutation_version_like", "mutation_config_heavy", "mutation_script_like"]:
+        fixture = base / "tests" / "fixtures" / name
+        if not fixture.exists():
+            continue
+        archive = tmp_path / f"{name}.infold"
+        create_archive(fixture, archive)
+        ok, _ = validate_archive(archive, mode="strict")
+        assert ok
+        out = tmp_path / f"restored_{name}"
+        reconstruct_archive(archive, out)
+        for p in fixture.rglob("*"):
+            if p.is_file():
+                rel = p.relative_to(fixture)
+                restored = out / rel
+                assert restored.exists(), f"Missing {rel} in {name}"
+                assert restored.read_text() == p.read_text(), f"Content mismatch {rel} in {name}"

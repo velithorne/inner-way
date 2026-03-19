@@ -1609,13 +1609,10 @@ def reconstruct_archive(
                         p.parent.mkdir(parents=True, exist_ok=True)
                         p.write_text(base_content, encoding="utf-8")
                         result[base_path_str] = base_content
-                    for path_str, mut_list in mutations.items():
-                        lines = list(base_lines)
-                        for line_idx, line_content in mut_list:
-                            if line_idx < len(lines):
-                                lines[line_idx] = line_content
-                            else:
-                                lines.append(line_content)
+                    for path_str, mut_stored in mutations.items():
+                        from infold.engine.mutation_chain import _decode_mutation_from_storage, _apply_mutation
+                        mut = _decode_mutation_from_storage(mut_stored) if isinstance(mut_stored, list) else mut_stored
+                        lines = _apply_mutation(base_lines, mut)
                         content = "".join(lines)
                         p = out_root / path_str
                         p.parent.mkdir(parents=True, exist_ok=True)
@@ -1991,10 +1988,13 @@ def explain_to_text(info: dict[str, Any]) -> str:
     mc_fams = info.get("mutation_chain_families", [])
     if mc_fams:
         lines.append("")
-        lines.append("Mutation Chains (Phase 16A):")
+        lines.append("Mutation Chains (Phase 16A/16B):")
         total_members = sum(f.get("targets", 0) for f in mc_fams)
         total_gain = sum(f.get("gain", 0) for f in mc_fams)
+        avg_changed = [f.get("avg_changed_lines") for f in mc_fams if f.get("avg_changed_lines") is not None]
         lines.append(f"  families: {len(mc_fams)}, members: {total_members}, gain: {total_gain:,} bytes")
+        if avg_changed:
+            lines.append(f"  avg changed lines per chain: {sum(avg_changed) / len(avg_changed):.1f}")
     scope = info.get("scope_accounting")
     if scope and scope.get("excluded_file_count", 0) > 0:
         lines.append("")

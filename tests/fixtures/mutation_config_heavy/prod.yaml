@@ -1,0 +1,6 @@
+# App config
+environment: production
+host: localhost
+port: 8080
+debug: true
+log: stdout

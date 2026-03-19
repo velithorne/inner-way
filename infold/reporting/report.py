@@ -24,6 +24,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     hierarchy_metrics: dict[str, Any] = {}
     dependency_metrics: dict[str, Any] = {}
     byte_fold_metrics: dict[str, Any] = {}
+    mutation_chain_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -69,6 +70,15 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
             template_metrics.setdefault("family_purity", []).append(recipe.get("family_purity"))
             template_metrics.setdefault("slot_ambiguity", []).append(recipe.get("slot_ambiguity"))
             template_metrics.setdefault("avg_slot_size", []).append(recipe.get("avg_slot_size"))
+        if r.operator_id == "mutation_chain":
+            recipe = getattr(r, "unfold_recipe", {}) or {}
+            mutation_chain_metrics.setdefault("families_found", 0)
+            mutation_chain_metrics["families_found"] += 1
+            mutation_chain_metrics.setdefault("members_per_chain", []).append(len(r.targets))
+            mutation_chain_metrics.setdefault("gain_bytes", 0)
+            mutation_chain_metrics["gain_bytes"] = mutation_chain_metrics.get("gain_bytes", 0) + r.gain
+            if recipe.get("avg_changed_lines") is not None:
+                mutation_chain_metrics.setdefault("avg_changed_lines", []).append(recipe["avg_changed_lines"])
         if r.operator_id == "byte_fold":
             recipe = getattr(r, "unfold_recipe", {}) or {}
             chunk_dict = recipe.get("chunk_dict_b64", {})
@@ -140,7 +150,10 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["hierarchy_templates"] = [{"targets": len(r.targets), "gain": r.gain} for r in hierarchy_templates]
         report["dependency_motifs"] = [{"targets": len(r.targets), "gain": r.gain} for r in dependency_motifs]
         report["byte_fold_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in byte_fold_families]
-        report["mutation_chain_families"] = [{"targets": len(r.targets), "gain": r.gain} for r in mutation_chain_families]
+        report["mutation_chain_families"] = [
+            {"targets": len(r.targets), "gain": r.gain, "avg_changed_lines": (r.unfold_recipe or {}).get("avg_changed_lines")}
+            for r in mutation_chain_families
+        ]
         report["per_operator_gain_share"] = per_operator_gain
         report["fold_profile"] = config.get("_fold_profile_info", {}).get("fold_profile")
         report["fold_profile_mode"] = config.get("_fold_profile_info", {}).get("fold_profile_mode")
@@ -167,6 +180,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["hierarchy_metrics"] = hierarchy_metrics if hierarchy_metrics else None
         report["dependency_metrics"] = dependency_metrics if dependency_metrics else None
         report["byte_fold_metrics"] = byte_fold_metrics if byte_fold_metrics else None
+        report["mutation_chain_metrics"] = mutation_chain_metrics if mutation_chain_metrics else None
         report["template_families"] = [
             {
                 "targets": len(r.targets),
