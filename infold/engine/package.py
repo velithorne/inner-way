@@ -211,6 +211,19 @@ def export_package(
                 chunk_reconstruction_records.append({})
             chunk_reconstruction_records[i] = {"paths": paths, "seqs": seqs}
 
+    # Phase 18A: Anchor files (metadata only)
+    if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+        try:
+            from infold.engine.anchor_file import find_anchor_files
+            anchors = find_anchor_files(sheet, sheet.source_path)
+            if anchors:
+                (shared_dir / "anchors.json").write_text(
+                    _json_dump({"anchors": anchors}, compact),
+                    encoding="utf-8",
+                )
+        except Exception:
+            pass  # optional, do not fail export
+
     # Ensure shared/ has at least one file when empty (0 folds) so ZIP/validation sees the dir
     if not any(shared_dir.iterdir()):
         (shared_dir / ".gitkeep").write_text("", encoding="utf-8")

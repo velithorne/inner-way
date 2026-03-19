@@ -26,6 +26,7 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
     byte_fold_metrics: dict[str, Any] = {}
     mutation_chain_metrics: dict[str, Any] = {}
     fold_echo_metrics: dict[str, Any] = {}
+    anchor_metrics: dict[str, Any] = {}
     for r in ledger.fold_records:
         if r.operator_id not in op_breakdown:
             op_breakdown[r.operator_id] = {"count": 0, "gain": 0, "targets": 0}
@@ -195,6 +196,20 @@ def build_report(result: FoldResult, config: dict[str, Any]) -> dict[str, Any]:
         report["byte_fold_metrics"] = byte_fold_metrics if byte_fold_metrics else None
         report["mutation_chain_metrics"] = mutation_chain_metrics if mutation_chain_metrics else None
         report["fold_echo_metrics"] = fold_echo_metrics if fold_echo_metrics else None
+        # Phase 18A: Anchor files (metadata only)
+        if config.get("operators", {}).get("anchor_file", {}).get("enabled", True):
+            try:
+                from infold.engine.anchor_file import find_anchor_files
+                anchors = find_anchor_files(sheet, sheet.source_path)
+                if anchors:
+                    anchor_metrics["anchors_detected"] = len(anchors)
+                    anchor_metrics["anchor_types"] = list({a["anchor_type"] for a in anchors})
+                    anchor_metrics["total_anchored_count"] = sum(a["anchored_count"] for a in anchors)
+                    anchor_metrics["metadata_reduction_estimate"] = sum(a["metadata_reduction_estimate"] for a in anchors)
+                    report["anchor_metrics"] = anchor_metrics
+                    report["anchor_families"] = [{"path": a["path"], "type": a["anchor_type"], "anchored_count": a["anchored_count"]} for a in anchors]
+            except Exception:
+                pass
         report["template_families"] = [
             {
                 "targets": len(r.targets),

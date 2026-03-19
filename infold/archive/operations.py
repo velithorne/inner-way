@@ -320,6 +320,8 @@ def explain_archive(archive_path: Path | str) -> dict[str, Any]:
             "byte_fold_families": report.get("byte_fold_families", []),
             "mutation_chain_families": report.get("mutation_chain_families", []),
             "fold_echo_families": report.get("fold_echo_families", []),
+            "anchor_families": report.get("anchor_families", []),
+            "anchor_metrics": report.get("anchor_metrics"),
             "metadata_table_fold_metrics": report.get("metadata_table_fold_metrics"),
             "metadata_table_fold": manifest.get("metadata_table_fold", False),
             "path_dna_folding": manifest.get("path_dna_folding", False),
@@ -2024,6 +2026,16 @@ def explain_to_text(info: dict[str, Any]) -> str:
         total_echoes = sum(f.get("targets", 0) for f in fe_fams)
         total_gain = sum(f.get("gain", 0) for f in fe_fams)
         lines.append(f"  echoes: {total_echoes}, gain: {total_gain:,} bytes")
+    anchor_fams = info.get("anchor_families", [])
+    if anchor_fams:
+        lines.append("")
+        lines.append("Anchor Files (Phase 18A):")
+        total_anchored = sum(f.get("anchored_count", 0) for f in anchor_fams)
+        lines.append(f"  anchors: {len(anchor_fams)}, anchored members: {total_anchored}")
+        for a in anchor_fams[:5]:
+            lines.append(f"    {a.get('path', '?')} ({a.get('type', '?')}): {a.get('anchored_count', 0)} members")
+        if len(anchor_fams) > 5:
+            lines.append(f"    ... and {len(anchor_fams) - 5} more")
     scope = info.get("scope_accounting")
     if scope and scope.get("excluded_file_count", 0) > 0:
         lines.append("")

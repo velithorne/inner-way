@@ -25,6 +25,7 @@
     "dependency_motif": {"enabled": true},
     "byte_fold": {"enabled": true},
     "fold_echo": {"enabled": true},
+    "anchor_file": {"enabled": true},
     "metadata_table_fold": {"enabled": true}
   },
   "thresholds": {
