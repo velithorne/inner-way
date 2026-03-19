@@ -1,0 +1,6 @@
+{
+  "service": "scheduler",
+  "version": "1.0.0",
+  "env": "dev",
+  "description": "API service configuration"
+}

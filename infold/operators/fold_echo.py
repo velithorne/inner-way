@@ -101,13 +101,13 @@ class FoldEchoOperator(BaseOperator):
         path = Path(meta["echo_path"])
         expected = project_sheet.file_nodes.get(path)
         if not expected:
-            return FoldSimulationResult(success=False, reason="echo path not in sheet")
+            return FoldSimulationResult(folded_state=None, unfold_attempt=None, success=False, error="echo path not in sheet")
         ledger = config.get("_ledger")
         if not ledger:
-            return FoldSimulationResult(success=False, reason="no ledger")
+            return FoldSimulationResult(folded_state=None, unfold_attempt=None, success=False, error="no ledger")
         rec = ledger.fold_records[meta["host_idx"]]
         if rec.operator_id != "template_skeleton":
-            return FoldSimulationResult(success=False, reason="host not template")
+            return FoldSimulationResult(folded_state=None, unfold_attempt=None, success=False, error="host not template")
         recipe = rec.unfold_recipe
         content = reconstruct_echo_from_template(
             recipe.get("const_blocks", []),
@@ -115,20 +115,59 @@ class FoldEchoOperator(BaseOperator):
             meta["slot_values"],
         )
         if content != expected.raw_text:
-            return FoldSimulationResult(success=False, reason="reconstruction mismatch")
-        return FoldSimulationResult(success=True, unfolded={path: content})
+            return FoldSimulationResult(folded_state=None, unfold_attempt=None, success=False, error="reconstruction mismatch")
+        return FoldSimulationResult(
+            folded_state=meta,
+            unfold_attempt={path: content},
+            success=True,
+            error=None,
+        )
 
     def validate(
         self,
-        candidate: CandidateCrease,
+        simulation_result: FoldSimulationResult,
         project_sheet: ProjectSheet,
         config: dict[str, Any],
     ) -> ValidationResult:
         """Validate echo reconstruction."""
-        sim = self.simulate(candidate, project_sheet, config)
-        if not sim.success:
-            return ValidationResult(accepted=False, reason=sim.reason or "simulation failed")
-        return ValidationResult(accepted=True)
+        if not simulation_result.success:
+            return ValidationResult(
+                accepted=False,
+                hard_failures=[simulation_result.error or "simulation failed"],
+                warnings=[],
+                fidelity_ok=False,
+                stress_ok=True,
+                utility_ok=True,
+            )
+        unfold = simulation_result.unfold_attempt
+        if not unfold:
+            return ValidationResult(
+                accepted=False,
+                hard_failures=["No unfold"],
+                warnings=[],
+                fidelity_ok=False,
+                stress_ok=True,
+                utility_ok=True,
+            )
+        for path, content in unfold.items():
+            node = project_sheet.file_nodes.get(path)
+            if node and content != node.raw_text:
+                return ValidationResult(
+                    accepted=False,
+                    hard_failures=[f"Fidelity failed: {path}"],
+                    warnings=[],
+                    fidelity_ok=False,
+                    stress_ok=True,
+                    utility_ok=True,
+                )
+        return ValidationResult(
+            accepted=True,
+            hard_failures=[],
+            warnings=[],
+            fidelity_ok=True,
+            stress_ok=True,
+            utility_ok=True,
+        )
 
     def apply(
         self,

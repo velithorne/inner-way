@@ -78,7 +78,7 @@ def find_template_echo_candidates(
         ext = Path(host_paths[0]).suffix if host_paths else ""
         n_lines_host = sum(len(cb.splitlines(keepends=True)) for cb in const_blocks) + sum(len(sg) for sg in slot_groups)
 
-        for path in passthrough:
+        for path in list(passthrough):
             path_str = str(path).replace("\\", "/")
             if path_str in host_paths:
                 continue
@@ -96,7 +96,7 @@ def find_template_echo_candidates(
             # Net-positive check
             file_bytes = len(node.raw_text.encode("utf-8"))
             slot_payload = sum(len(s.encode("utf-8")) for s in slot_values)
-            overhead = 50 + len(path_str) + 20  # path, host ref, wrapper
+            overhead = 40 + len(path_str) + 15  # path, host ref, wrapper (reduced for small echoes)
             net = file_bytes - (slot_payload + overhead)
             if net < min_net_gain:
                 continue

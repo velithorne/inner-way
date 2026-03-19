@@ -78,6 +78,20 @@ def test_fold_echo_fixture_archive():
         assert orig.read_text() == rest.read_text(), f"Exact match for {name}"
 
 
+def test_fold_echo_validation_script():
+    """Run the Fold Echo validation script and verify echoes activate."""
+    import subprocess
+    result = subprocess.run(
+        ["python3", "tests/run_fold_echo_validation.py"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).parent.parent,
+        timeout=60,
+    )
+    assert result.returncode == 0, f"Validation script failed: {result.stderr}"
+    assert "Echo activated: True" in result.stdout or "echo members" in result.stdout.lower()
+
+
 def test_fold_echo_explain_shows_echoes():
     """Explain output should mention fold echoes when present."""
     fixture = Path(__file__).parent / "fixtures" / "fold_echo"

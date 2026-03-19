@@ -28,6 +28,7 @@ def _find_template_families(
     min_similarity: float,
     max_slot_ratio: float,
     min_lines: int = 5,
+    max_family_size: int | None = None,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[tuple[list[Path], list[str], list[list[str]], float, float]]:
     """
@@ -74,6 +75,10 @@ def _find_template_families(
                     "reject_reason": f"file_count {len(group)} < min_family_size {min_family}",
                 })
                 continue
+            # Cap family size for echo-friendly datasets (leaves excess as passthrough)
+            group = sorted(group, key=lambda x: str(x[0]))
+            if max_family_size is not None and len(group) > max_family_size:
+                group = group[:max_family_size]
             paths = [p for p, _ in group]
             lines_list = [lines for _, lines in group]
             const_blocks: list[str] = []
@@ -184,11 +189,12 @@ class TemplateSkeletonOperator(BaseOperator):
         min_similarity = thresh.get("min_scaffold_similarity", 0.80)
         max_slot_ratio = thresh.get("max_slot_ratio", 0.35)
         min_lines = thresh.get("min_lines", 5)
+        max_family_size = thresh.get("max_family_size")
 
         diag_list = config.get("_run_diagnostics", {}).get("template_rejected", [])
         families = _find_template_families(
             project_sheet, min_family, min_similarity, max_slot_ratio,
-            min_lines=min_lines, diagnostics=diag_list
+            min_lines=min_lines, max_family_size=max_family_size, diagnostics=diag_list
         )
         candidates: list[CandidateCrease] = []
         for paths, const_blocks, slot_groups, sim, slot_ratio in families:
