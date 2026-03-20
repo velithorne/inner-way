@@ -1589,7 +1589,10 @@ def reconstruct_archive(
                     data = json.loads(tmpl_path.read_text(encoding="utf-8"))
                     const_blocks = data.get("const_blocks", [])
                     slot_groups = data.get("slot_groups", [])
-                    paths = data.get("paths", targets)
+                    if path_table is not None and "path_refs" in data:
+                        paths = [path_table[i] for i in data["path_refs"] if i < len(path_table)]
+                    else:
+                        paths = data.get("paths", targets)
                     for j, path_str in enumerate(paths):
                         out_parts = []
                         for bi, const in enumerate(const_blocks):

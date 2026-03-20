@@ -104,3 +104,113 @@ def overhead_audit_to_text(audit: dict[str, Any]) -> str:
     for k, v in sorted(audit.get("breakdown", {}).items(), key=lambda x: -x[1]):
         lines.append(f"  {k}: {v:,} bytes")
     return "\n".join(lines)
+
+
+def audit_archive_overhead_phase21a(archive_path: Path | str) -> dict[str, Any]:
+    """
+    Phase 21A: Granular package overhead audit for density attack.
+
+    Breaks archive size into:
+    - manifest
+    - ledger
+    - integrity
+    - maps_reconstruction
+    - maps_chunk_reconstruction
+    - shared_operator_artifacts (template, mutation_chain, echo, exact, hierarchy, dependency, symbols)
+    - shared_anchors
+    - shared_metadata_tables (path_table, chunk_index)
+    - shared_chunks (binary)
+    - reports_json
+    - reports_txt
+    - snapshots_inventory
+    - snapshots_passthrough
+    """
+    archive = Path(archive_path).resolve()
+    if not archive.exists():
+        return {"error": "archive not found"}
+
+    per_file: dict[str, int] = {}
+    components: dict[str, int] = {}
+    total = 0
+
+    with zipfile.ZipFile(archive, "r") as zf:
+        for info in zf.infolist():
+            name = info.filename
+            size = info.file_size
+            total += size
+            per_file[name] = size
+
+            if name == "manifest.json":
+                components["manifest"] = components.get("manifest", 0) + size
+            elif name == "ledger.json":
+                components["ledger"] = components.get("ledger", 0) + size
+            elif name == "integrity.json":
+                components["integrity"] = components.get("integrity", 0) + size
+            elif name == "maps/reconstruction.json":
+                components["maps_reconstruction"] = components.get("maps_reconstruction", 0) + size
+            elif name == "maps/chunk_reconstruction.json":
+                components["maps_chunk_reconstruction"] = components.get("maps_chunk_reconstruction", 0) + size
+            elif name.startswith("maps/"):
+                components["maps_other"] = components.get("maps_other", 0) + size
+            elif name.startswith("shared/"):
+                if "metadata_tables" in name or "path_table" in name:
+                    components["shared_metadata_tables"] = components.get("shared_metadata_tables", 0) + size
+                elif "chunk_index" in name:
+                    components["shared_chunk_index"] = components.get("shared_chunk_index", 0) + size
+                elif "chunks/" in name and name.endswith(".bin"):
+                    components["shared_chunks"] = components.get("shared_chunks", 0) + size
+                elif "anchors.json" in name:
+                    components["shared_anchors"] = components.get("shared_anchors", 0) + size
+                elif "template_" in name or "mutation_chain_" in name or "echo_" in name:
+                    components["shared_operator_artifacts"] = components.get("shared_operator_artifacts", 0) + size
+                elif "exact_" in name or "hierarchy_" in name or "dependency_motif_" in name or "symbols_" in name:
+                    components["shared_operator_artifacts"] = components.get("shared_operator_artifacts", 0) + size
+                else:
+                    components["shared_other"] = components.get("shared_other", 0) + size
+            elif name == "reports/report.json":
+                components["reports_json"] = components.get("reports_json", 0) + size
+            elif name == "reports/report.txt":
+                components["reports_txt"] = components.get("reports_txt", 0) + size
+            elif name.startswith("reports/"):
+                components["reports_other"] = components.get("reports_other", 0) + size
+            elif name == "snapshots/inventory.json":
+                components["snapshots_inventory"] = components.get("snapshots_inventory", 0) + size
+            elif name == "snapshots/passthrough.json":
+                components["snapshots_passthrough"] = components.get("snapshots_passthrough", 0) + size
+            elif name.startswith("snapshots/"):
+                components["snapshots_other"] = components.get("snapshots_other", 0) + size
+
+    overhead = (
+        components.get("manifest", 0)
+        + components.get("ledger", 0)
+        + components.get("integrity", 0)
+        + components.get("maps_reconstruction", 0)
+        + components.get("maps_chunk_reconstruction", 0)
+        + components.get("maps_other", 0)
+        + components.get("shared_metadata_tables", 0)
+        + components.get("shared_chunk_index", 0)
+        + components.get("shared_anchors", 0)
+        + components.get("shared_operator_artifacts", 0)
+        + components.get("shared_other", 0)
+        + components.get("reports_json", 0)
+        + components.get("reports_txt", 0)
+        + components.get("reports_other", 0)
+        + components.get("snapshots_inventory", 0)
+        + components.get("snapshots_passthrough", 0)
+        + components.get("snapshots_other", 0)
+    )
+    # shared_chunks is content, not overhead
+    content_bytes = components.get("shared_chunks", 0)
+
+    return {
+        "breakdown": components,
+        "per_file": per_file,
+        "overhead_bytes": overhead,
+        "content_bytes": content_bytes,
+        "total_archive_bytes": total,
+        "overhead_pct": (overhead / total * 100) if total else 0,
+        "dominant": sorted(
+            [(k, v) for k, v in components.items() if v > 0],
+            key=lambda x: -x[1],
+        )[:8],
+    }

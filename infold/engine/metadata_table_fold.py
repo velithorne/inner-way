@@ -17,6 +17,35 @@ METADATA_TABLES_DIR = "metadata_tables"
 MIN_NET_GAIN_BYTES = 32
 
 
+def _apply_shared_artifact_path_refs(shared_dir: Path, path_to_ref: dict[str, int]) -> None:
+    """
+    Phase 21A: Rewrite shared operator artifacts to use path_refs instead of paths.
+    Saves bytes when paths are long and repeated. Deterministic.
+    """
+    for f in shared_dir.glob("template_*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            paths = data.get("paths", [])
+            if paths and all(str(p) in path_to_ref for p in paths):
+                data["path_refs"] = [path_to_ref[str(p)] for p in paths]
+                del data["paths"]
+                data["path_table_ref"] = True
+                f.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+        except Exception:
+            pass
+    for f in shared_dir.glob("mutation_chain_*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            paths = data.get("paths", [])
+            if paths and all(str(p) in path_to_ref for p in paths):
+                data["path_refs"] = [path_to_ref[str(p)] for p in paths]
+                del data["paths"]
+                data["path_table_ref"] = True
+                f.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+        except Exception:
+            pass
+
+
 def load_path_table(root: Path) -> list[str] | None:
     """Load path table from package if present. Returns None if not using metadata table fold.
     Supports Path DNA format (Phase 14A): when path_dna key exists, expands to full paths."""
@@ -337,6 +366,9 @@ def apply_metadata_table_fold(
             json.dumps(new_passthrough, separators=(",", ":")),
             encoding="utf-8",
         )
+
+    # Phase 21A: Shared artifact path ref compaction (template, mutation_chain)
+    _apply_shared_artifact_path_refs(shared_dir, path_to_ref)
 
     manifest_path = pkg_dir / "manifest.json"
     if manifest_path.exists():

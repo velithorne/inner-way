@@ -15,6 +15,7 @@ from typing import Any
 # Micro manifest short keys
 _MANIFEST_DECODE = {
     "v": "version",
+    "pid": "project_id",
     "ps": "package_spec",
     "c": "compatibility",
     "src": "source_path",
@@ -40,9 +41,15 @@ _MANIFEST_ENCODE = {v: k for k, v in _MANIFEST_DECODE.items()}
 
 
 def encode_manifest_micro(manifest: dict[str, Any]) -> dict[str, Any]:
-    """Encode manifest with short keys for micro mode. Deterministic."""
+    """Encode manifest with short keys for micro mode. Deterministic. Phase 21A: omit optional empty."""
+    from infold.engine.package_spec import MANIFEST_REQUIRED_KEYS
     out: dict[str, Any] = {"_m": 1}
+    omit_if_empty = {"fold_profile_mode", "fold_profile_reason", "scope_accounting"}
     for k, v in manifest.items():
+        if k in MANIFEST_REQUIRED_KEYS:
+            pass  # always include required
+        elif v is None or (k in omit_if_empty and (v == "" or v == [] or v == {})):
+            continue
         if k == "compatibility" and isinstance(v, dict):
             out["c"] = {"sv": v.get("spec_version", "1.0"), "mi": v.get("min_infold_version", "0.2.0"), "mr": v.get("min_reader_version", "0.2.0")}
         else:
