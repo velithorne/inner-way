@@ -1,0 +1,29 @@
+# Shared header block - repeated across files for chunk reuse
+# Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+# Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+# Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+# Duis aute irure dolor in reprehenderit in voluptate velit esse.
+# This block is 500+ bytes to ensure chunk boundaries can form.
+# 12345678901234567890123456789012345678901234567890
+# abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+# The quick brown fox jumps over the lazy dog.
+# Pack my box with five dozen liquor jugs.
+# How vexingly quick daft zebras jump!
+# Sphinx of black quartz, judge my vow.
+# END OF SHARED HEADER BLOCK
+
+UNIQUE_CONTENT_B: This file has unique middle section B.
+
+# Shared header block - repeated across files for chunk reuse
+# Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+# Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+# Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+# Duis aute irure dolor in reprehenderit in voluptate velit esse.
+# This block is 500+ bytes to ensure chunk boundaries can form.
+# 12345678901234567890123456789012345678901234567890
+# abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+# The quick brown fox jumps over the lazy dog.
+# Pack my box with five dozen liquor jugs.
+# How vexingly quick daft zebras jump!
+# Sphinx of black quartz, judge my vow.
+# END OF SHARED HEADER BLOCK

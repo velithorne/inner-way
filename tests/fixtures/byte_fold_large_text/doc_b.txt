@@ -1,0 +1,21 @@
+# Document A - Large shared preamble
+# This document has a long shared header block that repeats across files.
+# Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+# Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+# Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+# Duis aute irure dolor in reprehenderit in voluptate velit esse cillum.
+# Excepteur sint occaecat cupidatat non proident, sunt in culpa.
+# The quick brown fox jumps over the lazy dog.
+# Pack my box with five dozen liquor jugs.
+# How vexingly quick daft zebras jump!
+# Sphinx of black quartz, judge my vow.
+# 1234567890
+# abcdefghijklmnopqrstuvwxyz
+# ABCDEFGHIJKLMNOPQRSTUVWXYZ
+# End of shared preamble.
+
+UNIQUE_CONTENT_B: This is the unique section for document B only.
+
+# Document footer - also shared
+# =============================
+# End of document

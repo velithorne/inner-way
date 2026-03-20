@@ -1,0 +1,5 @@
+# Template A
+key=value_d
+version=1.0
+env=dev
+# End of config

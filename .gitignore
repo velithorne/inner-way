@@ -1,0 +1,59 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Infold outputs
+infold_reports/
+infold_sweep_report/
+infold_package/
+infold_package_test/
+tests/fixtures/sweep_summary.json
+tests/fixtures/**/test_report/
+*.infold
+.infold-sync/
+results/
+campaign_results/
+experiment_results/
+benchmark/synthetic/
+
+# OS
+.DS_Store
+Thumbs.db

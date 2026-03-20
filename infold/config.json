@@ -1,0 +1,128 @@
+{
+  "project": {
+    "id": null,
+    "source_path": ".",
+    "exclude_patterns": [".git", "__pycache__", "*.pyc", ".venv", "venv", "node_modules", ".tox", "dist", "build"],
+    "include_extensions": [".py", ".js", ".ts", ".json", ".yaml", ".yml", ".md", ".txt"]
+  },
+  "parser": {
+    "strict_mode": false,
+    "confidence_threshold": 0.7,
+    "python": {"enabled": true},
+    "javascript": {"enabled": true},
+    "typescript": {"enabled": true},
+    "json": {"enabled": true},
+    "yaml": {"enabled": true},
+    "markdown": {"enabled": true},
+    "text": {"enabled": true}
+  },
+  "operators": {
+    "exact_repetition": {"enabled": true},
+    "template_skeleton": {"enabled": true},
+    "mutation_chain": {"enabled": true},
+    "symbol_table": {"enabled": true},
+    "hierarchy_mirror": {"enabled": true},
+    "dependency_motif": {"enabled": true},
+    "byte_fold": {"enabled": true},
+    "fold_echo": {"enabled": true},
+    "anchor_file": {"enabled": true},
+    "structural_microscope": {"enabled": true},
+    "metadata_table_fold": {"enabled": true}
+  },
+  "thresholds": {
+    "exact_repetition": {
+      "min_region_length_bytes": 64,
+      "min_occurrences": 2,
+      "max_overlap_tolerance": 0
+    },
+    "template_skeleton": {
+      "min_family_size": 3,
+      "min_scaffold_similarity": 0.80,
+      "max_slot_ratio": 0.35,
+      "min_lines": 5
+    },
+    "mutation_chain": {
+      "min_family_size": 3,
+      "min_lines": 5,
+      "min_line_overlap_ratio": 0.85
+    },
+    "symbol_table": {
+      "min_symbol_reuse_count": 5,
+      "min_bundle_reuse_count": 3
+    },
+    "hierarchy_mirror": {
+      "min_subtree_depth": 2,
+      "min_repeated_instances": 2,
+      "min_structure_similarity": 0.85
+    },
+    "dependency_motif": {
+      "min_motif_node_count": 3,
+      "min_occurrences": 2,
+      "reject_overlap_ambiguity": true
+    },
+    "byte_fold": {
+      "min_chunk_bytes": 256,
+      "max_chunk_bytes": 8192,
+      "avg_chunk_bytes": 1024,
+      "min_net_gain": 64,
+      "min_file_bytes": 128,
+      "max_file_bytes": 2097152,
+      "min_chunk_reuse_count": 2,
+      "max_chunks_per_file": 1024,
+      "low_structure_confidence": 0.5
+    },
+    "fold_echo": {
+      "min_net_gain": 16,
+      "min_echo_similarity": 0.85
+    },
+    "structural_microscope": {
+      "max_bytes": 512,
+      "max_lines": 10
+    },
+    "metadata_table_fold": {
+      "min_net_gain_bytes": 32
+    }
+  },
+  "planner": {
+    "min_net_value": -0.5,
+    "max_stress": 1.0,
+    "logical_weight": 0.001,
+    "physical_weight": 0.0005,
+    "utility_weight": 1.0,
+    "reconstruction_confidence_weight": 0.5,
+    "metadata_penalty_weight": -0.001,
+    "stress_weight": -2.0
+  },
+  "validation": {
+    "min_net_gain": 0,
+    "max_stress": 1.0,
+    "min_utility_score": 0,
+    "exact_mode": true
+  },
+  "benchmark": {
+    "enabled": true,
+    "baselines": ["raw", "zip", "gzip"]
+  },
+  "benchmark_suite": {
+    "enabled": true,
+    "tier2_datasets": [
+      ["tests/fixtures/duplicate_python", "duplicate-heavy-python"],
+      ["tests/fixtures/template_heavy", "template-heavy"],
+      ["tests/fixtures/config_heavy", "config-heavy"],
+      [".", "infold-workspace"],
+      ["tests/fixtures/mixed_project", "mixed-small"],
+      ["tests/fixtures/hierarchy_mirror", "hierarchy-mirror"],
+      ["tests/fixtures/dependency_motif", "dependency-motif"]
+    ]
+  },
+  "report": {
+    "export_json": true,
+    "export_text": true,
+    "output_dir": "infold_reports"
+  },
+  "package_export": {
+    "compact": false,
+    "report_text": true,
+    "inventory_minimal": false
+  }
+}
