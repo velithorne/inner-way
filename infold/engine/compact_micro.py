@@ -250,6 +250,76 @@ def decode_report_micro(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _compact_passthrough_micro(pkg_dir: Path) -> None:
+    """Phase 21B: Convert passthrough to array format [[ref, content], ...] when path_refs. Saves key overhead."""
+    pt_path = pkg_dir / "shared" / "metadata_tables" / "path_table.json"
+    if not pt_path.exists():
+        return
+    passthrough_path = pkg_dir / "snapshots" / "passthrough.json"
+    if not passthrough_path.exists():
+        return
+    data = json.loads(passthrough_path.read_text(encoding="utf-8"))
+    if "_pa" in data:
+        return  # already compact
+    # Check if all keys are path refs (numeric strings)
+    items = list(data.items()) if isinstance(data, dict) else []
+    if not items:
+        return
+    all_refs = all(k.isdigit() for k in data.keys())
+    if not all_refs:
+        return
+    # Convert to [[ref, content], ...] - deterministic order by ref
+    entries = [[int(k), v] for k, v in sorted(items, key=lambda x: int(x[0]))]
+    compact = {"_pa": 1, "e": entries}
+    passthrough_path.write_text(json.dumps(compact, separators=(",", ":")), encoding="utf-8")
+
+
+def _compact_shared_artifacts_micro(pkg_dir: Path) -> None:
+    """Phase 21B: Template short keys (cb, sg, pr), anchors compact."""
+    shared_dir = pkg_dir / "shared"
+    for f in shared_dir.glob("template_*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            if "cb" in data:
+                continue  # already compact
+            out = {}
+            if "const_blocks" in data:
+                out["cb"] = data["const_blocks"]
+            if "slot_groups" in data:
+                out["sg"] = data["slot_groups"]
+            if "path_refs" in data:
+                out["pr"] = data["path_refs"]
+            elif "paths" in data:
+                out["paths"] = data["paths"]
+            if "path_table_ref" in data:
+                out["pt"] = 1
+            if out:
+                f.write_text(json.dumps(out, separators=(",", ":")), encoding="utf-8")
+        except Exception:
+            pass
+    anchors_path = shared_dir / "anchors.json"
+    if anchors_path.exists():
+        try:
+            data = json.loads(anchors_path.read_text(encoding="utf-8"))
+            if "_an" in data:
+                return
+            anchors = data.get("anchors", [])
+            if not anchors:
+                return
+            compact_anchors = []
+            for a in anchors:
+                ca = {"p": a.get("path"), "t": a.get("anchor_type"), "c": a.get("anchored_count")}
+                if a.get("anchored_paths"):
+                    ca["ap"] = a["anchored_paths"][:30]
+                compact_anchors.append(ca)
+            anchors_path.write_text(
+                json.dumps({"_an": 1, "a": compact_anchors}, separators=(",", ":")),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+
 def apply_compact_micro(pkg_dir: Path, config: dict[str, Any]) -> None:
     """
     Rewrite manifest, reconstruction, inventory, path_table, ledger, report with compact encoding.
@@ -307,3 +377,8 @@ def apply_compact_micro(pkg_dir: Path, config: dict[str, Any]) -> None:
         if "paths" in data and "path_dna" not in data:
             compact_pt = {"p": data["paths"]}
             pt_path.write_text(json.dumps(compact_pt, separators=(",", ":")), encoding="utf-8")
+
+    # Phase 21B: Passthrough array format, template short keys, anchors compact (skip when baseline)
+    if not config.get("_skip_phase21b_compaction", False):
+        _compact_passthrough_micro(pkg_dir)
+        _compact_shared_artifacts_micro(pkg_dir)

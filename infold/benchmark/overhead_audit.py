@@ -213,4 +213,36 @@ def audit_archive_overhead_phase21a(archive_path: Path | str) -> dict[str, Any]:
             [(k, v) for k, v in components.items() if v > 0],
             key=lambda x: -x[1],
         )[:8],
+        "focus_components": {
+            "snapshots_passthrough": components.get("snapshots_passthrough", 0),
+            "shared_operator_artifacts": components.get("shared_operator_artifacts", 0),
+            "shared_metadata_tables": components.get("shared_metadata_tables", 0),
+            "shared_anchors": components.get("shared_anchors", 0),
+        },
     }
+
+
+def audit_archive_overhead_phase21b(
+    archive_path: Path | str,
+    before_audit: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Phase 21B: Overhead-source-focused audit with before/after comparison.
+
+    Returns audit plus component deltas when before_audit is provided.
+    """
+    audit = audit_archive_overhead_phase21a(archive_path)
+    if "error" in audit:
+        return audit
+    if before_audit is not None and "error" not in before_audit:
+        focus = ["snapshots_passthrough", "shared_operator_artifacts", "shared_metadata_tables", "shared_anchors"]
+        before_breakdown = before_audit.get("breakdown", {})
+        after_breakdown = audit.get("breakdown", {})
+        component_deltas = {}
+        for k in focus:
+            b = before_breakdown.get(k, 0)
+            a = after_breakdown.get(k, 0)
+            component_deltas[k] = {"before": b, "after": a, "delta": a - b}
+        audit["component_before_after"] = component_deltas
+        audit["total_delta"] = audit.get("total_archive_bytes", 0) - before_audit.get("total_archive_bytes", 0)
+    return audit

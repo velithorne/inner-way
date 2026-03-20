@@ -1587,9 +1587,11 @@ def reconstruct_archive(
                 tmpl_path = shared_dir / f"template_{idx}.json"
                 if tmpl_path.exists():
                     data = json.loads(tmpl_path.read_text(encoding="utf-8"))
-                    const_blocks = data.get("const_blocks", [])
-                    slot_groups = data.get("slot_groups", [])
-                    if path_table is not None and "path_refs" in data:
+                    const_blocks = data.get("cb", data.get("const_blocks", []))
+                    slot_groups = data.get("sg", data.get("slot_groups", []))
+                    if path_table is not None and "pr" in data:
+                        paths = [path_table[i] for i in data["pr"] if i < len(path_table)]
+                    elif path_table is not None and "path_refs" in data:
                         paths = [path_table[i] for i in data["path_refs"] if i < len(path_table)]
                     else:
                         paths = data.get("paths", targets)
@@ -1735,13 +1737,22 @@ def reconstruct_archive(
         passthrough_path = root / "snapshots" / "passthrough.json"
         if passthrough_path.exists():
             passthrough = json.loads(passthrough_path.read_text(encoding="utf-8"))
-            for k, content in passthrough.items():
-                path_str = path_table[int(k)] if path_table is not None and k.isdigit() else k
-                if path_str not in result:
-                    p = out_root / path_str
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    p.write_text(content, encoding="utf-8")
-                    result[path_str] = content
+            if passthrough.get("_pa") and "e" in passthrough:
+                for ref, content in passthrough["e"]:
+                    path_str = path_table[ref] if path_table is not None and ref < len(path_table) else str(ref)
+                    if path_str not in result:
+                        p = out_root / path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(content, encoding="utf-8")
+                        result[path_str] = content
+            else:
+                for k, content in passthrough.items():
+                    path_str = path_table[int(k)] if path_table is not None and k.isdigit() else k
+                    if path_str not in result:
+                        p = out_root / path_str
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(content, encoding="utf-8")
+                        result[path_str] = content
         return result
 
 
