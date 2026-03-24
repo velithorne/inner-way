@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
+import com.aura.shell.command.DrawerRequest
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ data class HomeUiState(
     val recentApps: List<RecentAppEntry> = emptyList(),
     val isLoadingApps: Boolean = true,
     val loadError: String? = null,
+    val drawerRequest: DrawerRequest? = null,
 )
 
 class HomeViewModel(
@@ -69,6 +71,16 @@ class HomeViewModel(
                 refreshRecents()
             }
         }
+    }
+
+    fun requestDrawer(expand: Boolean) {
+        _uiState.update {
+            it.copy(drawerRequest = DrawerRequest(nonce = System.nanoTime(), expand = expand))
+        }
+    }
+
+    fun consumeDrawerRequest() {
+        _uiState.update { it.copy(drawerRequest = null) }
     }
 
 }

@@ -26,21 +26,27 @@ Open **Assets** and download `AuraShell-<tag>-debug.apk`, then install on your d
 
 If the workflow fails, check the **Actions** tab on GitHub for logs.
 
+## Phase 2 — typed command router
+
+- **Command layer** (`CommandLayerActivity`): Full-screen Compose UI with command field (keyboard-friendly), result area, and **recent command history** (last ~18 commands, SharedPreferences).
+- **Local router** (`CommandRouter` + `CommandDispatch`): Deterministic parsing — **open/launch** apps, **search apps for …**, **show/hide apps** (coordinates launcher bottom sheet via `MainActivity` + `DrawerRequest`), **show recents** / **open recent …**, **help**. No network, no ML.
+- **History** (`CommandHistoryStore`): Persists typed commands for replay chips.
+
 ## What Phase 1 includes
 
 - **Home / launcher**: Manifest declares `MAIN` + `HOME` + `DEFAULT` so the app can be chosen as the default Home app.
-- **Main screen**: Date/time header, command-first layout (later refined in Phase 1.1), command bar placeholder, modules, recent strip, and app discovery (drawer in Phase 1.1+).
-- **Command layer placeholder**: Tapping the command bar opens a small stub screen (`CommandLayerActivity`) describing Phase 2; the home bar is styled as the future intent router surface.
+- **Main screen**: Date/time header, command-first layout (Phase 1.1+), command bar, modules, compact recents, app drawer in bottom sheet.
+- **Command layer**: Opens from the command bar; Phase 2 adds typed routing (see above).
 - **Installed apps**: Queries launchable activities via `PackageManager`, shows icon + label, launches with `getLaunchIntentForPackage` + `FLAG_ACTIVITY_NEW_TASK`.
 - **Recents**: **Not** the system recents list (third-party launchers cannot read that). Aura stores a **most-recently-used list of apps launched from Aura** in app-private storage (`RecentAppsStore`). This is documented and structured for evolution.
 - **Pinned cards**: Visual placeholders only (subtle snackbar on tap).
 
 ## What is intentionally deferred
 
-- AI / LLM / chat / semantic search  
+- AI / LLM / cloud APIs / semantic “understanding” beyond pattern matching  
 - Notifications, file indexing, cloud sync  
-- Accessibility automation, voice, widgets  
-- Real command routing (Phase 2+)
+- Accessibility automation, voice recognition (mic is placeholder)  
+- Widgets, background services
 
 ## Requirements
 
@@ -76,7 +82,7 @@ Alternatively, press **Home** after install; Android may show the Home app picke
 | ViewModel & state | `app/src/main/java/com/aura/shell/ui/home/HomeViewModel.kt` |
 | App query & launch | `app/src/main/java/com/aura/shell/data/LauncherRepository.kt` |
 | MRU “recents” persistence | `app/src/main/java/com/aura/shell/data/RecentAppsStore.kt` |
-| Command stub screen | `app/src/main/java/com/aura/shell/CommandLayerActivity.kt` |
+| Command layer + router | `command/`, `ui/command/CommandLayerScreen.kt`, `CommandLayerActivity.kt` |
 | Theme | `app/src/main/java/com/aura/shell/ui/theme/` |
 
 ## Android limitations (launchers on modern devices)

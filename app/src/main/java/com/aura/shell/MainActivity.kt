@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.SnackbarHostState
+import com.aura.shell.command.LauncherDrawerIntent
 import com.aura.shell.ui.home.HomeScreen
 import com.aura.shell.ui.home.HomeViewModel
 import com.aura.shell.ui.home.HomeViewModelFactory
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleDrawerIntent(intent)
         enableEdgeToEdge()
         setContent {
             AuraShellTheme {
@@ -36,6 +38,8 @@ class MainActivity : ComponentActivity() {
 
                 HomeScreen(
                     state = state,
+                    drawerRequest = state.drawerRequest,
+                    onDrawerRequestConsumed = { vm.consumeDrawerRequest() },
                     onAppClick = { pkg -> vm.onAppLaunch(pkg) },
                     onCommandBarClick = {
                         startActivity(Intent(this@MainActivity, CommandLayerActivity::class.java))
@@ -63,5 +67,19 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         homeViewModel.refreshRecents()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDrawerIntent(intent)
+    }
+
+    private fun handleDrawerIntent(intent: Intent?) {
+        val action = intent?.action ?: return
+        when (action) {
+            LauncherDrawerIntent.ACTION_OPEN_APP_DRAWER -> homeViewModel.requestDrawer(expand = true)
+            LauncherDrawerIntent.ACTION_CLOSE_APP_DRAWER -> homeViewModel.requestDrawer(expand = false)
+        }
     }
 }

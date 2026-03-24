@@ -63,6 +63,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aura.shell.command.DrawerRequest
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.ui.components.DrawableImage
@@ -82,6 +83,8 @@ fun HomeScreen(
     onMicClick: () -> Unit,
     onPinnedClick: (PinnedCardUi) -> Unit,
     snackbarHostState: SnackbarHostState,
+    drawerRequest: DrawerRequest? = null,
+    onDrawerRequestConsumed: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pinned = remember { defaultPinnedCards() }
@@ -95,6 +98,16 @@ fun HomeScreen(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = sheetState,
     )
+
+    LaunchedEffect(drawerRequest?.nonce) {
+        val req = drawerRequest ?: return@LaunchedEffect
+        if (req.expand) {
+            sheetState.expand()
+        } else {
+            sheetState.partialExpand()
+        }
+        onDrawerRequestConsumed()
+    }
 
     val peekAlpha by animateFloatAsState(
         targetValue = if (sheetState.currentValue == SheetValue.Expanded) 0.92f else 1f,
