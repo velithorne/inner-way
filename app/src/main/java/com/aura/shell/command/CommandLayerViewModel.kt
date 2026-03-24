@@ -7,6 +7,8 @@ import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
+import com.aura.shell.voice.VoiceCommandPipeline
+import com.aura.shell.voice.VoiceSurfaceState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -23,6 +25,7 @@ data class CommandLayerUiState(
     val recentApps: List<RecentAppEntry> = emptyList(),
     val isLoading: Boolean = true,
     val surface: CommandSurfaceState = CommandSurfaceState.Empty,
+    val voice: VoiceSurfaceState = VoiceSurfaceState.Idle,
 )
 
 sealed class CommandSurfaceState {
@@ -96,6 +99,10 @@ class CommandLayerViewModel(
         _uiState.update { it.copy(inputText = text) }
     }
 
+    fun setVoiceState(state: VoiceSurfaceState) {
+        _uiState.update { it.copy(voice = state) }
+    }
+
     fun launchApp(packageName: String) {
         viewModelScope.launch {
             repository.launchApp(packageName)
@@ -105,18 +112,26 @@ class CommandLayerViewModel(
     }
 
     fun submitCommand() {
+        submitCommand(CommandInputSource.Typed)
+    }
+
+    /**
+     * Same pipeline as typed submit; used for voice transcripts.
+     */
+    fun submitCommand(source: CommandInputSource) {
         val text = _uiState.value.inputText
         val apps = _uiState.value.installedApps
         val recent = _uiState.value.recentApps
         if (_uiState.value.isLoading) return
 
         val normalized = CommandNormalizer.normalize(text)
-        historyStore.recordCommand(text, normalizedForReplay = normalized)
+        historyStore.recordCommand(text, normalizedForReplay = normalized, source = source)
 
-        val dispatch = router.route(text, apps, recent)
+        val dispatch = VoiceCommandPipeline.process(text, apps, recent, router)
         _uiState.update {
             it.copy(
                 history = historyStore.loadHistory(),
+                voice = VoiceSurfaceState.Idle,
             )
         }
         when (dispatch) {
@@ -145,6 +160,19 @@ class CommandLayerViewModel(
             }
             else -> applySurfaceOnly(dispatch)
         }
+    }
+
+    /**
+     * Inserts transcript and runs the same [submitCommand] path as typing.
+     */
+    fun applySpeechTranscriptAndSubmit(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) {
+            setVoiceState(VoiceSurfaceState.Error("Nothing recognized. Try again or type."))
+            return
+        }
+        _uiState.update { it.copy(inputText = trimmed, voice = VoiceSurfaceState.Processing) }
+        submitCommand(CommandInputSource.Voice)
     }
 
     private fun applySurfaceOnly(dispatch: CommandDispatch) {

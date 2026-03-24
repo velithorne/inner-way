@@ -21,8 +21,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -43,9 +47,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aura.shell.command.CommandHistoryEntry
+import com.aura.shell.command.CommandInputSource
 import com.aura.shell.command.CommandLayerUiState
 import com.aura.shell.command.CommandSurfaceState
 import com.aura.shell.command.SuggestionKind
+import com.aura.shell.voice.VoiceSurfaceState
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.ui.components.DrawableImage
@@ -62,6 +68,9 @@ fun CommandLayerScreen(
     onHistoryPick: (CommandHistoryEntry) -> Unit,
     onAppPick: (String) -> Unit,
     onRecentPick: (String) -> Unit,
+    onMicClick: () -> Unit,
+    onVoiceCancel: () -> Unit,
+    onPermissionRetry: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -102,27 +111,52 @@ fun CommandLayerScreen(
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp),
             ) {
-                OutlinedTextField(
-                    value = state.inputText,
-                    onValueChange = onInputChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    enabled = !state.isLoading,
-                    placeholder = { Text("What do you want to do?") },
-                    label = { Text("Command") },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(
-                        onDone = { onSubmit() },
-                    ),
-                    singleLine = false,
-                    maxLines = 3,
+                VoiceStatusBanner(
+                    voice = state.voice,
+                    onCancel = onVoiceCancel,
+                    onPermissionRetry = onPermissionRetry,
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    OutlinedTextField(
+                        value = state.inputText,
+                        onValueChange = onInputChange,
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester),
+                        enabled = !state.isLoading && state.voice !is VoiceSurfaceState.Listening,
+                        placeholder = { Text("What do you want to do?") },
+                        label = { Text("Command") },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = { onSubmit() },
+                        ),
+                        singleLine = false,
+                        maxLines = 3,
+                    )
+                    IconButton(
+                        onClick = onMicClick,
+                        enabled = !state.isLoading && state.voice !is VoiceSurfaceState.Processing,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.MicNone,
+                            contentDescription = "Voice input",
+                            tint = when (state.voice) {
+                                is VoiceSurfaceState.Listening -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -147,7 +181,11 @@ fun CommandLayerScreen(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                             ) {
                                 Text(
-                                    text = entry.original,
+                                    text = if (entry.source == CommandInputSource.Voice) {
+                                        "· ${entry.original}"
+                                    } else {
+                                        entry.original
+                                    },
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     maxLines = 1,
@@ -186,6 +224,108 @@ fun CommandLayerScreen(
                             onAppPick = onAppPick,
                             onRecentPick = onRecentPick,
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceStatusBanner(
+    voice: VoiceSurfaceState,
+    onCancel: () -> Unit,
+    onPermissionRetry: () -> Unit,
+) {
+    when (voice) {
+        VoiceSurfaceState.Idle -> { }
+        VoiceSurfaceState.Listening -> {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "Listening…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
+        VoiceSurfaceState.Processing -> {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        text = "Running command…",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+        is VoiceSurfaceState.Error -> {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+            ) {
+                Text(
+                    text = voice.userMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
+        VoiceSurfaceState.PermissionNeeded -> {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Microphone access lets Aura hear your commands. You can still type.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = onPermissionRetry) {
+                        Text("Allow microphone")
                     }
                 }
             }

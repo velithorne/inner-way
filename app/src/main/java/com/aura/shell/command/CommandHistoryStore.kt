@@ -21,11 +21,14 @@ class CommandHistoryStore(
                 for (i in 0 until arr.length()) {
                     val item = arr.get(i)
                     when (item) {
-                        is String -> add(CommandHistoryEntry(original = item, normalized = null))
+                        is String -> add(CommandHistoryEntry(original = item, normalized = null, source = CommandInputSource.Typed))
                         is JSONObject -> add(
                             CommandHistoryEntry(
                                 original = item.optString("original", ""),
                                 normalized = item.optString("normalized", "").takeIf { it.isNotEmpty() },
+                                source = CommandInputSource.entries.getOrNull(
+                                    item.optInt("source", 0),
+                                ) ?: CommandInputSource.Typed,
                             ),
                         )
                         else -> { }
@@ -37,7 +40,11 @@ class CommandHistoryStore(
         }
     }
 
-    fun recordCommand(raw: String, normalizedForReplay: String? = null) {
+    fun recordCommand(
+        raw: String,
+        normalizedForReplay: String? = null,
+        source: CommandInputSource = CommandInputSource.Typed,
+    ) {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return
         val current = loadHistory().toMutableList()
@@ -45,6 +52,7 @@ class CommandHistoryStore(
         val entry = CommandHistoryEntry(
             original = trimmed,
             normalized = normalizedForReplay?.takeIf { it.isNotBlank() && it != trimmed },
+            source = source,
         )
         current.add(0, entry)
         val next = current.take(MAX_ENTRIES)
@@ -53,6 +61,7 @@ class CommandHistoryStore(
             val o = JSONObject()
             o.put("original", e.original)
             e.normalized?.let { o.put("normalized", it) }
+            o.put("source", e.source.ordinal)
             arr.put(o)
         }
         prefs.edit { putString(KEY_LINES, arr.toString()) }
@@ -65,7 +74,13 @@ class CommandHistoryStore(
     }
 }
 
+enum class CommandInputSource {
+    Typed,
+    Voice,
+}
+
 data class CommandHistoryEntry(
     val original: String,
     val normalized: String?,
+    val source: CommandInputSource = CommandInputSource.Typed,
 )

@@ -1,9 +1,13 @@
 package com.aura.shell
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -12,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -21,6 +26,8 @@ import com.aura.shell.command.CommandSideEffect
 import com.aura.shell.command.LauncherDrawerIntent
 import com.aura.shell.ui.command.CommandLayerScreen
 import com.aura.shell.ui.theme.AuraShellTheme
+import com.aura.shell.voice.SpeechInputManager
+import com.aura.shell.voice.VoiceSurfaceState
 import kotlinx.coroutines.launch
 
 class CommandLayerActivity : ComponentActivity() {
@@ -29,9 +36,15 @@ class CommandLayerActivity : ComponentActivity() {
         CommandLayerViewModelFactory(application)
     }
 
+    private lateinit var speech: SpeechInputManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        speech = SpeechInputManager(this)
         enableEdgeToEdge()
+
+        val startListeningFromLaunch = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
+
         setContent {
             AuraShellTheme {
                 val state by viewModel.uiState.collectAsState()
@@ -39,9 +52,18 @@ class CommandLayerActivity : ComponentActivity() {
                 val focusManager = LocalFocusManager.current
                 val keyboard = LocalSoftwareKeyboardController.current
 
-                LaunchedEffect(Unit) {
-                    focusRequester.requestFocus()
-                    keyboard?.show()
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) {
+                        startVoiceCapture()
+                    } else {
+                        viewModel.setVoiceState(
+                            VoiceSurfaceState.Error(
+                                "Microphone access is off. You can still type commands below.",
+                            ),
+                        )
+                    }
                 }
 
                 LaunchedEffect(Unit) {
@@ -58,6 +80,21 @@ class CommandLayerActivity : ComponentActivity() {
                                 }
                             }
                         }
+                    }
+                }
+
+                LaunchedEffect(startListeningFromLaunch) {
+                    if (startListeningFromLaunch) {
+                        when {
+                            hasMicPermission() -> startVoiceCapture()
+                            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
+                                viewModel.setVoiceState(VoiceSurfaceState.PermissionNeeded)
+                            }
+                            else -> permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    } else {
+                        focusRequester.requestFocus()
+                        keyboard?.show()
                     }
                 }
 
@@ -80,10 +117,52 @@ class CommandLayerActivity : ComponentActivity() {
                     onRecentPick = { pkg ->
                         viewModel.launchApp(pkg)
                     },
+                    onMicClick = {
+                        when {
+                            hasMicPermission() -> startVoiceCapture()
+                            state.voice is VoiceSurfaceState.PermissionNeeded -> {
+                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
+                                viewModel.setVoiceState(VoiceSurfaceState.PermissionNeeded)
+                            }
+                            else -> permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    onVoiceCancel = {
+                        speech.stopListening()
+                        viewModel.setVoiceState(VoiceSurfaceState.Idle)
+                    },
+                    onPermissionRetry = {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    },
                     onBack = { finish() },
                 )
             }
         }
+    }
+
+    private fun hasMicPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun startVoiceCapture() {
+        if (!speech.isAvailable()) {
+            viewModel.setVoiceState(
+                VoiceSurfaceState.Error("Voice input isn’t available. Type your command instead."),
+            )
+            return
+        }
+        viewModel.setVoiceState(VoiceSurfaceState.Listening)
+        speech.startListening(
+            onReady = { viewModel.setVoiceState(VoiceSurfaceState.Listening) },
+            onPartialResult = { partial -> viewModel.onInputChange(partial) },
+            onFinalResult = { text ->
+                viewModel.setVoiceState(VoiceSurfaceState.Processing)
+                viewModel.applySpeechTranscriptAndSubmit(text)
+            },
+            onError = { msg -> viewModel.setVoiceState(VoiceSurfaceState.Error(msg)) },
+        )
     }
 
     private fun sendDrawerIntent(action: String) {
@@ -96,5 +175,14 @@ class CommandLayerActivity : ComponentActivity() {
         }
         startActivity(intent)
         finish()
+    }
+
+    override fun onDestroy() {
+        speech.stopListening()
+        super.onDestroy()
+    }
+
+    companion object {
+        const val EXTRA_START_LISTENING = "com.aura.shell.extra.START_LISTENING"
     }
 }

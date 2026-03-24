@@ -32,6 +32,13 @@ If the workflow fails, check the **Actions** tab on GitHub for logs.
 - **Local router** (`CommandRouter` + `CommandDispatch`): Deterministic parsing — **open/launch** apps, **search apps for …**, **show/hide apps** (coordinates launcher bottom sheet via `MainActivity` + `DrawerRequest`), **show recents** / **open recent …**, **help**. No network, no ML.
 - **History** (`CommandHistoryStore`): Persists typed commands for replay chips.
 
+## Phase 3 — voice → same command pipeline
+
+- **`SpeechInputManager`**: `SpeechRecognizer` one-shot capture (tap only); no background listening.
+- **Transcript** is placed in the command field, then **`submitCommand(CommandInputSource.Voice)`** runs the same **normalize → route → resolve** path as typing (`VoiceCommandPipeline` delegates to `CommandRouter`).
+- **Permission**: `RECORD_AUDIO` in manifest; runtime request from `CommandLayerActivity` when starting voice.
+- **Home mic**: opens `CommandLayerActivity` with `EXTRA_START_LISTENING` to begin listening after permission.
+
 ## Phase 2.1 — forgiving matching (local)
 
 - **`CommandNormalizer`**: Phrase templates (`take me to …`, `bring up …`, `show me …` → `open …`), filler stripping (`my`, `the`), drawer phrases.

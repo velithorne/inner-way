@@ -168,10 +168,11 @@ class CommandRouter(
 
     companion object {
         val HELP_LINES = listOf(
+            "Voice: tap the mic, speak, same commands as typing",
             "open camera — or: opn camra, cam, photo",
             "open settings — or: setings, prefs",
-            "open msg / msgs / messages",
-            "yt — YouTube & related apps",
+            "open msg / msgs / messages — or say “open msg”",
+            "yt / yt music — YouTube & related apps",
             "take me to chrome — or: bring up settings",
             "show me apps — open the app drawer",
             "close apps — hide the drawer",
