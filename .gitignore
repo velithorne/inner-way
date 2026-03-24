@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local
+local.properties
+*.iml
+.idea/
+
+# Android SDK (if vendored for CI)
+android-sdk/
+
+# OS
+.DS_Store
