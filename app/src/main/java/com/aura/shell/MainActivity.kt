@@ -40,6 +40,13 @@ class MainActivity : ComponentActivity() {
                     onCommandBarClick = {
                         startActivity(Intent(this@MainActivity, CommandLayerActivity::class.java))
                     },
+                    onMicClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = "Voice layer coming in Phase 3",
+                            )
+                        }
+                    },
                     onPinnedClick = { card: PinnedCardUi ->
                         scope.launch {
                             snackbarHostState.showSnackbar(

@@ -12,8 +12,8 @@ android {
         applicationId = "com.aura.shell"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0-phase1"
+        versionCode = 2
+        versionName = "1.0.1-phase1.1"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
