@@ -4,16 +4,18 @@ import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 
 /**
- * Deterministic local parser — no network, no ML.
+ * Routes normalized text to [CommandDispatch] using [AppResolutionEngine] and [CommandAliasRegistry].
  */
-class CommandRouter {
+class CommandRouter(
+    private val resolution: AppResolutionEngine = AppResolutionEngine(),
+) {
 
     fun route(
         rawInput: String,
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
     ): CommandDispatch {
-        val normalized = normalize(rawInput)
+        val normalized = CommandNormalizer.normalize(rawInput)
         if (normalized.isEmpty()) {
             return CommandDispatch.Unknown("Enter a command, or type help.")
         }
@@ -26,16 +28,16 @@ class CommandRouter {
             return dispatchRecentMessages(recentApps)
         }
 
-        if (isShowAppsIntent(normalized)) {
+        if (CommandAliasRegistry.matchesAppDrawerIntent(normalized)) {
             return CommandDispatch.OpenAppDrawer
         }
-        if (isHideAppsIntent(normalized)) {
+        if (CommandAliasRegistry.matchesHideDrawerIntent(normalized)) {
             return CommandDispatch.CloseAppDrawer
         }
 
         val searchQuery = extractSearchQuery(normalized)
         if (searchQuery != null) {
-            val matches = filterApps(installedApps, searchQuery)
+            val matches = resolution.searchApps(searchQuery, installedApps)
             return CommandDispatch.SearchMatches(
                 query = searchQuery,
                 matches = matches,
@@ -49,28 +51,60 @@ class CommandRouter {
             return dispatchOpenRecent(openRecentTarget, recentApps)
         }
 
-        val recentDispatch = tryRecentListCommands(normalized, recentApps)
-        if (recentDispatch != null) return recentDispatch
+        tryRecentListCommands(normalized, recentApps)?.let { return it }
 
-        return tryOpenLaunch(normalized, installedApps)
+        val openTarget = extractOpenTarget(normalized)
+        if (openTarget != null) {
+            return dispatchAppResolution(openTarget, installedApps)
+        }
+
+        // Bare shorthand: "calc", "yt", "msgs", "setings"
+        return dispatchAppResolution(normalized, installedApps)
+    }
+
+    private fun dispatchAppResolution(
+        target: String,
+        installedApps: List<LauncherAppInfo>,
+    ): CommandDispatch {
+        val cleaned = CommandNormalizer.stripTargetFiller(target)
+        if (cleaned.isEmpty()) {
+            return CommandDispatch.Unknown("Try: open camera, or yt, or help.")
+        }
+
+        return when (val outcome = resolution.resolve(cleaned, installedApps)) {
+            is ResolutionOutcome.SingleLaunch -> CommandDispatch.LaunchApp(
+                packageName = outcome.app.packageName,
+                displayLabel = outcome.app.label,
+                resultHint = outcome.hint,
+            )
+            is ResolutionOutcome.Suggest -> CommandDispatch.PickFromSuggestions(
+                message = outcome.title,
+                candidates = outcome.candidates,
+                subtitle = outcome.subtitle,
+                kind = outcome.kind,
+            )
+            is ResolutionOutcome.NoMatch -> CommandDispatch.Unknown(outcome.message)
+        }
     }
 
     private fun dispatchOpenRecent(
         target: String,
         recentApps: List<RecentAppEntry>,
     ): CommandDispatch {
-        val matches = filterRecents(recentApps, target)
+        val cleaned = CommandNormalizer.stripTargetFiller(target)
+        val matches = filterRecents(recentApps, cleaned)
         return when {
             matches.isEmpty() -> CommandDispatch.RecentMatches(
-                title = "No recent app matched \"$target\"",
+                title = "No recent app matched \"$cleaned\"",
                 entries = recentApps,
             )
             matches.size == 1 -> CommandDispatch.LaunchApp(
                 packageName = matches[0].packageName,
                 displayLabel = matches[0].label,
+                resultHint = "Recent: ${matches[0].label}",
             )
             else -> CommandDispatch.RecentMatches(
-                title = "Recent matching \"$target\"",
+                title = "Recent matching \"$cleaned\"",
                 entries = matches,
             )
         }
@@ -89,6 +123,7 @@ class CommandRouter {
             filtered.size == 1 -> CommandDispatch.LaunchApp(
                 packageName = filtered[0].packageName,
                 displayLabel = filtered[0].label,
+                resultHint = "Recent: ${filtered[0].label}",
             )
             else -> CommandDispatch.RecentMatches(
                 title = "Messaging apps (recent)",
@@ -113,116 +148,40 @@ class CommandRouter {
         return null
     }
 
-    private fun tryOpenLaunch(
-        normalized: String,
-        installedApps: List<LauncherAppInfo>,
-    ): CommandDispatch {
-        val target = extractOpenTarget(normalized) ?: return CommandDispatch.Unknown(
-            "Try: open settings, or open camera, or help.",
-        )
-        val matches = scoreAndRank(installedApps, target)
-        return when {
-            matches.isEmpty() -> CommandDispatch.Unknown(
-                "No app matched \"$target\". Try search apps for $target",
-            )
-            matches.size == 1 || (matches[0].score >= STRONG_MATCH && matches[1].score < matches[0].score - 15) -> {
-                val best = matches[0].app
-                CommandDispatch.LaunchApp(
-                    packageName = best.packageName,
-                    displayLabel = best.label,
-                )
-            }
-            else -> {
-                val top = matches.take(8).map { it.app }
-                CommandDispatch.PickFromSuggestions(
-                    message = "Several apps match \"$target\"",
-                    candidates = top,
-                )
-            }
-        }
-    }
-
-    private data class Scored(
-        val app: LauncherAppInfo,
-        val score: Int,
-    )
-
-    private fun scoreAndRank(apps: List<LauncherAppInfo>, target: String): List<Scored> {
-        val t = target.lowercase()
-        return apps
-            .map { app -> Scored(app, scoreLabel(app.label, t)) }
-            .filter { it.score > 0 }
-            .sortedByDescending { it.score }
-    }
-
-    private fun scoreLabel(label: String, target: String): Int {
-        val l = label.lowercase().replace(Regex("[^a-z0-9 ]+"), " ").trim().replace(Regex("\\s+"), " ")
-        val tgt = target.lowercase()
-        if (l == tgt) return 1000
-        if (l.startsWith(tgt)) return 800 - (l.length - tgt.length).coerceAtMost(100)
-        if (l.contains(tgt)) return 500 - (l.indexOf(tgt)).coerceAtMost(50)
-        val tokens = tgt.split(' ').filter { it.isNotBlank() }
-        var s = 0
-        for (tok in tokens) {
-            if (tok.length < 2) continue
-            if (l.contains(tok)) s += 120
-        }
-        return s
-    }
-
-    private fun filterApps(apps: List<LauncherAppInfo>, query: String): List<LauncherAppInfo> {
-        val q = query.lowercase()
-        return apps
-            .map { app -> app to scoreLabel(app.label, q) }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .map { it.first }
-    }
-
     private fun filterRecents(entries: List<RecentAppEntry>, target: String): List<RecentAppEntry> {
-        val q = target.lowercase()
+        val key = target.lowercase().trim()
         return entries
-            .map { e -> e to scoreLabel(e.label, q) }
-            .filter { it.second > 0 }
+            .map { e ->
+                val compact = e.label.lowercase().replace(Regex("[^a-z0-9]+"), "")
+                val score = FuzzyMatcher.fuzzyTokenScore(key.replace(" ", ""), compact)
+                e to score
+            }
+            .filter { (e, score) -> score > 400 || eLabelContains(e.label, key) }
             .sortedByDescending { it.second }
             .map { it.first }
+    }
+
+    private fun eLabelContains(label: String, key: String): Boolean {
+        val l = label.lowercase()
+        return l.contains(key) || key.split(' ').any { it.length >= 2 && l.contains(it) }
     }
 
     companion object {
-        private const val STRONG_MATCH = 400
-
         val HELP_LINES = listOf(
-            "open <app> — launch an installed app (e.g. open camera, open settings)",
-            "launch <app> — same as open",
-            "search apps for <text> — list matching apps",
-            "find <text> — search apps by name",
-            "show apps / hide apps — open or close the app drawer on home",
-            "show recents — apps you opened recently from Aura",
-            "open recent <name> — launch a recent app by name",
-            "help — this list",
+            "open camera — or: opn camra, cam, photo",
+            "open settings — or: setings, prefs",
+            "open msg / msgs / messages",
+            "yt — YouTube & related apps",
+            "take me to chrome — or: bring up settings",
+            "show me apps — open the app drawer",
+            "close apps — hide the drawer",
+            "search apps for music",
+            "show recents — help",
         )
-
-        fun normalize(raw: String): String {
-            return raw
-                .lowercase()
-                .replace(Regex("[^a-z0-9 ?]+"), " ")
-                .trim()
-                .replace(Regex("\\s+"), " ")
-        }
 
         private fun isHelpIntent(n: String): Boolean {
             return n == "help" || n == "?" || n == "h" ||
                 n == "what can you do" || n == "what can i do" || n == "commands"
-        }
-
-        private fun isShowAppsIntent(n: String): Boolean {
-            return n == "show apps" || n == "open apps" || n == "open app drawer" ||
-                n == "app drawer" || n == "list apps" || n == "open all apps"
-        }
-
-        private fun isHideAppsIntent(n: String): Boolean {
-            return n == "hide apps" || n == "close apps" || n == "dismiss apps" ||
-                n == "close app drawer" || n == "close drawer"
         }
 
         private fun extractSearchQuery(normalized: String): String? {
@@ -239,7 +198,12 @@ class CommandRouter {
         }
 
         private fun extractOpenTarget(normalized: String): String? {
-            val prefixes = listOf("open ", "launch ", "start ", "run ")
+            val prefixes = listOf(
+                "open ",
+                "launch ",
+                "start ",
+                "run ",
+            )
             for (p in prefixes) {
                 extractAfterPrefix(normalized, p)?.let { return it }
             }

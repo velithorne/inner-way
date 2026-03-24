@@ -18,6 +18,7 @@ class CommandRouterTest {
         LauncherAppInfo("com.android.settings", "Settings", dummyIcon),
         LauncherAppInfo("com.android.camera2", "Camera", dummyIcon),
         LauncherAppInfo("com.whatsapp", "WhatsApp", dummyIcon),
+        LauncherAppInfo("com.google.android.youtube", "YouTube", dummyIcon),
     )
 
     private val router = CommandRouter()
@@ -26,6 +27,12 @@ class CommandRouterTest {
     fun openSettings_launches() {
         val d = router.route("open settings", apps, emptyList())
         assertTrue(d is CommandDispatch.LaunchApp && (d as CommandDispatch.LaunchApp).packageName == "com.android.settings")
+    }
+
+    @Test
+    fun opnCamra_typoGetsCamera() {
+        val d = router.route("opn camra", apps, emptyList())
+        assertTrue(d is CommandDispatch.LaunchApp || d is CommandDispatch.PickFromSuggestions)
     }
 
     @Test
@@ -46,5 +53,18 @@ class CommandRouterTest {
     fun showApps_opensDrawer() {
         val d = router.route("show apps", apps, emptyList())
         assertTrue(d is CommandDispatch.OpenAppDrawer)
+    }
+
+    @Test
+    fun showMeApps_opensDrawer() {
+        val d = router.route("show me apps", apps, emptyList())
+        assertTrue(d is CommandDispatch.OpenAppDrawer)
+    }
+
+    @Test
+    fun takeMeToChrome_routes() {
+        val withChrome = apps + LauncherAppInfo("com.android.chrome", "Chrome", dummyIcon)
+        val d = router.route("take me to chrome", withChrome, emptyList())
+        assertTrue(d is CommandDispatch.LaunchApp || d is CommandDispatch.PickFromSuggestions)
     }
 }

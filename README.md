@@ -32,6 +32,13 @@ If the workflow fails, check the **Actions** tab on GitHub for logs.
 - **Local router** (`CommandRouter` + `CommandDispatch`): Deterministic parsing — **open/launch** apps, **search apps for …**, **show/hide apps** (coordinates launcher bottom sheet via `MainActivity` + `DrawerRequest`), **show recents** / **open recent …**, **help**. No network, no ML.
 - **History** (`CommandHistoryStore`): Persists typed commands for replay chips.
 
+## Phase 2.1 — forgiving matching (local)
+
+- **`CommandNormalizer`**: Phrase templates (`take me to …`, `bring up …`, `show me …` → `open …`), filler stripping (`my`, `the`), drawer phrases.
+- **`CommandAliasRegistry`**: Central alias → semantic keywords (e.g. `msg`/`msgs` → Messages, `yt` → YouTube family, `phone book` → Contacts).
+- **`FuzzyMatcher`**: Levenshtein-style token scores for typos (`camra`, `setings`).
+- **`AppResolutionEngine`**: Ranks exact / alias / fuzzy tiers; **direct launch** only above thresholds in `ResolutionThresholds`; weak fuzzy → suggestions (“Did you mean…”).
+
 ## What Phase 1 includes
 
 - **Home / launcher**: Manifest declares `MAIN` + `HOME` + `DEFAULT` so the app can be chosen as the default Home app.

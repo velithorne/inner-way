@@ -70,8 +70,8 @@ class CommandLayerActivity : ComponentActivity() {
                         keyboard?.hide()
                         viewModel.submitCommand()
                     },
-                    onHistoryPick = { line ->
-                        viewModel.applyHistoryLine(line)
+                    onHistoryPick = { entry ->
+                        viewModel.applyHistoryEntry(entry)
                         focusRequester.requestFocus()
                     },
                     onAppPick = { pkg ->

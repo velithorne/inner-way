@@ -12,8 +12,8 @@ android {
         applicationId = "com.aura.shell"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.0-phase2"
+        versionCode = 4
+        versionName = "1.2.0-phase2.1"
 
         vectorDrawables {
             useSupportLibrary = true

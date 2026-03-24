@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 
 data class CommandLayerUiState(
     val inputText: String = "",
-    val history: List<String> = emptyList(),
+    val history: List<CommandHistoryEntry> = emptyList(),
     val installedApps: List<LauncherAppInfo> = emptyList(),
     val recentApps: List<RecentAppEntry> = emptyList(),
     val isLoading: Boolean = true,
@@ -27,8 +27,13 @@ data class CommandLayerUiState(
 
 sealed class CommandSurfaceState {
     data object Empty : CommandSurfaceState()
-    data class Success(val message: String) : CommandSurfaceState()
-    data class Suggestions(val title: String, val apps: List<LauncherAppInfo>) : CommandSurfaceState()
+    data class Success(val message: String, val hint: String? = null) : CommandSurfaceState()
+    data class Suggestions(
+        val title: String,
+        val subtitle: String?,
+        val apps: List<LauncherAppInfo>,
+        val kind: SuggestionKind,
+    ) : CommandSurfaceState()
     data class SearchResults(val query: String, val apps: List<LauncherAppInfo>) : CommandSurfaceState()
     data class RecentsList(val title: String, val entries: List<RecentAppEntry>) : CommandSurfaceState()
     data class Help(val lines: List<String>) : CommandSurfaceState()
@@ -86,8 +91,9 @@ class CommandLayerViewModel(
         _uiState.update { it.copy(inputText = text) }
     }
 
-    fun applyHistoryLine(line: String) {
-        _uiState.update { it.copy(inputText = line) }
+    fun applyHistoryEntry(entry: CommandHistoryEntry) {
+        val text = entry.normalized ?: entry.original
+        _uiState.update { it.copy(inputText = text) }
     }
 
     fun launchApp(packageName: String) {
@@ -104,14 +110,15 @@ class CommandLayerViewModel(
         val recent = _uiState.value.recentApps
         if (_uiState.value.isLoading) return
 
-        historyStore.recordCommand(text)
+        val normalized = CommandNormalizer.normalize(text)
+        historyStore.recordCommand(text, normalizedForReplay = normalized)
+
+        val dispatch = router.route(text, apps, recent)
         _uiState.update {
             it.copy(
                 history = historyStore.loadHistory(),
             )
         }
-
-        val dispatch = router.route(text, apps, recent)
         when (dispatch) {
             is CommandDispatch.LaunchApp -> {
                 viewModelScope.launch {
@@ -119,7 +126,10 @@ class CommandLayerViewModel(
                     recentStore.recordLaunch(dispatch.packageName)
                     _uiState.update {
                         it.copy(
-                            surface = CommandSurfaceState.Success("Opened ${dispatch.displayLabel}"),
+                            surface = CommandSurfaceState.Success(
+                                message = "Opened ${dispatch.displayLabel}",
+                                hint = dispatch.resultHint,
+                            ),
                             recentApps = recentStore.loadRecentEntries(repository),
                         )
                     }
@@ -148,7 +158,9 @@ class CommandLayerViewModel(
                     it.copy(
                         surface = CommandSurfaceState.Suggestions(
                             title = dispatch.message,
+                            subtitle = dispatch.subtitle,
                             apps = dispatch.candidates,
+                            kind = dispatch.kind,
                         ),
                     )
                 }

@@ -10,11 +10,15 @@ sealed class CommandDispatch {
     data class LaunchApp(
         val packageName: String,
         val displayLabel: String,
+        /** Short line for UI, e.g. "Best match: Camera" */
+        val resultHint: String? = null,
     ) : CommandDispatch()
 
     data class PickFromSuggestions(
         val message: String,
         val candidates: List<LauncherAppInfo>,
+        val subtitle: String? = null,
+        val kind: SuggestionKind = SuggestionKind.DISAMBIGUATION,
     ) : CommandDispatch()
 
     data class SearchMatches(

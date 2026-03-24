@@ -42,8 +42,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aura.shell.command.CommandHistoryEntry
 import com.aura.shell.command.CommandLayerUiState
 import com.aura.shell.command.CommandSurfaceState
+import com.aura.shell.command.SuggestionKind
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.ui.components.DrawableImage
@@ -57,7 +59,7 @@ fun CommandLayerScreen(
     focusRequester: FocusRequester,
     onInputChange: (String) -> Unit,
     onSubmit: () -> Unit,
-    onHistoryPick: (String) -> Unit,
+    onHistoryPick: (CommandHistoryEntry) -> Unit,
     onAppPick: (String) -> Unit,
     onRecentPick: (String) -> Unit,
     onBack: () -> Unit,
@@ -136,16 +138,16 @@ fun CommandLayerScreen(
                         contentPadding = PaddingValues(bottom = 4.dp),
                     ) {
                         items(state.history.size) { i ->
-                            val line = state.history[i]
+                            val entry = state.history[i]
                             Surface(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
-                                    .clickable { onHistoryPick(line) },
+                                    .clickable { onHistoryPick(entry) },
                                 shape = RoundedCornerShape(999.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                             ) {
                                 Text(
-                                    text = line,
+                                    text = entry.original,
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     maxLines = 1,
@@ -215,11 +217,20 @@ private fun ResultPanel(
                 )
             }
             is CommandSurfaceState.Success -> {
-                Text(
-                    text = surface.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(16.dp),
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = surface.message,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    surface.hint?.let { hint ->
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = hint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             is CommandSurfaceState.Unknown -> {
                 Text(
@@ -257,8 +268,24 @@ private fun ResultPanel(
                     Text(
                         text = surface.title,
                         style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(bottom = 8.dp),
                     )
+                    surface.subtitle?.let {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (surface.kind == SuggestionKind.DID_YOU_MEAN) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Pick one to confirm",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     surface.apps.forEach { app ->
                         AppResultRow(app = app, onClick = { onAppPick(app.packageName) })
                     }
