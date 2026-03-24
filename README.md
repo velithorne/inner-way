@@ -1,11 +1,35 @@
-# Aura Shell (Phase 1)
+# Aura Shell
 
-**Aura Shell** is a launcher-capable Android shell built with Kotlin and Jetpack Compose. Phase 1 delivers a minimal, polished home experience: default launcher support, installed app launching, a “recently launched from Aura” strip, pinned placeholders, and a universal command bar placeholder for later phases.
+**Aura Shell** is a launcher-capable Android shell built with Kotlin and Jetpack Compose. It provides a command-first home surface, default launcher support, app launching, MRU “recent” tracking, and placeholders for later intent and voice layers.
+
+## Download the latest APK (sideload)
+
+Prebuilt **debug** APKs are attached to **GitHub Releases** when a maintainer pushes a **version tag** (see below).
+
+**Always use the latest release** (replace `owner/repo` if you forked):
+
+[https://github.com/velithorne/inner-way/releases/latest](https://github.com/velithorne/inner-way/releases/latest)
+
+Open **Assets** and download `AuraShell-<tag>-debug.apk`, then install on your device (allow install from your browser/Files app if prompted).
+
+### For maintainers: ship an APK after each phase
+
+1. Bump `versionCode` / `versionName` in `app/build.gradle.kts` and merge your phase work to `main` (or your release branch).
+2. Tag the release commit and push the tag (use a new `v…` name each time):
+
+   ```bash
+   git tag v1.0.2-phase2
+   git push origin v1.0.2-phase2
+   ```
+
+3. GitHub Actions (**Release APK** workflow) builds `assembleDebug` and uploads the APK to a Release for that tag. **Releases do not happen automatically on every commit** — only when you push a matching `v*` tag, so each phase gets a clear, downloadable build.
+
+If the workflow fails, check the **Actions** tab on GitHub for logs.
 
 ## What Phase 1 includes
 
 - **Home / launcher**: Manifest declares `MAIN` + `HOME` + `DEFAULT` so the app can be chosen as the default Home app.
-- **Main screen**: Date/time header, subtitle, command bar placeholder, pinned cards, recent strip, and full installed-apps list (alphabetical).
+- **Main screen**: Date/time header, command-first layout (later refined in Phase 1.1), command bar placeholder, modules, recent strip, and app discovery (drawer in Phase 1.1+).
 - **Command layer placeholder**: Tapping the command bar opens a small stub screen (`CommandLayerActivity`) describing Phase 2; the home bar is styled as the future intent router surface.
 - **Installed apps**: Queries launchable activities via `PackageManager`, shows icon + label, launches with `getLaunchIntentForPackage` + `FLAG_ACTIVITY_NEW_TASK`.
 - **Recents**: **Not** the system recents list (third-party launchers cannot read that). Aura stores a **most-recently-used list of apps launched from Aura** in app-private storage (`RecentAppsStore`). This is documented and structured for evolution.
