@@ -15,6 +15,9 @@ import com.aura.shell.LaunchActivityProvider
 import com.aura.shell.model.LauncherAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class LauncherRepository(
     private val appContext: Context,
@@ -40,7 +43,8 @@ class LauncherRepository(
     }
 
     /**
-     * @return false only if no launch intent could be built — throws from startActivity are swallowed but rare with Activity context.
+     * Runs the actual start on the main thread and returns whether a launch path succeeded.
+     * Synchronous from the caller's perspective so the pipeline can surface real failures.
      */
     fun launchApp(packageName: String): Boolean {
         val intent = resolveLaunchIntent(packageName) ?: return false
@@ -49,26 +53,35 @@ class LauncherRepository(
                 Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
         )
         val mainComponent = intent.component ?: resolveMainActivityComponent(packageName)
-        val runnable = {
-            val viaLauncher =
-                mainComponent != null && tryStartViaLauncherApps(mainComponent)
-            if (!viaLauncher) {
-                val launchContext = LaunchActivityProvider.current() ?: appContext
-                try {
-                    launchContext.startActivity(intent)
-                } catch (_: Exception) {
-                    try {
-                        appContext.startActivity(intent)
-                    } catch (_: Exception) { }
-                }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return launchAppOnMainThread(intent, mainComponent)
+        }
+        val latch = CountDownLatch(1)
+        val ok = AtomicBoolean(false)
+        Handler(Looper.getMainLooper()).post {
+            ok.set(launchAppOnMainThread(intent, mainComponent))
+            latch.countDown()
+        }
+        latch.await(5L, TimeUnit.SECONDS)
+        return ok.get()
+    }
+
+    private fun launchAppOnMainThread(intent: Intent, mainComponent: ComponentName?): Boolean {
+        if (mainComponent != null && tryStartViaLauncherApps(mainComponent)) {
+            return true
+        }
+        val launchContext = LaunchActivityProvider.current() ?: appContext
+        return try {
+            launchContext.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            try {
+                appContext.startActivity(intent)
+                true
+            } catch (_: Exception) {
+                false
             }
         }
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            runnable()
-        } else {
-            Handler(Looper.getMainLooper()).post(runnable)
-        }
-        return true
     }
 
     private fun resolveMainActivityComponent(packageName: String): ComponentName? {

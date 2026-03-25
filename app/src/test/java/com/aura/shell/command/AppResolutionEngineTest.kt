@@ -35,4 +35,16 @@ class AppResolutionEngineTest {
                 (o is ResolutionOutcome.SingleLaunch && (o as ResolutionOutcome.SingleLaunch).app.label.contains("YouTube", ignoreCase = true)),
         )
     }
+
+    @Test
+    fun messagesAlias_prefersExactMessagesLabelWhenUnique() {
+        val messagingApps = listOf(
+            LauncherAppInfo("com.google.android.apps.messaging", "Messages", icon),
+            LauncherAppInfo("com.facebook.orca", "Messenger", icon),
+            LauncherAppInfo("com.example.sms", "SMS Organizer", icon),
+        )
+        val o = engine.resolve("messages", messagingApps)
+        assertTrue(o is ResolutionOutcome.SingleLaunch)
+        assertTrue((o as ResolutionOutcome.SingleLaunch).app.label.equals("Messages", ignoreCase = true))
+    }
 }

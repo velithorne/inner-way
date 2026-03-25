@@ -80,7 +80,7 @@ object CommandAliasRegistry {
      */
     fun keywordsFor(token: SemanticToken): Set<String> {
         return when (token) {
-            SemanticToken.MESSAGES -> setOf("message", "messages", "sms", "text")
+            SemanticToken.MESSAGES -> setOf("message", "messages", "messaging", "sms", "text")
             SemanticToken.CAMERA -> setOf("camera", "photo")
             SemanticToken.SETTINGS -> setOf("settings")
             SemanticToken.CONTACTS -> setOf("contact", "contacts", "people")

@@ -62,6 +62,11 @@ class AppResolutionEngine(
         installedApps: List<LauncherAppInfo>,
         aliasKey: String,
     ): ResolutionOutcome {
+        // Prefer a single installed app whose visible label matches what the user said
+        // (e.g. "messages" → app labeled "Messages"), so we launch instead of disambiguating
+        // against Messenger / Facebook / carrier SMS duplicates.
+        preferExactLabelForAlias(installedApps, aliasKey)?.let { return it }
+
         val mergedKeywords = semantics.flatMap { CommandAliasRegistry.keywordsFor(it).toList() }.toSet()
         val ranked = installedApps
             .map { app -> scoreSemantic(app, mergedKeywords) }
@@ -97,6 +102,43 @@ class AppResolutionEngine(
             candidates = ranked.take(8).map { it.app },
             kind = kind,
         )
+    }
+
+    /**
+     * Returns a single launch when exactly one app's normalized label matches [aliasKey]
+     * or common singular/plural variants (messages ↔ message).
+     */
+    private fun preferExactLabelForAlias(
+        installedApps: List<LauncherAppInfo>,
+        aliasKey: String,
+    ): ResolutionOutcome? {
+        val key = aliasKey.trim().lowercase()
+        if (key.isEmpty()) return null
+        val variants = buildSet {
+            add(key)
+            if (key == "message") {
+                add("messages")
+                add("messaging")
+            }
+            if (key == "messages") {
+                add("message")
+                add("messaging")
+            }
+            if (key == "contact") add("contacts")
+            if (key == "contacts") add("contact")
+            if (key == "setting") add("settings")
+            if (key == "settings") add("setting")
+        }
+        val matches = installedApps
+            .filter { app -> normalizeLabel(app.label) in variants }
+            .distinctBy { it.packageName }
+        return when (matches.size) {
+            1 -> ResolutionOutcome.SingleLaunch(
+                matches[0],
+                "Opened ${matches[0].label}",
+            )
+            else -> null
+        }
     }
 
     private fun scoreSemantic(
