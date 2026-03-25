@@ -32,6 +32,16 @@ class MainActivity : ComponentActivity() {
         HomeViewModelFactory(application)
     }
 
+    override fun onResume() {
+        super.onResume()
+        LaunchActivityProvider.attach(this)
+        homeViewModel.refreshRecents()
+    }
+
+    override fun onPause() {
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleDrawerIntent(intent)
@@ -110,11 +120,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        homeViewModel.refreshRecents()
     }
 
     override fun onNewIntent(intent: Intent) {

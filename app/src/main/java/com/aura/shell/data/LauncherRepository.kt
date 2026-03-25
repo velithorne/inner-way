@@ -1,5 +1,6 @@
 package com.aura.shell.data
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import com.aura.shell.LaunchActivityProvider
 import com.aura.shell.model.LauncherAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,14 +37,23 @@ class LauncherRepository(
             .toList()
     }
 
+    /**
+     * @return false only if no launch intent could be built — throws from startActivity are swallowed but rare with Activity context.
+     */
     fun launchApp(packageName: String): Boolean {
-        val launcherIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
-        launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = resolveLaunchIntent(packageName) ?: return false
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+        )
+        val launchContext = LaunchActivityProvider.current() ?: appContext
         val runnable = {
             try {
-                appContext.startActivity(launcherIntent)
+                launchContext.startActivity(intent)
             } catch (_: Exception) {
-                // Caller may check success via foreground transition
+                try {
+                    appContext.startActivity(intent)
+                } catch (_: Exception) { }
             }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -51,6 +62,25 @@ class LauncherRepository(
             Handler(Looper.getMainLooper()).post(runnable)
         }
         return true
+    }
+
+    /**
+     * [getLaunchIntentForPackage] is null for some apps/work profiles; fall back to explicit MAIN/LAUNCHER activity.
+     */
+    fun resolveLaunchIntent(packageName: String): Intent? {
+        packageManager.getLaunchIntentForPackage(packageName)?.let {
+            return it
+        }
+        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolves = queryLaunchActivities(main)
+        val resolve = resolves.firstOrNull { it.activityInfo.packageName == packageName } ?: return null
+        return Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            component = ComponentName(
+                resolve.activityInfo.packageName,
+                resolve.activityInfo.name,
+            )
+        }
     }
 
     fun getIconForPackage(packageName: String): Drawable? {

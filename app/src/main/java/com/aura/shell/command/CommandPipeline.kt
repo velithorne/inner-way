@@ -31,7 +31,10 @@ suspend fun executeCommandPipeline(
 
     return when (dispatch) {
         is CommandDispatch.LaunchApp -> {
-            repository.launchApp(dispatch.packageName)
+            val ok = repository.launchApp(dispatch.packageName)
+            if (!ok) {
+                return PipelineResult.Error("Couldn’t open ${dispatch.displayLabel}. Try again or pick from suggestions.")
+            }
             recentStore.recordLaunch(dispatch.packageName)
             PipelineResult.Launched(
                 displayLabel = dispatch.displayLabel,

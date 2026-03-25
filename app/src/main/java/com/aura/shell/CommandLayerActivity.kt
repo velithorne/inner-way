@@ -38,6 +38,16 @@ class CommandLayerActivity : ComponentActivity() {
 
     private lateinit var speech: SpeechInputManager
 
+    override fun onResume() {
+        super.onResume()
+        LaunchActivityProvider.attach(this)
+    }
+
+    override fun onPause() {
+        LaunchActivityProvider.detach(this)
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         speech = SpeechInputManager(applicationContext)
