@@ -12,6 +12,9 @@ import com.aura.shell.command.executeCommandPipeline
 import com.aura.shell.data.AuraSettingsStore
 import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
+import com.aura.shell.personalization.PersonalAliasStore
+import com.aura.shell.personalization.PreferenceLearningStore
+import com.aura.shell.personalization.PersonalResolutionContext
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.voice.ForegroundPassiveVoiceCoordinator
@@ -29,6 +32,8 @@ data class HomeUiState(
     val isLoadingApps: Boolean = true,
     val loadError: String? = null,
     val drawerRequest: DrawerRequest? = null,
+    /** One-shot: open command layer with personalization sheet (voice “manage aliases” from home). */
+    val personalizationNavNonce: Long? = null,
     val passiveHandsFreeEnabled: Boolean = false,
     val handsFree: HandsFreeUiState = HandsFreeUiState.Disabled,
 )
@@ -41,7 +46,11 @@ class HomeViewModel(
     private val recentStore = RecentAppsStore(application.applicationContext)
     private val historyStore = CommandHistoryStore(application.applicationContext)
     private val settingsStore = AuraSettingsStore(application.applicationContext)
+    private val aliasStore = PersonalAliasStore(application.applicationContext)
+    private val learningStore = PreferenceLearningStore(application.applicationContext)
     private val router = CommandRouter()
+    private val personal: PersonalResolutionContext
+        get() = PersonalResolutionContext(aliasStore, learningStore)
 
     private val speech = SpeechInputManager(application.applicationContext)
 
@@ -99,6 +108,8 @@ class HomeViewModel(
                     recentStore = recentStore,
                     historyStore = historyStore,
                     router = router,
+                    learningStore = learningStore,
+                    personal = personal,
                 )
                 applyPassivePipelineResult(result)
                 result
@@ -130,6 +141,11 @@ class HomeViewModel(
             is PipelineResult.GoHome -> {
                 // MainActivity already foreground; refresh recents if needed
                 refreshRecents()
+            }
+            is PipelineResult.OpenPersonalization -> {
+                _uiState.update {
+                    it.copy(personalizationNavNonce = System.nanoTime())
+                }
             }
             is PipelineResult.SurfaceOnly -> { }
             is PipelineResult.Error -> { }
@@ -180,6 +196,10 @@ class HomeViewModel(
 
     fun consumeDrawerRequest() {
         _uiState.update { it.copy(drawerRequest = null) }
+    }
+
+    fun consumePersonalizationNavRequest() {
+        _uiState.update { it.copy(personalizationNavNonce = null) }
     }
 
     override fun onCleared() {

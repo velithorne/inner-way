@@ -12,6 +12,10 @@ sealed class CommandDispatch {
         val displayLabel: String,
         /** Short line for UI, e.g. "Best match: Camera" */
         val resultHint: String? = null,
+        /** Normalized phrase for [com.aura.shell.personalization.PreferenceLearningStore]. */
+        val resolutionTargetKey: String? = null,
+        val usedPersonalAlias: Boolean = false,
+        val usedLearnedPreference: Boolean = false,
     ) : CommandDispatch()
 
     data class PickFromSuggestions(
@@ -19,11 +23,14 @@ sealed class CommandDispatch {
         val candidates: List<LauncherAppInfo>,
         val subtitle: String? = null,
         val kind: SuggestionKind = SuggestionKind.DISAMBIGUATION,
+        val resolutionTargetKey: String? = null,
     ) : CommandDispatch()
 
     data class SearchMatches(
         val query: String,
         val matches: List<LauncherAppInfo>,
+        /** Normalized key for learning when user picks from search results. */
+        val resolutionTargetKey: String? = null,
     ) : CommandDispatch()
 
     data class RecentMatches(
@@ -39,6 +46,13 @@ sealed class CommandDispatch {
     data object GoHome : CommandDispatch()
 
     data class ShowHelp(val lines: List<String>) : CommandDispatch()
+
+    /** Open the in-app personalization sheet (aliases + learned + reset). */
+    data object OpenPersonalizationPanel : CommandDispatch()
+
+    data object ClearLearnedPreferences : CommandDispatch()
+
+    data object ClearAllPersonalization : CommandDispatch()
 
     data class Unknown(val message: String) : CommandDispatch()
 }

@@ -8,6 +8,12 @@ import com.aura.shell.data.RecentAppsStore
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.data.AuraSettingsStore
+import com.aura.shell.personalization.LearnedPreferenceRow
+import com.aura.shell.personalization.LearningSignal
+import com.aura.shell.personalization.PersonalAliasEntry
+import com.aura.shell.personalization.PersonalAliasStore
+import com.aura.shell.personalization.PreferenceLearningStore
+import com.aura.shell.personalization.PersonalResolutionContext
 import com.aura.shell.voice.ForegroundPassiveVoiceCoordinator
 import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.voice.SpeechInputManager
@@ -26,11 +32,14 @@ data class CommandLayerUiState(
     val history: List<CommandHistoryEntry> = emptyList(),
     val installedApps: List<LauncherAppInfo> = emptyList(),
     val recentApps: List<RecentAppEntry> = emptyList(),
+    val personalAliases: List<PersonalAliasEntry> = emptyList(),
+    val learnedPreferences: List<LearnedPreferenceRow> = emptyList(),
     val isLoading: Boolean = true,
     val surface: CommandSurfaceState = CommandSurfaceState.Empty,
     val voice: VoiceSurfaceState = VoiceSurfaceState.Idle,
     val passiveHandsFreeEnabled: Boolean = false,
     val handsFree: HandsFreeUiState = HandsFreeUiState.Disabled,
+    val showPersonalizationSheet: Boolean = false,
 )
 
 sealed class CommandSurfaceState {
@@ -41,8 +50,13 @@ sealed class CommandSurfaceState {
         val subtitle: String?,
         val apps: List<LauncherAppInfo>,
         val kind: SuggestionKind,
+        val resolutionTargetKey: String? = null,
     ) : CommandSurfaceState()
-    data class SearchResults(val query: String, val apps: List<LauncherAppInfo>) : CommandSurfaceState()
+    data class SearchResults(
+        val query: String,
+        val apps: List<LauncherAppInfo>,
+        val resolutionTargetKey: String? = null,
+    ) : CommandSurfaceState()
     data class RecentsList(val title: String, val entries: List<RecentAppEntry>) : CommandSurfaceState()
     data class Help(val lines: List<String>) : CommandSurfaceState()
     data class Unknown(val message: String) : CommandSurfaceState()
@@ -56,8 +70,12 @@ class CommandLayerViewModel(
     private val recentStore = RecentAppsStore(application.applicationContext)
     private val historyStore = CommandHistoryStore(application.applicationContext)
     private val settingsStore = AuraSettingsStore(application.applicationContext)
+    private val aliasStore = PersonalAliasStore(application.applicationContext)
+    private val learningStore = PreferenceLearningStore(application.applicationContext)
     private val passiveSpeech = SpeechInputManager(application.applicationContext)
     private val router = CommandRouter()
+    private val personal: PersonalResolutionContext
+        get() = PersonalResolutionContext(aliasStore, learningStore)
 
     private var passiveCoordinator: ForegroundPassiveVoiceCoordinator? = null
     private var commandForeground = false
@@ -86,6 +104,8 @@ class CommandLayerViewModel(
                         installedApps = apps,
                         recentApps = recent,
                         history = history,
+                        personalAliases = aliasStore.getAllAliases(),
+                        learnedPreferences = learningStore.getAllLearnedRows(),
                         isLoading = false,
                         passiveHandsFreeEnabled = settingsStore.passiveHandsFreeEnabled,
                     )
@@ -116,10 +136,60 @@ class CommandLayerViewModel(
         _uiState.update { it.copy(voice = state) }
     }
 
-    fun launchApp(packageName: String) {
+    fun launchApp(
+        packageName: String,
+        resolutionTargetKey: String? = null,
+        learningSignal: LearningSignal? = null,
+    ) {
         viewModelScope.launch {
             repository.launchApp(packageName)
             recentStore.recordLaunch(packageName)
+            if (resolutionTargetKey != null && learningSignal != null) {
+                learningStore.record(resolutionTargetKey, packageName, learningSignal)
+            }
+            reloadData()
+        }
+    }
+
+    fun dismissPersonalizationSheet() {
+        _uiState.update { it.copy(showPersonalizationSheet = false) }
+    }
+
+    fun openPersonalizationSheet() {
+        _uiState.update {
+            it.copy(
+                showPersonalizationSheet = true,
+                personalAliases = aliasStore.getAllAliases(),
+                learnedPreferences = learningStore.getAllLearnedRows(),
+            )
+        }
+    }
+
+    fun addPersonalAlias(alias: String, packageName: String) {
+        viewModelScope.launch {
+            aliasStore.setAlias(alias, packageName)
+            reloadData()
+        }
+    }
+
+    fun removePersonalAlias(alias: String) {
+        viewModelScope.launch {
+            aliasStore.removeAlias(alias)
+            reloadData()
+        }
+    }
+
+    fun clearLearnedPreferencesOnly() {
+        viewModelScope.launch {
+            learningStore.clearAll()
+            reloadData()
+        }
+    }
+
+    fun clearAllPersonalization() {
+        viewModelScope.launch {
+            learningStore.clearAll()
+            aliasStore.clearAll()
             reloadData()
         }
     }
@@ -146,6 +216,8 @@ class CommandLayerViewModel(
             recentStore = recentStore,
             historyStore = historyStore,
             router = router,
+            learningStore = learningStore,
+            personal = personal,
         )
     }
 
@@ -222,6 +294,7 @@ class CommandLayerViewModel(
                         ),
                         history = result.history,
                         recentApps = result.recentApps,
+                        learnedPreferences = learningStore.getAllLearnedRows(),
                     )
                 }
             }
@@ -252,11 +325,23 @@ class CommandLayerViewModel(
                 }
                 _sideEffects.tryEmit(CommandSideEffect.FinishAfterGoHome)
             }
+            is PipelineResult.OpenPersonalization -> {
+                _uiState.update {
+                    it.copy(
+                        history = result.history,
+                        showPersonalizationSheet = true,
+                        personalAliases = aliasStore.getAllAliases(),
+                        learnedPreferences = learningStore.getAllLearnedRows(),
+                    )
+                }
+            }
             is PipelineResult.SurfaceOnly -> {
                 _uiState.update {
                     it.copy(
                         surface = result.surface,
                         history = result.history,
+                        personalAliases = aliasStore.getAllAliases(),
+                        learnedPreferences = learningStore.getAllLearnedRows(),
                     )
                 }
             }

@@ -52,6 +52,7 @@ import com.aura.shell.command.CommandInputSource
 import com.aura.shell.command.CommandLayerUiState
 import com.aura.shell.command.CommandSurfaceState
 import com.aura.shell.command.SuggestionKind
+import com.aura.shell.personalization.LearningSignal
 import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.voice.VoiceSurfaceState
 import com.aura.shell.model.LauncherAppInfo
@@ -68,12 +69,18 @@ fun CommandLayerScreen(
     onInputChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onHistoryPick: (CommandHistoryEntry) -> Unit,
-    onAppPick: (String) -> Unit,
+    onAppPick: (String, String?, LearningSignal?) -> Unit,
     onRecentPick: (String) -> Unit,
     onMicClick: () -> Unit,
     onVoiceCancel: () -> Unit,
     onPermissionRetry: () -> Unit,
     onPassiveHandsFreeChange: (Boolean) -> Unit,
+    onOpenPersonalization: () -> Unit,
+    onDismissPersonalization: () -> Unit,
+    onAddPersonalAlias: (String, String) -> Unit,
+    onRemovePersonalAlias: (String) -> Unit,
+    onClearLearnedOnly: () -> Unit,
+    onClearAllPersonalization: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -99,6 +106,11 @@ fun CommandLayerScreen(
                     navigationIcon = {
                         TextButton(onClick = onBack) {
                             Text("Close")
+                        }
+                    },
+                    actions = {
+                        TextButton(onClick = onOpenPersonalization) {
+                            Text("Personalize")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -239,6 +251,18 @@ fun CommandLayerScreen(
                 }
             }
         }
+
+        PersonalizationSheet(
+            visible = state.showPersonalizationSheet,
+            onDismiss = onDismissPersonalization,
+            aliases = state.personalAliases,
+            learned = state.learnedPreferences,
+            installedApps = state.installedApps,
+            onAddAlias = onAddPersonalAlias,
+            onRemoveAlias = onRemovePersonalAlias,
+            onClearLearned = onClearLearnedOnly,
+            onClearAll = onClearAllPersonalization,
+        )
     }
 }
 
@@ -391,7 +415,7 @@ private fun VoiceStatusBanner(
 @Composable
 private fun ResultPanel(
     surface: CommandSurfaceState,
-    onAppPick: (String) -> Unit,
+    onAppPick: (String, String?, LearningSignal?) -> Unit,
     onRecentPick: (String) -> Unit,
 ) {
     Surface(
@@ -481,8 +505,18 @@ private fun ResultPanel(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    val learnKey = surface.resolutionTargetKey
                     surface.apps.forEach { app ->
-                        AppResultRow(app = app, onClick = { onAppPick(app.packageName) })
+                        AppResultRow(
+                            app = app,
+                            onClick = {
+                                onAppPick(
+                                    app.packageName,
+                                    learnKey,
+                                    if (learnKey != null) LearningSignal.SUGGESTION_PICK else null,
+                                )
+                            },
+                        )
                     }
                 }
             }
@@ -500,8 +534,18 @@ private fun ResultPanel(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
+                        val learnKey = surface.resolutionTargetKey
                         surface.apps.forEach { app ->
-                            AppResultRow(app = app, onClick = { onAppPick(app.packageName) })
+                            AppResultRow(
+                                app = app,
+                                onClick = {
+                                    onAppPick(
+                                        app.packageName,
+                                        learnKey,
+                                        if (learnKey != null) LearningSignal.SUGGESTION_PICK else null,
+                                    )
+                                },
+                            )
                         }
                     }
                 }

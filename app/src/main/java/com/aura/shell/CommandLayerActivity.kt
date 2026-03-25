@@ -54,6 +54,7 @@ class CommandLayerActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val startListeningFromLaunch = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
+        val openPersonalization = intent.getBooleanExtra(EXTRA_OPEN_PERSONALIZATION, false)
 
         lifecycle.addObserver(
             androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -128,6 +129,12 @@ class CommandLayerActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(openPersonalization) {
+                    if (openPersonalization) {
+                        viewModel.openPersonalizationSheet()
+                    }
+                }
+
                 LaunchedEffect(startListeningFromLaunch) {
                     if (startListeningFromLaunch) {
                         when {
@@ -156,12 +163,18 @@ class CommandLayerActivity : ComponentActivity() {
                         viewModel.applyHistoryEntry(entry)
                         focusRequester.requestFocus()
                     },
-                    onAppPick = { pkg ->
-                        viewModel.launchApp(pkg)
+                    onAppPick = { pkg, learnKey, signal ->
+                        viewModel.launchApp(pkg, resolutionTargetKey = learnKey, learningSignal = signal)
                     },
                     onRecentPick = { pkg ->
                         viewModel.launchApp(pkg)
                     },
+                    onOpenPersonalization = { viewModel.openPersonalizationSheet() },
+                    onDismissPersonalization = { viewModel.dismissPersonalizationSheet() },
+                    onAddPersonalAlias = { a, p -> viewModel.addPersonalAlias(a, p) },
+                    onRemovePersonalAlias = { viewModel.removePersonalAlias(it) },
+                    onClearLearnedOnly = { viewModel.clearLearnedPreferencesOnly() },
+                    onClearAllPersonalization = { viewModel.clearAllPersonalization() },
                     onMicClick = {
                         when {
                             hasMicPermission() -> startVoiceCapture()
@@ -231,5 +244,6 @@ class CommandLayerActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_START_LISTENING = "com.aura.shell.extra.START_LISTENING"
+        const val EXTRA_OPEN_PERSONALIZATION = "com.aura.shell.extra.OPEN_PERSONALIZATION"
     }
 }

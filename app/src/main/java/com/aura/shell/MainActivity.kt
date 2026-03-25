@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -73,6 +74,16 @@ class MainActivity : ComponentActivity() {
                             snackbarHostState.showSnackbar("Microphone access is needed for hands-free. Toggle on again after allowing.")
                         }
                     }
+                }
+
+                LaunchedEffect(state.personalizationNavNonce) {
+                    if (state.personalizationNavNonce == null) return@LaunchedEffect
+                    startActivity(
+                        Intent(this@MainActivity, CommandLayerActivity::class.java).apply {
+                            putExtra(CommandLayerActivity.EXTRA_OPEN_PERSONALIZATION, true)
+                        },
+                    )
+                    vm.consumePersonalizationNavRequest()
                 }
 
                 fun onPassiveToggle(enabled: Boolean) {

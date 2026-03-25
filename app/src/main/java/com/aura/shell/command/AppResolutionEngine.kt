@@ -1,6 +1,8 @@
 package com.aura.shell.command
 
 import com.aura.shell.model.LauncherAppInfo
+import com.aura.shell.personalization.PersonalLearningBonus
+import com.aura.shell.personalization.PersonalResolutionContext
 
 /**
  * Ranks apps for a target phrase with exact / alias / fuzzy tiers and confidence.
@@ -24,43 +26,72 @@ class AppResolutionEngine(
     /**
      * Search / find apps — ranked list for "search apps for …".
      */
-    fun searchApps(query: String, installedApps: List<LauncherAppInfo>): List<LauncherAppInfo> {
+    fun searchApps(
+        query: String,
+        installedApps: List<LauncherAppInfo>,
+        personal: PersonalResolutionContext? = null,
+    ): List<LauncherAppInfo> {
         val key = query.lowercase().trim()
         if (key.isEmpty()) return emptyList()
-        return rankAllApps(installedApps, key).take(24).map { it.app }
+        val learnKey = personal?.learningStore?.normalizeQueryKey(query) ?: key
+        return rankAllApps(installedApps, key, personal, learnKey).take(24).map { it.app }
     }
 
     fun resolve(
         target: String,
         installedApps: List<LauncherAppInfo>,
+        personal: PersonalResolutionContext? = null,
     ): ResolutionOutcome {
         val stripped = CommandNormalizer.stripTargetFiller(target)
         val key = stripped.lowercase().trim()
         if (key.isEmpty()) {
             return ResolutionOutcome.NoMatch("Nothing to open.")
         }
+        val learnKey = personal?.learningStore?.normalizeQueryKey(stripped) ?: key
+
+        personal?.let { ctx ->
+            resolvePersonalAlias(key, installedApps, ctx)?.let { return it }
+        }
 
         // 1) Exact alias → semantic resolution
         CommandAliasRegistry.lookupAlias(key)?.let { semantics ->
-            return resolveSemantics(semantics, installedApps, key)
+            return resolveSemantics(semantics, installedApps, key, personal, learnKey)
         }
 
         // 2) Multi-word: try whole string as alias (e.g. "phone book")
         if (key.contains(' ')) {
             CommandAliasRegistry.lookupAlias(key)?.let { semantics ->
-                return resolveSemantics(semantics, installedApps, key)
+                return resolveSemantics(semantics, installedApps, key, personal, learnKey)
             }
         }
 
         // 3) Score all apps: exact + fuzzy on label tokens
-        val ranked = rankAllApps(installedApps, key)
-        return pickOutcome(ranked, key)
+        val ranked = rankAllApps(installedApps, key, personal, learnKey)
+        return pickOutcome(ranked, key, personal, learnKey)
+    }
+
+    private fun resolvePersonalAlias(
+        key: String,
+        installedApps: List<LauncherAppInfo>,
+        ctx: PersonalResolutionContext,
+    ): ResolutionOutcome? {
+        val pkg = ctx.aliasStore.getPackageForAlias(key) ?: return null
+        val app = installedApps.find { it.packageName == pkg } ?: return ResolutionOutcome.NoMatch(
+            "Your alias \"$key\" pointed to an app that isn’t installed. Edit it in Personalization.",
+        )
+        return ResolutionOutcome.SingleLaunch(
+            app,
+            "Using your alias for ${app.label}",
+            usedPersonalAlias = true,
+        )
     }
 
     private fun resolveSemantics(
         semantics: List<CommandAliasRegistry.SemanticToken>,
         installedApps: List<LauncherAppInfo>,
         aliasKey: String,
+        personal: PersonalResolutionContext?,
+        learnKey: String,
     ): ResolutionOutcome {
         // Prefer a single installed app whose visible label matches what the user said
         // (e.g. "messages" → app labeled "Messages"), so we launch instead of disambiguating
@@ -69,7 +100,7 @@ class AppResolutionEngine(
 
         val mergedKeywords = semantics.flatMap { CommandAliasRegistry.keywordsFor(it).toList() }.toSet()
         val ranked = installedApps
-            .map { app -> scoreSemantic(app, mergedKeywords) }
+            .map { app -> addPersonalBonus(scoreSemantic(app, mergedKeywords), app, personal, learnKey) }
             .filter { it.score > 0 }
             .sortedByDescending { it.score }
 
@@ -85,9 +116,16 @@ class AppResolutionEngine(
             gap >= ResolutionThresholds.GAP_FOR_DIRECT
 
         if (canLaunch) {
+            val learned = personal?.learningStore?.getWeight(learnKey, best.app.packageName) ?: 0
+            val prefHint = if (PersonalLearningBonus.bonusPoints(learned) > 0) {
+                "Preferred: ${best.app.label}"
+            } else {
+                "Best match: ${best.app.label}"
+            }
             return ResolutionOutcome.SingleLaunch(
                 best.app,
-                "Best match: ${best.app.label}",
+                prefHint,
+                usedLearnedPreference = PersonalLearningBonus.bonusPoints(learned) > 0,
             )
         }
 
@@ -98,7 +136,7 @@ class AppResolutionEngine(
         }
         return ResolutionOutcome.Suggest(
             title = "Matches for \"$aliasKey\"",
-            subtitle = "Tap to open",
+            subtitle = "Tap to choose",
             candidates = ranked.take(8).map { it.app },
             kind = kind,
         )
@@ -171,12 +209,41 @@ class AppResolutionEngine(
         return Ranked(app, best, tier)
     }
 
-    private fun rankAllApps(apps: List<LauncherAppInfo>, key: String): List<Ranked> {
+    private fun rankAllApps(
+        apps: List<LauncherAppInfo>,
+        key: String,
+        personal: PersonalResolutionContext?,
+        learnKey: String,
+    ): List<Ranked> {
         val tokens = key.split(' ').filter { it.isNotBlank() }
         return apps.mapNotNull { app ->
             val score = scoreAgainstLabel(app.label, tokens, key)
-            if (score <= 0) null else Ranked(app, score, classifyTier(score))
+            if (score <= 0) null else addPersonalBonus(
+                Ranked(app, score, classifyTier(score)),
+                app,
+                personal,
+                learnKey,
+            )
         }.sortedByDescending { it.score }
+    }
+
+    private fun addPersonalBonus(
+        base: Ranked,
+        app: LauncherAppInfo,
+        personal: PersonalResolutionContext?,
+        learnKey: String,
+    ): Ranked {
+        if (personal == null) return base
+        val w = personal.learningStore.getWeight(learnKey, app.packageName)
+        val bonus = PersonalLearningBonus.bonusPoints(w)
+        if (bonus <= 0) return base
+        val newScore = (base.score + bonus).coerceAtMost(1100)
+        return base.copy(score = newScore, tier = maxOfTier(base.tier, classifyTier(newScore)))
+    }
+
+    private fun maxOfTier(a: MatchTier, b: MatchTier): MatchTier {
+        val order = listOf(MatchTier.FUZZY, MatchTier.ALIAS_SEMANTIC, MatchTier.EXACT_LABEL)
+        return if (order.indexOf(a) >= order.indexOf(b)) a else b
     }
 
     private fun classifyTier(score: Int): MatchTier {
@@ -214,7 +281,12 @@ class AppResolutionEngine(
         return sum
     }
 
-    private fun pickOutcome(ranked: List<Ranked>, queryKey: String): ResolutionOutcome {
+    private fun pickOutcome(
+        ranked: List<Ranked>,
+        queryKey: String,
+        personal: PersonalResolutionContext?,
+        learnKey: String,
+    ): ResolutionOutcome {
         if (ranked.isEmpty()) {
             return ResolutionOutcome.NoMatch("No app matched \"$queryKey\". Try search apps for $queryKey")
         }
@@ -229,13 +301,18 @@ class AppResolutionEngine(
         }
 
         if (canDirect && (second == null || best.score - (second?.score ?: 0) >= 25)) {
+            val learned = personal?.learningStore?.getWeight(learnKey, best.app.packageName) ?: 0
+            val usedPref = PersonalLearningBonus.bonusPoints(learned) > 0 &&
+                best.tier != MatchTier.EXACT_LABEL
+            val hint = when (best.tier) {
+                MatchTier.EXACT_LABEL -> "Best match: ${best.app.label}"
+                MatchTier.ALIAS_SEMANTIC -> if (usedPref) "Preferred app: ${best.app.label}" else "Best match: ${best.app.label}"
+                MatchTier.FUZZY -> if (usedPref) "Preferred app: ${best.app.label}" else "Close match: ${best.app.label}"
+            }
             return ResolutionOutcome.SingleLaunch(
                 best.app,
-                when (best.tier) {
-                    MatchTier.EXACT_LABEL -> "Best match: ${best.app.label}"
-                    MatchTier.ALIAS_SEMANTIC -> "Best match: ${best.app.label}"
-                    MatchTier.FUZZY -> "Close match: ${best.app.label}"
-                },
+                hint,
+                usedLearnedPreference = usedPref,
             )
         }
 
@@ -251,7 +328,7 @@ class AppResolutionEngine(
             } else {
                 "I found a few matches"
             },
-            subtitle = "For \"$queryKey\"",
+            subtitle = "Tap to choose · For \"$queryKey\"",
             candidates = topN,
             kind = kind,
         )
@@ -269,6 +346,8 @@ sealed class ResolutionOutcome {
     data class SingleLaunch(
         val app: LauncherAppInfo,
         val hint: String,
+        val usedPersonalAlias: Boolean = false,
+        val usedLearnedPreference: Boolean = false,
     ) : ResolutionOutcome()
 
     data class Suggest(

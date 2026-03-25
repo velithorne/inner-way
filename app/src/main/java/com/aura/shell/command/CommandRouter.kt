@@ -3,6 +3,8 @@ package com.aura.shell.command
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 
+import com.aura.shell.personalization.PersonalResolutionContext
+
 /**
  * Routes normalized text to [CommandDispatch] using [AppResolutionEngine] and [CommandAliasRegistry].
  */
@@ -15,6 +17,7 @@ class CommandRouter(
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
         appDrawerExpanded: Boolean = false,
+        personal: PersonalResolutionContext? = null,
     ): CommandDispatch {
         val normalized = CommandNormalizer.normalize(rawInput)
         if (normalized.isEmpty()) {
@@ -26,8 +29,10 @@ class CommandRouter(
         }
 
         if (normalized == "open recent messages") {
-            return dispatchRecentMessages(recentApps)
+            return dispatchRecentMessages(recentApps, personal)
         }
+
+        routePersonalizationMeta(normalized)?.let { return it }
 
         if (CommandAliasRegistry.matchesAppDrawerIntent(normalized)) {
             return CommandDispatch.OpenAppDrawer
@@ -46,10 +51,11 @@ class CommandRouter(
 
         val searchQuery = extractSearchQuery(normalized)
         if (searchQuery != null) {
-            val matches = resolution.searchApps(searchQuery, installedApps)
+            val matches = resolution.searchApps(searchQuery, installedApps, personal)
             return CommandDispatch.SearchMatches(
                 query = searchQuery,
                 matches = matches,
+                resolutionTargetKey = personal?.learningStore?.normalizeQueryKey(searchQuery),
             )
         }
 
@@ -57,40 +63,68 @@ class CommandRouter(
             ?: extractAfterPrefix(normalized, "launch recent ")
             ?: extractAfterPrefix(normalized, "start recent ")
         if (openRecentTarget != null) {
-            return dispatchOpenRecent(openRecentTarget, recentApps)
+            return dispatchOpenRecent(openRecentTarget, recentApps, personal)
         }
 
         tryRecentListCommands(normalized, recentApps)?.let { return it }
 
         val openTarget = extractOpenTarget(normalized)
         if (openTarget != null) {
-            return dispatchAppResolution(openTarget, installedApps)
+            return dispatchAppResolution(openTarget, installedApps, personal)
         }
 
         // Bare shorthand: "calc", "yt", "msgs", "setings"
-        return dispatchAppResolution(normalized, installedApps)
+        return dispatchAppResolution(normalized, installedApps, personal)
+    }
+
+    private fun routePersonalizationMeta(normalized: String): CommandDispatch? {
+        return when (normalized) {
+            "manage aliases",
+            "personalization",
+            "personalize",
+            "manage personalization",
+            "my aliases",
+            "show my aliases",
+            "learned preferences",
+            "show learned preferences",
+            -> CommandDispatch.OpenPersonalizationPanel
+            "reset preferences",
+            "clear learned",
+            "clear learned preferences",
+            -> CommandDispatch.ClearLearnedPreferences
+            "reset personalization",
+            "clear personalization",
+            "clear all personalization",
+            -> CommandDispatch.ClearAllPersonalization
+            else -> null
+        }
     }
 
     private fun dispatchAppResolution(
         target: String,
         installedApps: List<LauncherAppInfo>,
+        personal: PersonalResolutionContext?,
     ): CommandDispatch {
         val cleaned = CommandNormalizer.stripTargetFiller(target)
         if (cleaned.isEmpty()) {
             return CommandDispatch.Unknown("Try: open camera, or yt, or help.")
         }
 
-        return when (val outcome = resolution.resolve(cleaned, installedApps)) {
+        return when (val outcome = resolution.resolve(cleaned, installedApps, personal)) {
             is ResolutionOutcome.SingleLaunch -> CommandDispatch.LaunchApp(
                 packageName = outcome.app.packageName,
                 displayLabel = outcome.app.label,
                 resultHint = outcome.hint,
+                resolutionTargetKey = personal?.learningStore?.normalizeQueryKey(cleaned) ?: cleaned,
+                usedPersonalAlias = outcome.usedPersonalAlias,
+                usedLearnedPreference = outcome.usedLearnedPreference,
             )
             is ResolutionOutcome.Suggest -> CommandDispatch.PickFromSuggestions(
                 message = outcome.title,
                 candidates = outcome.candidates,
                 subtitle = outcome.subtitle,
                 kind = outcome.kind,
+                resolutionTargetKey = personal?.learningStore?.normalizeQueryKey(cleaned) ?: cleaned,
             )
             is ResolutionOutcome.NoMatch -> CommandDispatch.Unknown(outcome.message)
         }
@@ -99,6 +133,7 @@ class CommandRouter(
     private fun dispatchOpenRecent(
         target: String,
         recentApps: List<RecentAppEntry>,
+        personal: PersonalResolutionContext?,
     ): CommandDispatch {
         val cleaned = CommandNormalizer.stripTargetFiller(target)
         val matches = filterRecents(recentApps, cleaned)
@@ -111,6 +146,7 @@ class CommandRouter(
                 packageName = matches[0].packageName,
                 displayLabel = matches[0].label,
                 resultHint = "Recent: ${matches[0].label}",
+                resolutionTargetKey = personal?.learningStore?.normalizeQueryKey(cleaned) ?: cleaned,
             )
             else -> CommandDispatch.RecentMatches(
                 title = "Recent matching \"$cleaned\"",
@@ -119,7 +155,10 @@ class CommandRouter(
         }
     }
 
-    private fun dispatchRecentMessages(recentApps: List<RecentAppEntry>): CommandDispatch {
+    private fun dispatchRecentMessages(
+        recentApps: List<RecentAppEntry>,
+        personal: PersonalResolutionContext?,
+    ): CommandDispatch {
         val filtered = recentApps.filter { e ->
             val l = e.label.lowercase()
             l.contains("message") || l.contains("sms") || l.contains("messenger") || l.contains("chat")
@@ -133,6 +172,8 @@ class CommandRouter(
                 packageName = filtered[0].packageName,
                 displayLabel = filtered[0].label,
                 resultHint = "Recent: ${filtered[0].label}",
+                resolutionTargetKey = personal?.learningStore?.normalizeQueryKey("open recent messages")
+                    ?: "open recent messages",
             )
             else -> CommandDispatch.RecentMatches(
                 title = "Messaging apps (recent)",
@@ -179,6 +220,9 @@ class CommandRouter(
         val HELP_LINES = listOf(
             "Hands-free only while Aura’s home/command screen is visible — not while another app is on top (Android limit). Press Home first, then say “Aura”.",
             "Voice: tap the mic, speak, same commands as typing",
+            "Personalization (local on device): open vids, tunes, workmail — add aliases in Personalization",
+            "music, msg, browser — Aura learns which app you pick over time",
+            "manage aliases · show my aliases — open the sheet · reset preferences · clear personalization",
             "go home / home / Aura, close — return to launcher (press device Home if another app is open first)",
             "close apps — hide Aura’s installed-apps drawer only",
             "open camera — or: opn camra, cam, photo",

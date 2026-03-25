@@ -5,6 +5,9 @@ import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
+import com.aura.shell.personalization.LearningSignal
+import com.aura.shell.personalization.PreferenceLearningStore
+import com.aura.shell.personalization.PersonalResolutionContext
 import com.aura.shell.ui.home.AppDrawerSessionState
 
 /**
@@ -17,6 +20,8 @@ suspend fun executeCommandPipeline(
     recentStore: RecentAppsStore,
     historyStore: CommandHistoryStore,
     router: CommandRouter,
+    learningStore: PreferenceLearningStore,
+    personal: PersonalResolutionContext,
 ): PipelineResult {
     val trimmed = text.trim()
     if (trimmed.isEmpty()) {
@@ -33,6 +38,7 @@ suspend fun executeCommandPipeline(
         recentApps = recent,
         appDrawerExpanded = AppDrawerSessionState.expanded,
         router = router,
+        personal = personal,
     )
     val history = historyStore.loadHistory()
 
@@ -43,11 +49,29 @@ suspend fun executeCommandPipeline(
                 return PipelineResult.Error("Couldn’t open ${dispatch.displayLabel}. Try again or pick from suggestions.")
             }
             recentStore.recordLaunch(dispatch.packageName)
+            recordLaunchLearning(learningStore, history, trimmed, dispatch)
             PipelineResult.Launched(
                 displayLabel = dispatch.displayLabel,
                 hint = dispatch.resultHint,
                 history = history,
                 recentApps = recentStore.loadRecentEntries(repository),
+            )
+        }
+        is CommandDispatch.OpenPersonalizationPanel ->
+            PipelineResult.OpenPersonalization(history = history)
+        is CommandDispatch.ClearLearnedPreferences -> {
+            learningStore.clearAll()
+            PipelineResult.SurfaceOnly(
+                surface = CommandSurfaceState.Success("Cleared learned preferences. Your custom aliases are unchanged."),
+                history = history,
+            )
+        }
+        is CommandDispatch.ClearAllPersonalization -> {
+            learningStore.clearAll()
+            personal.aliasStore.clearAll()
+            PipelineResult.SurfaceOnly(
+                surface = CommandSurfaceState.Success("Cleared all personalization on this device."),
+                history = history,
             )
         }
         is CommandDispatch.OpenAppDrawer -> PipelineResult.OpenDrawer(history = history)
@@ -66,22 +90,47 @@ suspend fun executeCommandPipeline(
     }
 }
 
-private fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState {
+private fun recordLaunchLearning(
+    learningStore: PreferenceLearningStore,
+    history: List<CommandHistoryEntry>,
+    trimmed: String,
+    dispatch: CommandDispatch.LaunchApp,
+) {
+    if (dispatch.usedPersonalAlias) return
+    val key = dispatch.resolutionTargetKey?.takeIf { it.isNotBlank() } ?: return
+    learningStore.record(key, dispatch.packageName, LearningSignal.DIRECT_LAUNCH)
+    val prev = history.getOrNull(1)
+    if (prev != null) {
+        val same = prev.normalized?.let {
+            learningStore.normalizeQueryKey(it) == learningStore.normalizeQueryKey(key)
+        } ?: (learningStore.normalizeQueryKey(prev.original) == learningStore.normalizeQueryKey(key))
+        if (same) {
+            learningStore.record(key, dispatch.packageName, LearningSignal.REPEAT_PATTERN)
+        }
+    }
+}
+
+internal fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState {
     return when (dispatch) {
         is CommandDispatch.LaunchApp,
         is CommandDispatch.OpenAppDrawer,
         is CommandDispatch.CloseAppDrawer,
         is CommandDispatch.GoHome,
+        is CommandDispatch.OpenPersonalizationPanel,
+        is CommandDispatch.ClearLearnedPreferences,
+        is CommandDispatch.ClearAllPersonalization,
         -> CommandSurfaceState.Empty
         is CommandDispatch.PickFromSuggestions -> CommandSurfaceState.Suggestions(
             title = dispatch.message,
             subtitle = dispatch.subtitle,
             apps = dispatch.candidates,
             kind = dispatch.kind,
+            resolutionTargetKey = dispatch.resolutionTargetKey,
         )
         is CommandDispatch.SearchMatches -> CommandSurfaceState.SearchResults(
             query = dispatch.query,
             apps = dispatch.matches,
+            resolutionTargetKey = dispatch.resolutionTargetKey,
         )
         is CommandDispatch.RecentMatches -> CommandSurfaceState.RecentsList(
             title = dispatch.title,
@@ -103,6 +152,7 @@ sealed class PipelineResult {
     data class OpenDrawer(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class CloseDrawer(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class GoHome(val history: List<CommandHistoryEntry>) : PipelineResult()
+    data class OpenPersonalization(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class SurfaceOnly(
         val surface: CommandSurfaceState,
         val history: List<CommandHistoryEntry>,
