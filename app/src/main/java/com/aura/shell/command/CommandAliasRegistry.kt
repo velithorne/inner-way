@@ -121,11 +121,24 @@ object CommandAliasRegistry {
 
     fun matchesHideDrawerIntent(normalizedPhrase: String): Boolean {
         val n = normalizedPhrase.trim()
+        // Short voice phrases after wake: "Aura, close" / "Aura, dismiss"
+        if (n == "close" ||
+            n == "dismiss" ||
+            n == "hide" ||
+            n == "close it" ||
+            n == "dismiss it" ||
+            n == "hide it" ||
+            n == "go back"
+        ) {
+            return true
+        }
         return n == "hide apps" ||
             n == "close apps" ||
             n == "dismiss apps" ||
             n == "close app drawer" ||
             n == "close drawer" ||
+            n == "hide drawer" ||
+            n == "dismiss drawer" ||
             n == "hide the apps"
     }
 }

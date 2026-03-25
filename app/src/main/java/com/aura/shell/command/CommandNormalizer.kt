@@ -71,6 +71,8 @@ object CommandNormalizer {
         out = out.replace(Regex("^hide the apps$"), "hide apps")
         out = out.replace(Regex("^close the apps$"), "close apps")
         out = out.replace(Regex("^close the app drawer$"), "close apps")
+        out = out.replace(Regex("^shut the apps$"), "close apps")
+        out = out.replace(Regex("^shut apps$"), "close apps")
 
         return out
     }

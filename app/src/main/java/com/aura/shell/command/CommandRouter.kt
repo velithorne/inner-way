@@ -170,6 +170,7 @@ class CommandRouter(
         val HELP_LINES = listOf(
             "Hands-free (home/command, screen on): say “Aura, open camera” or “Aura” then command",
             "Voice: tap the mic, speak, same commands as typing",
+            "Aura, close — or: close apps, dismiss, hide (closes Aura’s app list drawer)",
             "open camera — or: opn camra, cam, photo",
             "open settings — or: setings, prefs",
             "open msg / msgs / messages — or say “open msg”",

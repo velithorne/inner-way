@@ -62,6 +62,18 @@ class CommandRouterTest {
     }
 
     @Test
+    fun bareClose_hidesDrawer() {
+        val d = router.route("close", apps, emptyList())
+        assertTrue(d is CommandDispatch.CloseAppDrawer)
+    }
+
+    @Test
+    fun dismiss_hidesDrawer() {
+        val d = router.route("dismiss", apps, emptyList())
+        assertTrue(d is CommandDispatch.CloseAppDrawer)
+    }
+
+    @Test
     fun takeMeToChrome_routes() {
         val withChrome = apps + LauncherAppInfo("com.android.chrome", "Chrome", dummyIcon)
         val d = router.route("take me to chrome", withChrome, emptyList())
