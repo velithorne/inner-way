@@ -3,12 +3,14 @@ package com.aura.shell.data
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import com.aura.shell.LaunchActivityProvider
 import com.aura.shell.model.LauncherAppInfo
 import kotlinx.coroutines.Dispatchers
@@ -46,14 +48,19 @@ class LauncherRepository(
             Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
         )
-        val launchContext = LaunchActivityProvider.current() ?: appContext
+        val mainComponent = intent.component ?: resolveMainActivityComponent(packageName)
         val runnable = {
-            try {
-                launchContext.startActivity(intent)
-            } catch (_: Exception) {
+            val viaLauncher =
+                mainComponent != null && tryStartViaLauncherApps(mainComponent)
+            if (!viaLauncher) {
+                val launchContext = LaunchActivityProvider.current() ?: appContext
                 try {
-                    appContext.startActivity(intent)
-                } catch (_: Exception) { }
+                    launchContext.startActivity(intent)
+                } catch (_: Exception) {
+                    try {
+                        appContext.startActivity(intent)
+                    } catch (_: Exception) { }
+                }
             }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -62,6 +69,32 @@ class LauncherRepository(
             Handler(Looper.getMainLooper()).post(runnable)
         }
         return true
+    }
+
+    private fun resolveMainActivityComponent(packageName: String): ComponentName? {
+        val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolves = queryLaunchActivities(main)
+        val resolve = resolves.firstOrNull { it.activityInfo.packageName == packageName } ?: return null
+        return ComponentName(
+            resolve.activityInfo.packageName,
+            resolve.activityInfo.name,
+        )
+    }
+
+    /**
+     * When Aura is the default HOME app, plain [Context.startActivity] from the launcher task can be
+     * ignored on some devices. [LauncherApps.startMainActivity] is the supported path for launchers.
+     */
+    private fun tryStartViaLauncherApps(component: ComponentName): Boolean {
+        return try {
+            val launcherApps =
+                appContext.getSystemService(Context.LAUNCHER_APPS_SERVICE) as? LauncherApps
+                    ?: return false
+            launcherApps.startMainActivity(component, Process.myUserHandle(), null, null)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**

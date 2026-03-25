@@ -1,6 +1,7 @@
 package com.aura.shell.voice
 
 import com.aura.shell.command.CommandInputSource
+import com.aura.shell.command.CommandSurfaceState
 import com.aura.shell.command.PipelineResult
 import com.aura.shell.command.WakePhraseProcessor
 import com.aura.shell.command.WakeProcessResult
@@ -146,8 +147,27 @@ class ForegroundPassiveVoiceCoordinator(
             is PipelineResult.OpenDrawer,
             is PipelineResult.CloseDrawer,
             -> HandsFreeUiState.Success("Done")
-            is PipelineResult.SurfaceOnly -> HandsFreeUiState.Success("Ready")
+            is PipelineResult.SurfaceOnly ->
+                HandsFreeUiState.Success(surfaceOnlySummary(result.surface))
             is PipelineResult.Error -> HandsFreeUiState.Error(result.message)
+        }
+    }
+
+    /**
+     * Hands-free cannot tap suggestions; make clear when the router needs the command screen.
+     */
+    private fun surfaceOnlySummary(surface: CommandSurfaceState): String {
+        return when (surface) {
+            is CommandSurfaceState.Empty -> "No matching command."
+            is CommandSurfaceState.Success -> surface.message
+            is CommandSurfaceState.Suggestions ->
+                "${surface.title} — open the command bar to choose an app."
+            is CommandSurfaceState.SearchResults ->
+                "Found apps for “${surface.query}” — open the command bar to pick one."
+            is CommandSurfaceState.RecentsList ->
+                "${surface.title} — open the command bar to pick one."
+            is CommandSurfaceState.Help -> "Say e.g. “Aura, open camera”."
+            is CommandSurfaceState.Unknown -> surface.message
         }
     }
 }
