@@ -70,6 +70,11 @@ class ForegroundPassiveVoiceCoordinator(
             if (followUpMode) HandsFreeUiState.ListeningForCommand
             else HandsFreeUiState.ListeningForWake,
         )
+        val profile = if (followUpMode) {
+            SpeechInputManager.ListenProfile.PassiveFollowUp
+        } else {
+            SpeechInputManager.ListenProfile.PassiveWake
+        }
         speech.startListening(
             onReady = { },
             onPartialResult = { },
@@ -91,6 +96,7 @@ class ForegroundPassiveVoiceCoordinator(
                     }
                 }
             },
+            profile = profile,
         )
     }
 
@@ -104,7 +110,9 @@ class ForegroundPassiveVoiceCoordinator(
             }
             WakeProcessResult.WakeOnly -> {
                 onState(HandsFreeUiState.WakeDetected)
-                delay(350)
+                // Brief gap so the mic session from "Aura" fully tears down before the follow-up
+                // session starts — avoids ERROR_CLIENT / empty results on some devices.
+                delay(550)
                 if (!foregroundVisible || !isPassiveEnabled()) return
                 listenForWake(followUpMode = true)
             }
