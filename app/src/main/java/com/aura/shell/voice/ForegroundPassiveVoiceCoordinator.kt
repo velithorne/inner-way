@@ -110,22 +110,7 @@ class ForegroundPassiveVoiceCoordinator(
             is WakeProcessResult.Command -> {
                 onState(HandsFreeUiState.Processing)
                 val result = submitCommand(w.text, CommandInputSource.PassiveVoice)
-                when (result) {
-                    is PipelineResult.Launched -> {
-                        onState(HandsFreeUiState.Success("Opened ${result.displayLabel}"))
-                    }
-                    is PipelineResult.OpenDrawer,
-                    is PipelineResult.CloseDrawer,
-                    -> {
-                        onState(HandsFreeUiState.Success("Done"))
-                    }
-                    is PipelineResult.SurfaceOnly -> {
-                        onState(HandsFreeUiState.Success("Ready"))
-                    }
-                    is PipelineResult.Error -> {
-                        onState(HandsFreeUiState.Error(result.message))
-                    }
-                }
+                onState(afterSubmitState(result))
                 delay(900)
                 if (foregroundVisible && isPassiveEnabled()) scheduleArm()
                 else onState(HandsFreeUiState.Disabled)
@@ -133,13 +118,17 @@ class ForegroundPassiveVoiceCoordinator(
             WakeProcessResult.NotWake -> {
                 if (followUpMode) {
                     onState(HandsFreeUiState.Processing)
-                    submitCommand(raw, CommandInputSource.PassiveVoice)
+                    val r = submitCommand(raw, CommandInputSource.PassiveVoice)
+                    onState(afterSubmitState(r))
                     delay(900)
                     if (foregroundVisible && isPassiveEnabled()) scheduleArm()
                 } else {
-                    onState(HandsFreeUiState.Timeout)
-                    delay(500)
-                    scheduleArm()
+                    // Single utterance without "Aura" prefix — still try as a command (e.g. "open camera").
+                    onState(HandsFreeUiState.Processing)
+                    val r = submitCommand(raw, CommandInputSource.PassiveVoice)
+                    onState(afterSubmitState(r))
+                    delay(900)
+                    if (foregroundVisible && isPassiveEnabled()) scheduleArm()
                 }
             }
         }
@@ -149,5 +138,16 @@ class ForegroundPassiveVoiceCoordinator(
         loopJob?.cancel()
         loopJob = null
         speech.stopListening()
+    }
+
+    private fun afterSubmitState(result: PipelineResult): HandsFreeUiState {
+        return when (result) {
+            is PipelineResult.Launched -> HandsFreeUiState.Success("Opened ${result.displayLabel}")
+            is PipelineResult.OpenDrawer,
+            is PipelineResult.CloseDrawer,
+            -> HandsFreeUiState.Success("Done")
+            is PipelineResult.SurfaceOnly -> HandsFreeUiState.Success("Ready")
+            is PipelineResult.Error -> HandsFreeUiState.Error(result.message)
+        }
     }
 }

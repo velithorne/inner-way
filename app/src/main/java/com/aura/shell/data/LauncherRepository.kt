@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import com.aura.shell.model.LauncherAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,7 +38,18 @@ class LauncherRepository(
     fun launchApp(packageName: String): Boolean {
         val launcherIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
         launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        appContext.startActivity(launcherIntent)
+        val runnable = {
+            try {
+                appContext.startActivity(launcherIntent)
+            } catch (_: Exception) {
+                // Caller may check success via foreground transition
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            runnable()
+        } else {
+            Handler(Looper.getMainLooper()).post(runnable)
+        }
         return true
     }
 
