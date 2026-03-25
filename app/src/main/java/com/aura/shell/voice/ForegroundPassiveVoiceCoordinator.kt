@@ -157,6 +157,7 @@ class ForegroundPassiveVoiceCoordinator(
             -> HandsFreeUiState.Success("Done")
             is PipelineResult.GoHome -> HandsFreeUiState.Success("Returned home")
             is PipelineResult.OpenPersonalization -> HandsFreeUiState.Success("Opening personalization…")
+            is PipelineResult.OpenKnowledge -> HandsFreeUiState.Success("Opening knowledge…")
             is PipelineResult.SurfaceOnly ->
                 HandsFreeUiState.Success(surfaceOnlySummary(result.surface))
             is PipelineResult.Error -> HandsFreeUiState.Error(result.message)
@@ -178,6 +179,9 @@ class ForegroundPassiveVoiceCoordinator(
                 "${surface.title} — open the command bar to pick one."
             is CommandSurfaceState.Help -> "Say e.g. “Aura, open camera”."
             is CommandSurfaceState.Unknown -> surface.message
+            is CommandSurfaceState.KnowledgeResults ->
+                if (surface.items.isEmpty()) surface.subtitle ?: "No matches"
+                else "${surface.title} — open the command bar to open a note."
         }
     }
 }

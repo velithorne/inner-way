@@ -12,12 +12,13 @@ class CommandRouter(
     private val resolution: AppResolutionEngine = AppResolutionEngine(),
 ) {
 
-    fun route(
+    suspend fun route(
         rawInput: String,
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
         appDrawerExpanded: Boolean = false,
         personal: PersonalResolutionContext? = null,
+        knowledgeRepository: com.aura.shell.knowledge.KnowledgeRepository? = null,
     ): CommandDispatch {
         val normalized = CommandNormalizer.normalize(rawInput)
         if (normalized.isEmpty()) {
@@ -27,6 +28,8 @@ class CommandRouter(
         if (isHelpIntent(normalized)) {
             return CommandDispatch.ShowHelp(HELP_LINES)
         }
+
+        knowledgeRepository?.let { dispatchKnowledge(normalized, it) }?.let { return it }
 
         if (normalized == "open recent messages") {
             return dispatchRecentMessages(recentApps, personal)
@@ -75,6 +78,83 @@ class CommandRouter(
 
         // Bare shorthand: "calc", "yt", "msgs", "setings"
         return dispatchAppResolution(normalized, installedApps, personal)
+    }
+
+    private suspend fun dispatchKnowledge(
+        normalized: String,
+        knowledgeRepository: com.aura.shell.knowledge.KnowledgeRepository,
+    ): CommandDispatch? {
+        return when (val k = com.aura.shell.knowledge.KnowledgeCommandParser.parse(normalized)) {
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.None -> null
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.ShowAll ->
+                CommandDispatch.OpenKnowledge("list")
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.OpenImportPicker ->
+                CommandDispatch.OpenKnowledge("import")
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.RecentImports ->
+                CommandDispatch.OpenKnowledge("imports")
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.NewOrSaveNote ->
+                CommandDispatch.OpenKnowledge("new")
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.SaveFromClipboard ->
+                CommandDispatch.OpenKnowledge("clipboard")
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.ContinueRecentWork -> {
+                val first = knowledgeRepository.getRecent(1).firstOrNull()
+                if (first == null) {
+                    CommandDispatch.Unknown("No saved knowledge yet. Try “new note”.")
+                } else {
+                    CommandDispatch.OpenKnowledge("item:${first.id}")
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.SearchKnowledge -> {
+                val items = knowledgeRepository.searchAll(k.query, 24)
+                if (items.isEmpty()) {
+                    CommandDispatch.KnowledgeSearchResults(
+                        title = "Knowledge",
+                        subtitle = "Nothing matched “${k.query}”.",
+                        items = emptyList(),
+                    )
+                } else {
+                    CommandDispatch.KnowledgeSearchResults(
+                        title = "Knowledge · “${k.query}”",
+                        subtitle = "Stored only on this device",
+                        items = items,
+                    )
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.SearchNotes -> {
+                val items = knowledgeRepository.searchNotes(k.query, 24)
+                if (items.isEmpty()) {
+                    CommandDispatch.KnowledgeSearchResults(
+                        title = "Notes",
+                        subtitle = if (k.query == null) "No notes yet." else "Nothing matched “${k.query}”.",
+                        items = emptyList(),
+                    )
+                } else {
+                    CommandDispatch.KnowledgeSearchResults(
+                        title = if (k.query != null) "Notes · “${k.query}”" else "Your notes",
+                        subtitle = "Tap to open",
+                        items = items,
+                    )
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.OpenLinkAbout -> {
+                val items = knowledgeRepository.searchAll(k.query, 12)
+                    .filter {
+                        it.sourceType == com.aura.shell.knowledge.KnowledgeSourceType.SHARED_URL ||
+                            it.title.contains("http", ignoreCase = true)
+                    }
+                if (items.isEmpty()) {
+                    CommandDispatch.Unknown("No saved links matched. Try “show knowledge”.")
+                } else if (items.size == 1) {
+                    CommandDispatch.OpenKnowledge("item:${items[0].id}")
+                } else {
+                    CommandDispatch.KnowledgeSearchResults(
+                        title = "Saved links",
+                        subtitle = "Pick one",
+                        items = items,
+                    )
+                }
+            }
+        }
     }
 
     private fun routePersonalizationMeta(normalized: String): CommandDispatch? {
@@ -234,6 +314,9 @@ class CommandRouter(
             "close apps — hide the drawer",
             "search apps for music",
             "show recents — help",
+            "Knowledge (local on device): new note · show my notes · search notes for …",
+            "show knowledge · show recent imports · search knowledge for … · import file in app",
+            "open saved link about … · continue my work · save from clipboard",
         )
 
         private fun isHelpIntent(n: String): Boolean {
@@ -245,6 +328,12 @@ class CommandRouter(
             extractAfterPrefix(normalized, "search apps for ")?.let { return it }
             extractAfterPrefix(normalized, "search for ")?.let { return it }
             extractAfterPrefix(normalized, "search apps ")?.let { return it }
+            // avoid capturing "find X notes" / knowledge find — handled by knowledge layer
+            if (Regex("^find .+ notes$").matches(normalized) ||
+                normalized.startsWith("find knowledge")
+            ) {
+                return null
+            }
             if (normalized.startsWith("find ")) {
                 return normalized.removePrefix("find ").trim().takeIf { it.isNotEmpty() }
             }

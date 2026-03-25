@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aura.shell.command.DrawerRequest
+import com.aura.shell.knowledge.KnowledgeListItem
 import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
@@ -90,6 +91,8 @@ fun HomeScreen(
     snackbarHostState: SnackbarHostState,
     drawerRequest: DrawerRequest? = null,
     onDrawerRequestConsumed: () -> Unit = {},
+    knowledgePreview: KnowledgeListItem? = null,
+    onOpenKnowledge: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pinned = remember { defaultPinnedCards() }
@@ -198,6 +201,15 @@ fun HomeScreen(
                     onMicClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onMicClick()
+                    },
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                KnowledgeHomeCard(
+                    preview = knowledgePreview,
+                    onOpenKnowledge = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onOpenKnowledge()
                     },
                 )
 

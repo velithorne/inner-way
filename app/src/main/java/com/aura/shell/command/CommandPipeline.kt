@@ -39,6 +39,7 @@ suspend fun executeCommandPipeline(
         appDrawerExpanded = AppDrawerSessionState.expanded,
         router = router,
         personal = personal,
+        knowledgeRepository = com.aura.shell.AuraApplication.instance.knowledgeRepository,
     )
     val history = historyStore.loadHistory()
 
@@ -83,6 +84,11 @@ suspend fun executeCommandPipeline(
             }
             PipelineResult.GoHome(history = history)
         }
+        is CommandDispatch.OpenKnowledge -> PipelineResult.OpenKnowledge(path = dispatch.path, history = history)
+        is CommandDispatch.KnowledgeSearchResults -> PipelineResult.SurfaceOnly(
+            surface = surfaceFromDispatch(dispatch),
+            history = history,
+        )
         else -> PipelineResult.SurfaceOnly(
             surface = surfaceFromDispatch(dispatch),
             history = history,
@@ -119,6 +125,7 @@ internal fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState
         is CommandDispatch.OpenPersonalizationPanel,
         is CommandDispatch.ClearLearnedPreferences,
         is CommandDispatch.ClearAllPersonalization,
+        is CommandDispatch.OpenKnowledge,
         -> CommandSurfaceState.Empty
         is CommandDispatch.PickFromSuggestions -> CommandSurfaceState.Suggestions(
             title = dispatch.message,
@@ -137,6 +144,11 @@ internal fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState
             entries = dispatch.entries,
         )
         is CommandDispatch.ShowHelp -> CommandSurfaceState.Help(dispatch.lines)
+        is CommandDispatch.KnowledgeSearchResults -> CommandSurfaceState.KnowledgeResults(
+            title = dispatch.title,
+            subtitle = dispatch.subtitle,
+            items = dispatch.items,
+        )
         is CommandDispatch.Unknown -> CommandSurfaceState.Unknown(dispatch.message)
     }
 }
@@ -153,6 +165,10 @@ sealed class PipelineResult {
     data class CloseDrawer(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class GoHome(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class OpenPersonalization(val history: List<CommandHistoryEntry>) : PipelineResult()
+    data class OpenKnowledge(
+        val path: String,
+        val history: List<CommandHistoryEntry>,
+    ) : PipelineResult()
     data class SurfaceOnly(
         val surface: CommandSurfaceState,
         val history: List<CommandHistoryEntry>,

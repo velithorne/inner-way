@@ -17,6 +17,8 @@ import com.aura.shell.personalization.PreferenceLearningStore
 import com.aura.shell.personalization.PersonalResolutionContext
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
+import com.aura.shell.knowledge.KnowledgeListItem
+import com.aura.shell.knowledge.KnowledgeRepository
 import com.aura.shell.voice.ForegroundPassiveVoiceCoordinator
 import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.voice.SpeechInputManager
@@ -34,6 +36,9 @@ data class HomeUiState(
     val drawerRequest: DrawerRequest? = null,
     /** One-shot: open command layer with personalization sheet (voice “manage aliases” from home). */
     val personalizationNavNonce: Long? = null,
+    /** One-shot: open Knowledge from a passive voice command. */
+    val knowledgeNavNonce: Pair<String, Long>? = null,
+    val latestKnowledgePreview: KnowledgeListItem? = null,
     val passiveHandsFreeEnabled: Boolean = false,
     val handsFree: HandsFreeUiState = HandsFreeUiState.Disabled,
 )
@@ -49,6 +54,7 @@ class HomeViewModel(
     private val aliasStore = PersonalAliasStore(application.applicationContext)
     private val learningStore = PreferenceLearningStore(application.applicationContext)
     private val router = CommandRouter()
+    private val knowledgeRepository = KnowledgeRepository(application.applicationContext)
     private val personal: PersonalResolutionContext
         get() = PersonalResolutionContext(aliasStore, learningStore)
 
@@ -65,6 +71,11 @@ class HomeViewModel(
     init {
         refreshApps()
         refreshRecents()
+        viewModelScope.launch {
+            knowledgeRepository.observeRecent(1).collect { list ->
+                _uiState.update { it.copy(latestKnowledgePreview = list.firstOrNull()) }
+            }
+        }
     }
 
     fun setPassiveHandsFreeEnabled(enabled: Boolean) {
@@ -147,6 +158,11 @@ class HomeViewModel(
                     it.copy(personalizationNavNonce = System.nanoTime())
                 }
             }
+            is PipelineResult.OpenKnowledge -> {
+                _uiState.update {
+                    it.copy(knowledgeNavNonce = result.path to System.nanoTime())
+                }
+            }
             is PipelineResult.SurfaceOnly -> { }
             is PipelineResult.Error -> { }
         }
@@ -200,6 +216,10 @@ class HomeViewModel(
 
     fun consumePersonalizationNavRequest() {
         _uiState.update { it.copy(personalizationNavNonce = null) }
+    }
+
+    fun consumeKnowledgeNavRequest() {
+        _uiState.update { it.copy(knowledgeNavNonce = null) }
     }
 
     override fun onCleared() {

@@ -123,6 +123,17 @@ class CommandLayerActivity : ComponentActivity() {
                                     is CommandSideEffect.FinishAfterGoHome -> {
                                         finish()
                                     }
+                                    is CommandSideEffect.OpenKnowledge -> {
+                                        startActivity(
+                                            android.content.Intent(
+                                                this@CommandLayerActivity,
+                                                com.aura.shell.knowledge.KnowledgeActivity::class.java,
+                                            ).putExtra(
+                                                com.aura.shell.knowledge.KnowledgeActivity.EXTRA_ROUTE,
+                                                effect.path,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -175,6 +186,17 @@ class CommandLayerActivity : ComponentActivity() {
                     onRemovePersonalAlias = { viewModel.removePersonalAlias(it) },
                     onClearLearnedOnly = { viewModel.clearLearnedPreferencesOnly() },
                     onClearAllPersonalization = { viewModel.clearAllPersonalization() },
+                    onKnowledgeItemPick = { id ->
+                        startActivity(
+                            android.content.Intent(
+                                this@CommandLayerActivity,
+                                com.aura.shell.knowledge.KnowledgeActivity::class.java,
+                            ).putExtra(
+                                com.aura.shell.knowledge.KnowledgeActivity.EXTRA_ROUTE,
+                                "item:$id",
+                            ),
+                        )
+                    },
                     onMicClick = {
                         when {
                             hasMicPermission() -> startVoiceCapture()

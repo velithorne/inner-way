@@ -4,6 +4,7 @@ import android.graphics.drawable.ColorDrawable
 import com.aura.shell.command.CommandDispatch
 import com.aura.shell.command.CommandRouter
 import com.aura.shell.model.LauncherAppInfo
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,27 +24,29 @@ class VoiceCommandPipelineTest {
     private val router = CommandRouter()
 
     @Test
-    fun voiceTranscript_sameAsTypedRoute() {
+    fun voiceTranscript_sameAsTypedRoute() = runBlocking {
         val spoken = "open camera"
-        val typed = router.route(spoken, apps, emptyList())
+        val typed = router.route(spoken, apps, emptyList(), knowledgeRepository = null)
         val via = VoiceCommandPipeline.process(
             transcript = spoken,
             installedApps = apps,
             recentApps = emptyList(),
             appDrawerExpanded = false,
             router = router,
+            knowledgeRepository = null,
         )
         assertTrue(typed == via)
     }
 
     @Test
-    fun transcript_openCamera_dispatch() {
+    fun transcript_openCamera_dispatch() = runBlocking {
         val d = VoiceCommandPipeline.process(
             transcript = "open camera",
             installedApps = apps,
             recentApps = emptyList(),
             appDrawerExpanded = false,
             router = router,
+            knowledgeRepository = null,
         )
         assertTrue(d is CommandDispatch.LaunchApp)
     }

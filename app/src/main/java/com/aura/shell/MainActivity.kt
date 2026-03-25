@@ -20,6 +20,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.ContextCompat
 import androidx.compose.material3.SnackbarHostState
 import com.aura.shell.command.LauncherDrawerIntent
+import com.aura.shell.knowledge.KnowledgeActivity
 import com.aura.shell.ui.home.HomeScreen
 import com.aura.shell.ui.home.HomeViewModel
 import com.aura.shell.ui.home.HomeViewModelFactory
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        LaunchActivityProvider.detach(this)
         super.onPause()
     }
 
@@ -86,6 +88,16 @@ class MainActivity : ComponentActivity() {
                     vm.consumePersonalizationNavRequest()
                 }
 
+                LaunchedEffect(state.knowledgeNavNonce) {
+                    val req = state.knowledgeNavNonce ?: return@LaunchedEffect
+                    startActivity(
+                        Intent(this@MainActivity, KnowledgeActivity::class.java).apply {
+                            putExtra(KnowledgeActivity.EXTRA_ROUTE, req.first)
+                        },
+                    )
+                    vm.consumeKnowledgeNavRequest()
+                }
+
                 fun onPassiveToggle(enabled: Boolean) {
                     if (!enabled) {
                         vm.setPassiveHandsFreeEnabled(false)
@@ -104,6 +116,14 @@ class MainActivity : ComponentActivity() {
 
                 HomeScreen(
                     state = state,
+                    knowledgePreview = state.latestKnowledgePreview,
+                    onOpenKnowledge = {
+                        startActivity(
+                            Intent(this@MainActivity, KnowledgeActivity::class.java).apply {
+                                putExtra(KnowledgeActivity.EXTRA_ROUTE, "list")
+                            },
+                        )
+                    },
                     passiveHandsFreeEnabled = state.passiveHandsFreeEnabled,
                     onPassiveHandsFreeChange = { onPassiveToggle(it) },
                     handsFree = state.handsFree,

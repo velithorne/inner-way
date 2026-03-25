@@ -1,5 +1,6 @@
 package com.aura.shell.command
 
+import com.aura.shell.knowledge.KnowledgeListItem
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 
@@ -55,4 +56,13 @@ sealed class CommandDispatch {
     data object ClearAllPersonalization : CommandDispatch()
 
     data class Unknown(val message: String) : CommandDispatch()
+
+    /** Deep link into knowledge UI: list | imports | notes | new | clipboard | item:<id> | search:<q> | notesearch:<q> */
+    data class OpenKnowledge(val path: String) : CommandDispatch()
+
+    data class KnowledgeSearchResults(
+        val title: String,
+        val subtitle: String?,
+        val items: List<KnowledgeListItem>,
+    ) : CommandDispatch()
 }

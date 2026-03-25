@@ -57,6 +57,11 @@ sealed class CommandSurfaceState {
         val apps: List<LauncherAppInfo>,
         val resolutionTargetKey: String? = null,
     ) : CommandSurfaceState()
+    data class KnowledgeResults(
+        val title: String,
+        val subtitle: String?,
+        val items: List<com.aura.shell.knowledge.KnowledgeListItem>,
+    ) : CommandSurfaceState()
     data class RecentsList(val title: String, val entries: List<RecentAppEntry>) : CommandSurfaceState()
     data class Help(val lines: List<String>) : CommandSurfaceState()
     data class Unknown(val message: String) : CommandSurfaceState()
@@ -334,6 +339,12 @@ class CommandLayerViewModel(
                         learnedPreferences = learningStore.getAllLearnedRows(),
                     )
                 }
+            }
+            is PipelineResult.OpenKnowledge -> {
+                _uiState.update {
+                    it.copy(history = result.history)
+                }
+                _sideEffects.tryEmit(CommandSideEffect.OpenKnowledge(result.path))
             }
             is PipelineResult.SurfaceOnly -> {
                 _uiState.update {

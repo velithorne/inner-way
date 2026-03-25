@@ -11,14 +11,22 @@ import com.aura.shell.personalization.PersonalResolutionContext
  */
 object VoiceCommandPipeline {
 
-    fun process(
+    suspend fun process(
         transcript: String,
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
         appDrawerExpanded: Boolean = false,
         router: CommandRouter = CommandRouter(),
         personal: PersonalResolutionContext? = null,
+        knowledgeRepository: com.aura.shell.knowledge.KnowledgeRepository? = null,
     ): CommandDispatch {
-        return router.route(transcript, installedApps, recentApps, appDrawerExpanded, personal)
+        return router.route(
+            transcript,
+            installedApps,
+            recentApps,
+            appDrawerExpanded,
+            personal,
+            knowledgeRepository,
+        )
     }
 }

@@ -1,0 +1,80 @@
+package com.aura.shell.knowledge
+
+/**
+ * Deterministic knowledge intents from normalized command text (lowercase, normalized punctuation).
+ */
+object KnowledgeCommandParser {
+
+    sealed class Intent {
+        data object None : Intent()
+        data object ShowAll : Intent()
+        data object RecentImports : Intent()
+        data object NewOrSaveNote : Intent()
+        data object SaveFromClipboard : Intent()
+        data object ContinueRecentWork : Intent()
+        data object OpenImportPicker : Intent()
+        data class SearchKnowledge(val query: String) : Intent()
+        data class SearchNotes(val query: String?) : Intent()
+        data class OpenLinkAbout(val query: String) : Intent()
+    }
+
+    fun parse(normalized: String): Intent {
+        val n = normalized.trim()
+        if (n.isEmpty()) return Intent.None
+
+        if (n == "show my notes" || n == "my notes" || n == "list notes") {
+            return Intent.SearchNotes(null)
+        }
+        if (n == "show recent imports" || n == "recent imports" || n == "show imports") {
+            return Intent.RecentImports
+        }
+        if (n == "show knowledge" || n == "knowledge" || n == "open knowledge" || n == "my knowledge") {
+            return Intent.ShowAll
+        }
+        if (n == "new note" || n == "save a note" || n == "create note" || n == "add note") {
+            return Intent.NewOrSaveNote
+        }
+        if (n == "save from clipboard" || n == "paste to knowledge" || n == "save clipboard") {
+            return Intent.SaveFromClipboard
+        }
+        if (n == "continue my recent work" || n == "continue my work" || n == "recent work") {
+            return Intent.ContinueRecentWork
+        }
+        if (n == "import file" || n == "open knowledge import" || n == "pick file to import") {
+            return Intent.OpenImportPicker
+        }
+
+        extractAfterPrefixes(n, listOf("search knowledge for ", "search knowledge ", "find knowledge "))?.let {
+            return Intent.SearchKnowledge(it)
+        }
+        extractAfterPrefixes(n, listOf("search notes for ", "search notes ", "find notes for ", "find notes "))?.let {
+            return Intent.SearchNotes(it)
+        }
+        Regex("^find (.+) notes$").find(n)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            return Intent.SearchNotes(it)
+        }
+        extractAfterPrefix(n, "open saved link about ")?.let {
+            return Intent.OpenLinkAbout(it)
+        }
+        extractAfterPrefix(n, "remember this ")?.let {
+            if (it.isNotBlank()) return Intent.SearchKnowledge(it)
+        }
+        if (n == "remember this" || n == "save this note" || n == "save this") {
+            return Intent.NewOrSaveNote
+        }
+
+        return Intent.None
+    }
+
+    private fun extractAfterPrefix(n: String, prefix: String): String? {
+        if (!n.startsWith(prefix)) return null
+        return n.removePrefix(prefix).trim().takeIf { it.isNotEmpty() }
+    }
+
+    private fun extractAfterPrefixes(n: String, prefixes: List<String>): String? {
+        for (p in prefixes) {
+            extractAfterPrefix(n, p)?.let { return it }
+        }
+        return null
+    }
+}

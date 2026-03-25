@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aura.shell.knowledge.KnowledgeListItem
 import com.aura.shell.command.CommandHistoryEntry
 import com.aura.shell.command.CommandInputSource
 import com.aura.shell.command.CommandLayerUiState
@@ -81,6 +82,7 @@ fun CommandLayerScreen(
     onRemovePersonalAlias: (String) -> Unit,
     onClearLearnedOnly: () -> Unit,
     onClearAllPersonalization: () -> Unit,
+    onKnowledgeItemPick: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -246,6 +248,7 @@ fun CommandLayerScreen(
                             surface = state.surface,
                             onAppPick = onAppPick,
                             onRecentPick = onRecentPick,
+                            onKnowledgeItemPick = onKnowledgeItemPick,
                         )
                     }
                 }
@@ -417,6 +420,7 @@ private fun ResultPanel(
     surface: CommandSurfaceState,
     onAppPick: (String, String?, LearningSignal?) -> Unit,
     onRecentPick: (String) -> Unit,
+    onKnowledgeItemPick: (String) -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -550,6 +554,34 @@ private fun ResultPanel(
                     }
                 }
             }
+            is CommandSurfaceState.KnowledgeResults -> {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = surface.title,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    surface.subtitle?.let {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (surface.items.isEmpty()) {
+                        Text(
+                            text = "Nothing to show.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        surface.items.forEach { item ->
+                            KnowledgeResultRow(item = item, onClick = { onKnowledgeItemPick(item.id) })
+                        }
+                    }
+                }
+            }
             is CommandSurfaceState.RecentsList -> {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
@@ -598,6 +630,40 @@ private fun AppResultRow(
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun KnowledgeResultRow(
+    item: KnowledgeListItem,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+    ) {
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = item.snippet,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = item.sourceType.name.replace('_', ' '),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }
