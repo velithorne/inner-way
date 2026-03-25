@@ -127,6 +127,10 @@ class HomeViewModel(
                     it.copy(drawerRequest = DrawerRequest(nonce = System.nanoTime(), expand = false))
                 }
             }
+            is PipelineResult.GoHome -> {
+                // MainActivity already foreground; refresh recents if needed
+                refreshRecents()
+            }
             is PipelineResult.SurfaceOnly -> { }
             is PipelineResult.Error -> { }
         }

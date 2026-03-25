@@ -35,6 +35,9 @@ sealed class CommandDispatch {
 
     data object CloseAppDrawer : CommandDispatch()
 
+    /** Bring the default HOME (Aura) to the front — press Home, then voice works hands-free again. */
+    data object GoHome : CommandDispatch()
+
     data class ShowHelp(val lines: List<String>) : CommandDispatch()
 
     data class Unknown(val message: String) : CommandDispatch()

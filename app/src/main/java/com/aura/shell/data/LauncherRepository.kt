@@ -138,6 +138,42 @@ class LauncherRepository(
         }
     }
 
+    /**
+     * Press “Home” programmatically: show the default HOME activity (Aura when set as launcher).
+     */
+    fun goHome(): Boolean {
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return tryStartHome(intent)
+        }
+        val latch = CountDownLatch(1)
+        val ok = AtomicBoolean(false)
+        Handler(Looper.getMainLooper()).post {
+            ok.set(tryStartHome(intent))
+            latch.countDown()
+        }
+        latch.await(5L, TimeUnit.SECONDS)
+        return ok.get()
+    }
+
+    private fun tryStartHome(intent: Intent): Boolean {
+        return try {
+            val c = LaunchActivityProvider.current() ?: appContext
+            c.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            try {
+                appContext.startActivity(intent)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
     fun getLabelForPackage(packageName: String): String? {
         return try {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)

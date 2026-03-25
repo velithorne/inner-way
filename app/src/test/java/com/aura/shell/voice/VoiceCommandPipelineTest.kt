@@ -26,13 +26,25 @@ class VoiceCommandPipelineTest {
     fun voiceTranscript_sameAsTypedRoute() {
         val spoken = "open camera"
         val typed = router.route(spoken, apps, emptyList())
-        val via = VoiceCommandPipeline.process(spoken, apps, emptyList(), router)
+        val via = VoiceCommandPipeline.process(
+            transcript = spoken,
+            installedApps = apps,
+            recentApps = emptyList(),
+            appDrawerExpanded = false,
+            router = router,
+        )
         assertTrue(typed == via)
     }
 
     @Test
     fun transcript_openCamera_dispatch() {
-        val d = VoiceCommandPipeline.process("open camera", apps, emptyList(), router)
+        val d = VoiceCommandPipeline.process(
+            transcript = "open camera",
+            installedApps = apps,
+            recentApps = emptyList(),
+            appDrawerExpanded = false,
+            router = router,
+        )
         assertTrue(d is CommandDispatch.LaunchApp)
     }
 }

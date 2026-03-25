@@ -243,6 +243,15 @@ class CommandLayerViewModel(
                 }
                 _sideEffects.tryEmit(CommandSideEffect.CloseAppDrawerAndFinish)
             }
+            is PipelineResult.GoHome -> {
+                _uiState.update {
+                    it.copy(
+                        surface = CommandSurfaceState.Success("Returned home"),
+                        history = result.history,
+                    )
+                }
+                _sideEffects.tryEmit(CommandSideEffect.FinishAfterGoHome)
+            }
             is PipelineResult.SurfaceOnly -> {
                 _uiState.update {
                     it.copy(

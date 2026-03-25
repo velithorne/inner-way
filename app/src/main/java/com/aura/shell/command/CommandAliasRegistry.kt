@@ -121,17 +121,6 @@ object CommandAliasRegistry {
 
     fun matchesHideDrawerIntent(normalizedPhrase: String): Boolean {
         val n = normalizedPhrase.trim()
-        // Short voice phrases after wake: "Aura, close" / "Aura, dismiss"
-        if (n == "close" ||
-            n == "dismiss" ||
-            n == "hide" ||
-            n == "close it" ||
-            n == "dismiss it" ||
-            n == "hide it" ||
-            n == "go back"
-        ) {
-            return true
-        }
         return n == "hide apps" ||
             n == "close apps" ||
             n == "dismiss apps" ||
@@ -139,6 +128,44 @@ object CommandAliasRegistry {
             n == "close drawer" ||
             n == "hide drawer" ||
             n == "dismiss drawer" ||
-            n == "hide the apps"
+            n == "hide the apps" ||
+            n == "dismiss drawer apps"
+    }
+
+    /**
+     * Short phrases: if Aura’s app drawer is expanded, these collapse it; otherwise they mean “show HOME”.
+     */
+    fun matchesBareCloseOrDismiss(normalizedPhrase: String): Boolean {
+        val n = normalizedPhrase.trim()
+        return n == "close" ||
+            n == "close it" ||
+            n == "dismiss" ||
+            n == "hide" ||
+            n == "dismiss it" ||
+            n == "hide it" ||
+            n == "go back" ||
+            n == "back"
+    }
+
+    /** Leave the foreground app and show HOME (launcher). Not force-stop — Android does not allow that here. */
+    fun matchesGoHomeIntent(normalizedPhrase: String): Boolean {
+        val n = normalizedPhrase.trim()
+        return n == "go home" ||
+            n == "home" ||
+            n == "launcher" ||
+            n == "aura home" ||
+            n == "back home" ||
+            n == "return home" ||
+            n == "back to home" ||
+            n == "back to launcher" ||
+            n == "show home" ||
+            n == "close app" ||
+            n == "close application" ||
+            n == "exit app" ||
+            n == "quit app" ||
+            n == "leave app" ||
+            n == "dismiss app" ||
+            n == "exit" ||
+            n == "quit"
     }
 }

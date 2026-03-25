@@ -62,15 +62,21 @@ class CommandRouterTest {
     }
 
     @Test
-    fun bareClose_hidesDrawer() {
-        val d = router.route("close", apps, emptyList())
+    fun bareClose_whenDrawerExpanded_hidesDrawer() {
+        val d = router.route("close", apps, emptyList(), appDrawerExpanded = true)
         assertTrue(d is CommandDispatch.CloseAppDrawer)
     }
 
     @Test
-    fun dismiss_hidesDrawer() {
-        val d = router.route("dismiss", apps, emptyList())
-        assertTrue(d is CommandDispatch.CloseAppDrawer)
+    fun bareClose_whenDrawerPeek_goHome() {
+        val d = router.route("close", apps, emptyList(), appDrawerExpanded = false)
+        assertTrue(d is CommandDispatch.GoHome)
+    }
+
+    @Test
+    fun goHome_explicit() {
+        val d = router.route("go home", apps, emptyList())
+        assertTrue(d is CommandDispatch.GoHome)
     }
 
     @Test

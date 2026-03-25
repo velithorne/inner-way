@@ -114,6 +114,10 @@ fun HomeScreen(
         onDrawerRequestConsumed()
     }
 
+    LaunchedEffect(sheetState.currentValue) {
+        AppDrawerSessionState.expanded = sheetState.currentValue == SheetValue.Expanded
+    }
+
     val peekAlpha by animateFloatAsState(
         targetValue = if (sheetState.currentValue == SheetValue.Expanded) 0.92f else 1f,
         animationSpec = tween(220),

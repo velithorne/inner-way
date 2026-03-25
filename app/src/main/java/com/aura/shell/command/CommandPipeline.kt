@@ -5,6 +5,7 @@ import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
+import com.aura.shell.ui.home.AppDrawerSessionState
 
 /**
  * Shared submit path for typed, tap-mic, and passive foreground voice.
@@ -26,7 +27,13 @@ suspend fun executeCommandPipeline(
     val normalized = CommandNormalizer.normalize(trimmed)
     historyStore.recordCommand(trimmed, normalizedForReplay = normalized, source = source)
 
-    val dispatch = VoiceCommandPipeline.process(trimmed, apps, recent, router)
+    val dispatch = VoiceCommandPipeline.process(
+        transcript = trimmed,
+        installedApps = apps,
+        recentApps = recent,
+        appDrawerExpanded = AppDrawerSessionState.expanded,
+        router = router,
+    )
     val history = historyStore.loadHistory()
 
     return when (dispatch) {
@@ -45,6 +52,13 @@ suspend fun executeCommandPipeline(
         }
         is CommandDispatch.OpenAppDrawer -> PipelineResult.OpenDrawer(history = history)
         is CommandDispatch.CloseAppDrawer -> PipelineResult.CloseDrawer(history = history)
+        is CommandDispatch.GoHome -> {
+            val ok = repository.goHome()
+            if (!ok) {
+                return PipelineResult.Error("Couldn’t return home. Try your device’s Home button.")
+            }
+            PipelineResult.GoHome(history = history)
+        }
         else -> PipelineResult.SurfaceOnly(
             surface = surfaceFromDispatch(dispatch),
             history = history,
@@ -57,6 +71,7 @@ private fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState 
         is CommandDispatch.LaunchApp,
         is CommandDispatch.OpenAppDrawer,
         is CommandDispatch.CloseAppDrawer,
+        is CommandDispatch.GoHome,
         -> CommandSurfaceState.Empty
         is CommandDispatch.PickFromSuggestions -> CommandSurfaceState.Suggestions(
             title = dispatch.message,
@@ -87,6 +102,7 @@ sealed class PipelineResult {
 
     data class OpenDrawer(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class CloseDrawer(val history: List<CommandHistoryEntry>) : PipelineResult()
+    data class GoHome(val history: List<CommandHistoryEntry>) : PipelineResult()
     data class SurfaceOnly(
         val surface: CommandSurfaceState,
         val history: List<CommandHistoryEntry>,

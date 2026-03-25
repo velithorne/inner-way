@@ -119,6 +119,9 @@ class CommandLayerActivity : ComponentActivity() {
                                     is CommandSideEffect.CloseAppDrawerAndFinish -> {
                                         sendDrawerIntent(LauncherDrawerIntent.ACTION_CLOSE_APP_DRAWER)
                                     }
+                                    is CommandSideEffect.FinishAfterGoHome -> {
+                                        finish()
+                                    }
                                 }
                             }
                         }

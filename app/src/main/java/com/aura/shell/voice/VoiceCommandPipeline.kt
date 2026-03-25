@@ -14,8 +14,9 @@ object VoiceCommandPipeline {
         transcript: String,
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
+        appDrawerExpanded: Boolean = false,
         router: CommandRouter = CommandRouter(),
     ): CommandDispatch {
-        return router.route(transcript, installedApps, recentApps)
+        return router.route(transcript, installedApps, recentApps, appDrawerExpanded)
     }
 }

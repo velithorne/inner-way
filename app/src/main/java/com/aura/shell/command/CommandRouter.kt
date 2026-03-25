@@ -14,6 +14,7 @@ class CommandRouter(
         rawInput: String,
         installedApps: List<LauncherAppInfo>,
         recentApps: List<RecentAppEntry>,
+        appDrawerExpanded: Boolean = false,
     ): CommandDispatch {
         val normalized = CommandNormalizer.normalize(rawInput)
         if (normalized.isEmpty()) {
@@ -33,6 +34,14 @@ class CommandRouter(
         }
         if (CommandAliasRegistry.matchesHideDrawerIntent(normalized)) {
             return CommandDispatch.CloseAppDrawer
+        }
+        if (appDrawerExpanded && CommandAliasRegistry.matchesBareCloseOrDismiss(normalized)) {
+            return CommandDispatch.CloseAppDrawer
+        }
+        if (CommandAliasRegistry.matchesBareCloseOrDismiss(normalized) ||
+            CommandAliasRegistry.matchesGoHomeIntent(normalized)
+        ) {
+            return CommandDispatch.GoHome
         }
 
         val searchQuery = extractSearchQuery(normalized)
@@ -168,9 +177,10 @@ class CommandRouter(
 
     companion object {
         val HELP_LINES = listOf(
-            "Hands-free (home/command, screen on): say “Aura, open camera” or “Aura” then command",
+            "Hands-free only while Aura’s home/command screen is visible — not while another app is on top (Android limit). Press Home first, then say “Aura”.",
             "Voice: tap the mic, speak, same commands as typing",
-            "Aura, close — or: close apps, dismiss, hide (closes Aura’s app list drawer)",
+            "go home / home / Aura, close — return to launcher (press device Home if another app is open first)",
+            "close apps — hide Aura’s installed-apps drawer only",
             "open camera — or: opn camra, cam, photo",
             "open settings — or: setings, prefs",
             "open msg / msgs / messages — or say “open msg”",

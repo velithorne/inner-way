@@ -155,6 +155,7 @@ class ForegroundPassiveVoiceCoordinator(
             is PipelineResult.OpenDrawer,
             is PipelineResult.CloseDrawer,
             -> HandsFreeUiState.Success("Done")
+            is PipelineResult.GoHome -> HandsFreeUiState.Success("Returned home")
             is PipelineResult.SurfaceOnly ->
                 HandsFreeUiState.Success(surfaceOnlySummary(result.surface))
             is PipelineResult.Error -> HandsFreeUiState.Error(result.message)
