@@ -1,22 +1,22 @@
 package com.aura.shell.voice
 
-import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+
 /**
- * Wraps [SpeechRecognizer] for one-shot recognition from explicit user taps only.
- * No background listening.
+ * Wraps [SpeechRecognizer] for foreground-only capture. No background listening.
  */
 class SpeechInputManager(
-    private val activity: Activity,
+    context: Context,
 ) {
+    private val appContext = context.applicationContext
     private var recognizer: SpeechRecognizer? = null
 
-    fun isAvailable(): Boolean =
-        SpeechRecognizer.isRecognitionAvailable(activity.applicationContext)
+    fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(appContext)
 
     fun startListening(
         onReady: () -> Unit,
@@ -31,13 +31,15 @@ class SpeechInputManager(
             return
         }
 
-        val sr = SpeechRecognizer.createSpeechRecognizer(activity.applicationContext)
+        val sr = SpeechRecognizer.createSpeechRecognizer(appContext)
         recognizer = sr
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1_200)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1_500)
         }
 
         sr.setRecognitionListener(object : RecognitionListener {
@@ -55,19 +57,7 @@ class SpeechInputManager(
 
             override fun onError(error: Int) {
                 stopListening()
-                val msg = when (error) {
-                    SpeechRecognizer.ERROR_AUDIO -> "Couldn’t use the microphone. Check permissions."
-                    SpeechRecognizer.ERROR_CLIENT -> "Voice input was interrupted."
-                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is required."
-                    SpeechRecognizer.ERROR_NETWORK -> "Network required for this voice input. Try typing."
-                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Voice timed out. Try again."
-                    SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Try again or type."
-                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Voice is busy. Try again."
-                    SpeechRecognizer.ERROR_SERVER -> "Voice service error. Try typing."
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard. Try again."
-                    else -> "Voice didn’t work. Try typing your command."
-                }
-                onError(msg)
+                onError(errorToMessage(error))
             }
 
             override fun onResults(results: Bundle?) {
@@ -75,7 +65,7 @@ class SpeechInputManager(
                 val text = matches?.firstOrNull()?.trim().orEmpty()
                 stopListening()
                 if (text.isEmpty()) {
-                    onError("No speech recognized. Try again or type.")
+                    onError("No speech detected. Try again or type.")
                 } else {
                     onFinalResult(text)
                 }
@@ -105,5 +95,18 @@ class SpeechInputManager(
             } catch (_: Exception) { }
         }
         recognizer = null
+    }
+
+    private fun errorToMessage(error: Int): String = when (error) {
+        SpeechRecognizer.ERROR_AUDIO -> "Couldn’t use the microphone. Check permissions."
+        SpeechRecognizer.ERROR_CLIENT -> "Voice input was interrupted."
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is required."
+        SpeechRecognizer.ERROR_NETWORK -> "Network required for this voice input. Try typing."
+        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Voice timed out. Try again."
+        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected. Try again or type."
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Voice is busy. Try again."
+        SpeechRecognizer.ERROR_SERVER -> "Voice service error. Try typing."
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard. Try again."
+        else -> "Voice didn’t work. Try typing your command."
     }
 }

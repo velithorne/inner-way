@@ -40,10 +40,20 @@ class CommandLayerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        speech = SpeechInputManager(this)
+        speech = SpeechInputManager(applicationContext)
         enableEdgeToEdge()
 
         val startListeningFromLaunch = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
+
+        lifecycle.addObserver(
+            androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> viewModel.onForegroundChanged(true)
+                    Lifecycle.Event.ON_PAUSE -> viewModel.onForegroundChanged(false)
+                    else -> {}
+                }
+            },
+        )
 
         setContent {
             AuraShellTheme {
@@ -63,6 +73,28 @@ class CommandLayerActivity : ComponentActivity() {
                                 "Microphone access is off. You can still type commands below.",
                             ),
                         )
+                    }
+                }
+
+                val passiveMicLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) {
+                        viewModel.setPassiveHandsFreeEnabled(true)
+                    } else {
+                        viewModel.setPassiveHandsFreeEnabled(false)
+                    }
+                }
+
+                fun onPassiveToggle(enabled: Boolean) {
+                    if (!enabled) {
+                        viewModel.setPassiveHandsFreeEnabled(false)
+                        return
+                    }
+                    if (hasMicPermission()) {
+                        viewModel.setPassiveHandsFreeEnabled(true)
+                    } else {
+                        passiveMicLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 }
 
@@ -136,6 +168,7 @@ class CommandLayerActivity : ComponentActivity() {
                     onPermissionRetry = {
                         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     },
+                    onPassiveHandsFreeChange = { onPassiveToggle(it) },
                     onBack = { finish() },
                 )
             }
@@ -147,6 +180,7 @@ class CommandLayerActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     private fun startVoiceCapture() {
+        viewModel.onTapMicStarted()
         if (!speech.isAvailable()) {
             viewModel.setVoiceState(
                 VoiceSurfaceState.Error("Voice input isn’t available. Type your command instead."),

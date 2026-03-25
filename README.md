@@ -39,6 +39,12 @@ If the workflow fails, check the **Actions** tab on GitHub for logs.
 - **Permission**: `RECORD_AUDIO` in manifest; runtime request from `CommandLayerActivity` when starting voice.
 - **Home mic**: opens `CommandLayerActivity` with `EXTRA_START_LISTENING` to begin listening after permission.
 
+## Phase 3.1 — foreground hands-free “Aura”
+
+- **Toggle** (default off): `AuraSettingsStore` — hands-free only while home or command screen is **resumed**; stops on `onPause`.
+- **`ForegroundPassiveVoiceCoordinator`**: wake listen → `WakePhraseProcessor` → **`executeCommandPipeline`** (same as typed).
+- **Not** always-on / background / lock-screen.
+
 ## Phase 2.1 — forgiving matching (local)
 
 - **`CommandNormalizer`**: Phrase templates (`take me to …`, `bring up …`, `show me …` → `open …`), filler stripping (`my`, `the`), drawer phrases.

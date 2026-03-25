@@ -77,6 +77,7 @@ class CommandHistoryStore(
 enum class CommandInputSource {
     Typed,
     Voice,
+    PassiveVoice,
 }
 
 data class CommandHistoryEntry(

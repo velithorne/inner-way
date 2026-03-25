@@ -42,6 +42,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetScaffoldState
@@ -64,6 +65,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aura.shell.command.DrawerRequest
+import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
 import com.aura.shell.ui.components.DrawableImage
@@ -78,6 +80,9 @@ private const val RECENT_ON_HOME_MAX = 4
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    passiveHandsFreeEnabled: Boolean,
+    onPassiveHandsFreeChange: (Boolean) -> Unit,
+    handsFree: HandsFreeUiState,
     onAppClick: (String) -> Unit,
     onCommandBarClick: () -> Unit,
     onMicClick: () -> Unit,
@@ -172,7 +177,14 @@ fun HomeScreen(
             ) {
                 HomeHeader()
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                PassiveHandsFreeStrip(
+                    enabled = passiveHandsFreeEnabled,
+                    onEnabledChange = onPassiveHandsFreeChange,
+                    handsFree = handsFree,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 CommandBarBlock(
                     onCommandAreaClick = {
@@ -214,6 +226,65 @@ fun HomeScreen(
                     onAppClick(pkg)
                 },
             )
+        }
+    }
+}
+
+@Composable
+private fun PassiveHandsFreeStrip(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    handsFree: HandsFreeUiState,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+        tonalElevation = 0.dp,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Hands-free “Aura”",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text(
+                        text = "Only while this screen is open. Not always-on.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange,
+                )
+            }
+            val status = when (handsFree) {
+                HandsFreeUiState.Disabled,
+                is HandsFreeUiState.Error,
+                -> null
+                HandsFreeUiState.Armed -> "Aura is ready — say “Aura” or “Aura, …”"
+                HandsFreeUiState.ListeningForWake -> "Listening for “Aura”…"
+                HandsFreeUiState.WakeDetected -> "Wake heard"
+                HandsFreeUiState.ListeningForCommand -> "Say your command…"
+                HandsFreeUiState.Processing -> "Working…"
+                is HandsFreeUiState.Success -> handsFree.message
+                HandsFreeUiState.Timeout -> "Listening paused"
+                HandsFreeUiState.PermissionNeeded -> "Allow microphone in system settings"
+            }
+            if (enabled && status != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                )
+            }
         }
     }
 }

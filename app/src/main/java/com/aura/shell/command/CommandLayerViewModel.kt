@@ -7,7 +7,10 @@ import com.aura.shell.data.LauncherRepository
 import com.aura.shell.data.RecentAppsStore
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
-import com.aura.shell.voice.VoiceCommandPipeline
+import com.aura.shell.data.AuraSettingsStore
+import com.aura.shell.voice.ForegroundPassiveVoiceCoordinator
+import com.aura.shell.voice.HandsFreeUiState
+import com.aura.shell.voice.SpeechInputManager
 import com.aura.shell.voice.VoiceSurfaceState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +29,8 @@ data class CommandLayerUiState(
     val isLoading: Boolean = true,
     val surface: CommandSurfaceState = CommandSurfaceState.Empty,
     val voice: VoiceSurfaceState = VoiceSurfaceState.Idle,
+    val passiveHandsFreeEnabled: Boolean = false,
+    val handsFree: HandsFreeUiState = HandsFreeUiState.Disabled,
 )
 
 sealed class CommandSurfaceState {
@@ -50,9 +55,16 @@ class CommandLayerViewModel(
     private val repository = LauncherRepository(application.applicationContext)
     private val recentStore = RecentAppsStore(application.applicationContext)
     private val historyStore = CommandHistoryStore(application.applicationContext)
+    private val settingsStore = AuraSettingsStore(application.applicationContext)
+    private val passiveSpeech = SpeechInputManager(application.applicationContext)
     private val router = CommandRouter()
 
-    private val _uiState = MutableStateFlow(CommandLayerUiState())
+    private var passiveCoordinator: ForegroundPassiveVoiceCoordinator? = null
+    private var commandForeground = false
+
+    private val _uiState = MutableStateFlow(
+        CommandLayerUiState(passiveHandsFreeEnabled = settingsStore.passiveHandsFreeEnabled),
+    )
     val uiState: StateFlow<CommandLayerUiState> = _uiState.asStateFlow()
 
     private val _sideEffects = MutableSharedFlow<CommandSideEffect>(extraBufferCapacity = 1)
@@ -75,6 +87,7 @@ class CommandLayerViewModel(
                         recentApps = recent,
                         history = history,
                         isLoading = false,
+                        passiveHandsFreeEnabled = settingsStore.passiveHandsFreeEnabled,
                     )
                 }
             } catch (e: Exception) {
@@ -112,58 +125,142 @@ class CommandLayerViewModel(
     }
 
     fun submitCommand() {
-        submitCommand(CommandInputSource.Typed)
+        submitFromText(_uiState.value.inputText, CommandInputSource.Typed)
     }
 
     /**
      * Same pipeline as typed submit; used for voice transcripts.
      */
     fun submitCommand(source: CommandInputSource) {
-        val text = _uiState.value.inputText
-        val apps = _uiState.value.installedApps
-        val recent = _uiState.value.recentApps
-        if (_uiState.value.isLoading) return
+        submitFromText(_uiState.value.inputText, source)
+    }
 
-        val normalized = CommandNormalizer.normalize(text)
-        historyStore.recordCommand(text, normalizedForReplay = normalized, source = source)
+    suspend fun submitPipeline(text: String, source: CommandInputSource): PipelineResult {
+        if (_uiState.value.isLoading) {
+            return PipelineResult.Error("Loading…")
+        }
+        return executeCommandPipeline(
+            text = text,
+            source = source,
+            repository = repository,
+            recentStore = recentStore,
+            historyStore = historyStore,
+            router = router,
+        )
+    }
 
-        val dispatch = VoiceCommandPipeline.process(text, apps, recent, router)
+    private fun submitFromText(text: String, source: CommandInputSource) {
+        viewModelScope.launch {
+            val result = submitPipeline(text, source)
+            applyPipelineResult(result, commandTextForField = text)
+        }
+    }
+
+    fun setPassiveHandsFreeEnabled(enabled: Boolean) {
+        settingsStore.passiveHandsFreeEnabled = enabled
+        _uiState.update { it.copy(passiveHandsFreeEnabled = enabled) }
+        passiveCoordinator?.onPassiveSettingChanged(enabled)
+        if (!enabled) {
+            _uiState.update { it.copy(handsFree = HandsFreeUiState.Disabled) }
+        } else if (commandForeground) {
+            ensurePassiveCoordinator()
+            passiveCoordinator?.setForegroundVisible(true)
+        }
+    }
+
+    fun onForegroundChanged(visible: Boolean) {
+        commandForeground = visible
+        if (!visible) {
+            passiveCoordinator?.setForegroundVisible(false)
+            _uiState.update { it.copy(handsFree = HandsFreeUiState.Disabled) }
+            return
+        }
+        if (settingsStore.passiveHandsFreeEnabled) {
+            ensurePassiveCoordinator()
+            passiveCoordinator?.setForegroundVisible(true)
+        } else {
+            _uiState.update { it.copy(handsFree = HandsFreeUiState.Disabled) }
+        }
+    }
+
+    fun onTapMicStarted() {
+        passiveCoordinator?.stop()
+        _uiState.update { it.copy(handsFree = HandsFreeUiState.Disabled) }
+    }
+
+    private fun ensurePassiveCoordinator() {
+        if (passiveCoordinator != null) return
+        passiveCoordinator = ForegroundPassiveVoiceCoordinator(
+            scope = viewModelScope,
+            speech = passiveSpeech,
+            isPassiveEnabled = { settingsStore.passiveHandsFreeEnabled },
+            submitCommand = { text, source ->
+                val result = submitPipeline(text, source)
+                applyPipelineResult(result, commandTextForField = text)
+                result
+            },
+            onState = { state ->
+                _uiState.update { it.copy(handsFree = state) }
+            },
+        )
+    }
+
+    fun applyPipelineResult(result: PipelineResult, commandTextForField: String? = null) {
         _uiState.update {
             it.copy(
-                history = historyStore.loadHistory(),
                 voice = VoiceSurfaceState.Idle,
             )
         }
-        when (dispatch) {
-            is CommandDispatch.LaunchApp -> {
-                viewModelScope.launch {
-                    repository.launchApp(dispatch.packageName)
-                    recentStore.recordLaunch(dispatch.packageName)
-                    _uiState.update {
-                        it.copy(
-                            surface = CommandSurfaceState.Success(
-                                message = "Opened ${dispatch.displayLabel}",
-                                hint = dispatch.resultHint,
-                            ),
-                            recentApps = recentStore.loadRecentEntries(repository),
-                        )
-                    }
+        when (result) {
+            is PipelineResult.Launched -> {
+                _uiState.update {
+                    it.copy(
+                        inputText = commandTextForField ?: it.inputText,
+                        surface = CommandSurfaceState.Success(
+                            message = "Opened ${result.displayLabel}",
+                            hint = result.hint,
+                        ),
+                        history = result.history,
+                        recentApps = result.recentApps,
+                    )
                 }
             }
-            is CommandDispatch.OpenAppDrawer -> {
-                _uiState.update { it.copy(surface = CommandSurfaceState.Success("Opening app drawer…")) }
+            is PipelineResult.OpenDrawer -> {
+                _uiState.update {
+                    it.copy(
+                        surface = CommandSurfaceState.Success("Opening app drawer…"),
+                        history = result.history,
+                    )
+                }
                 _sideEffects.tryEmit(CommandSideEffect.OpenAppDrawerAndFinish)
             }
-            is CommandDispatch.CloseAppDrawer -> {
-                _uiState.update { it.copy(surface = CommandSurfaceState.Success("Closing app drawer…")) }
+            is PipelineResult.CloseDrawer -> {
+                _uiState.update {
+                    it.copy(
+                        surface = CommandSurfaceState.Success("Closing app drawer…"),
+                        history = result.history,
+                    )
+                }
                 _sideEffects.tryEmit(CommandSideEffect.CloseAppDrawerAndFinish)
             }
-            else -> applySurfaceOnly(dispatch)
+            is PipelineResult.SurfaceOnly -> {
+                _uiState.update {
+                    it.copy(
+                        surface = result.surface,
+                        history = result.history,
+                    )
+                }
+            }
+            is PipelineResult.Error -> {
+                _uiState.update {
+                    it.copy(surface = CommandSurfaceState.Unknown(result.message))
+                }
+            }
         }
     }
 
     /**
-     * Inserts transcript and runs the same [submitCommand] path as typing.
+     * Inserts transcript and runs the same pipeline as typing.
      */
     fun applySpeechTranscriptAndSubmit(text: String) {
         val trimmed = text.trim()
@@ -172,57 +269,15 @@ class CommandLayerViewModel(
             return
         }
         _uiState.update { it.copy(inputText = trimmed, voice = VoiceSurfaceState.Processing) }
-        submitCommand(CommandInputSource.Voice)
+        submitFromText(trimmed, CommandInputSource.Voice)
     }
 
-    private fun applySurfaceOnly(dispatch: CommandDispatch) {
-        when (dispatch) {
-            is CommandDispatch.LaunchApp,
-            is CommandDispatch.OpenAppDrawer,
-            is CommandDispatch.CloseAppDrawer,
-            -> { }
-            is CommandDispatch.PickFromSuggestions -> {
-                _uiState.update {
-                    it.copy(
-                        surface = CommandSurfaceState.Suggestions(
-                            title = dispatch.message,
-                            subtitle = dispatch.subtitle,
-                            apps = dispatch.candidates,
-                            kind = dispatch.kind,
-                        ),
-                    )
-                }
-            }
-            is CommandDispatch.SearchMatches -> {
-                _uiState.update {
-                    it.copy(
-                        surface = CommandSurfaceState.SearchResults(
-                            query = dispatch.query,
-                            apps = dispatch.matches,
-                        ),
-                    )
-                }
-            }
-            is CommandDispatch.RecentMatches -> {
-                _uiState.update {
-                    it.copy(
-                        surface = CommandSurfaceState.RecentsList(
-                            title = dispatch.title,
-                            entries = dispatch.entries,
-                        ),
-                    )
-                }
-            }
-            is CommandDispatch.ShowHelp -> {
-                _uiState.update {
-                    it.copy(surface = CommandSurfaceState.Help(dispatch.lines))
-                }
-            }
-            is CommandDispatch.Unknown -> {
-                _uiState.update {
-                    it.copy(surface = CommandSurfaceState.Unknown(dispatch.message))
-                }
-            }
-        }
+    fun updateHandsFreeState(state: HandsFreeUiState) {
+        _uiState.update { it.copy(handsFree = state) }
+    }
+
+    override fun onCleared() {
+        passiveCoordinator?.stop()
+        super.onCleared()
     }
 }

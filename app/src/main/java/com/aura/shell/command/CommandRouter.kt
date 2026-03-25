@@ -168,6 +168,7 @@ class CommandRouter(
 
     companion object {
         val HELP_LINES = listOf(
+            "Hands-free (home/command, screen on): say “Aura, open camera” or “Aura” then command",
             "Voice: tap the mic, speak, same commands as typing",
             "open camera — or: opn camra, cam, photo",
             "open settings — or: setings, prefs",

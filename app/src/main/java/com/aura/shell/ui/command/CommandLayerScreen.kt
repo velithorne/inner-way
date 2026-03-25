@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MicNone
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +52,7 @@ import com.aura.shell.command.CommandInputSource
 import com.aura.shell.command.CommandLayerUiState
 import com.aura.shell.command.CommandSurfaceState
 import com.aura.shell.command.SuggestionKind
+import com.aura.shell.voice.HandsFreeUiState
 import com.aura.shell.voice.VoiceSurfaceState
 import com.aura.shell.model.LauncherAppInfo
 import com.aura.shell.model.RecentAppEntry
@@ -71,6 +73,7 @@ fun CommandLayerScreen(
     onMicClick: () -> Unit,
     onVoiceCancel: () -> Unit,
     onPermissionRetry: () -> Unit,
+    onPassiveHandsFreeChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -116,6 +119,14 @@ fun CommandLayerScreen(
                     onCancel = onVoiceCancel,
                     onPermissionRetry = onPermissionRetry,
                 )
+
+                CommandPassiveStrip(
+                    enabled = state.passiveHandsFreeEnabled,
+                    onEnabledChange = onPassiveHandsFreeChange,
+                    handsFree = state.handsFree,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -181,10 +192,10 @@ fun CommandLayerScreen(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                             ) {
                                 Text(
-                                    text = if (entry.source == CommandInputSource.Voice) {
-                                        "· ${entry.original}"
-                                    } else {
+                                    text = if (entry.source == CommandInputSource.Typed) {
                                         entry.original
+                                    } else {
+                                        "· ${entry.original}"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -226,6 +237,50 @@ fun CommandLayerScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommandPassiveStrip(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    handsFree: HandsFreeUiState,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "Hands-free while this screen is open",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            }
+            val line = when (handsFree) {
+                HandsFreeUiState.Armed -> "Say “Aura” or “Aura, …”"
+                HandsFreeUiState.ListeningForWake -> "Listening for “Aura”…"
+                HandsFreeUiState.ListeningForCommand -> "Say your command…"
+                HandsFreeUiState.Processing -> "Working…"
+                is HandsFreeUiState.Success -> handsFree.message
+                else -> null
+            }
+            line?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                )
             }
         }
     }
