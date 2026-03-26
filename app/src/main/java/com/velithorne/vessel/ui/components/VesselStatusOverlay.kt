@@ -24,6 +24,7 @@ fun VesselStatusOverlay(
     vitality: Float,
     feverLabel: String,
     hungerLabel: String,
+    selectedOrganName: String?,
     statusLine: String,
     expanded: Boolean,
     onToggleInfo: () -> Unit,
@@ -59,6 +60,14 @@ fun VesselStatusOverlay(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
                     modifier = Modifier.padding(top = 4.dp),
                 )
+                if (selectedOrganName != null) {
+                    Text(
+                        text = "Selected · $selectedOrganName",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.95f),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
             Text(
                 text = "ⓘ",

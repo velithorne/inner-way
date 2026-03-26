@@ -27,4 +27,20 @@ data class RenderTuning(
     val recoveryShimmerScale: Float = 0.65f,
     val signalCyanBoost: Float = 0.9f,
     val bodyProfileScale: Float = 1f,
+
+    // Phase 4 — camera & inspection
+    val defaultZoom: Float = 1f,
+    val minZoom: Float = 1f,
+    val maxZoom: Float = 2.85f,
+    val focusZoom: Float = 1.55f,
+    val maxPanFraction: Float = 0.42f,
+    val maxRotationDeg: Float = 12f,
+    val maxTiltDeg: Float = 8f,
+    val cameraSmoothing: Float = 0.18f,
+    val selectionDimAlpha: Float = 0.42f,
+    val selectionGlowStrength: Float = 1.35f,
+    val organHitPadMultiplier: Float = 1.55f,
+    val doubleTapAnimationCoarse: Float = 0.22f,
+    val focusTransitionSeconds: Float = 0.38f,
+    val thermalHitFullBodyMultiplier: Float = 1f,
 )

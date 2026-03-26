@@ -17,14 +17,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.physiology.OrganType
+import com.velithorne.vessel.renderer.RenderTuning
+import com.velithorne.vessel.renderer.VesselGestureController
 import com.velithorne.vessel.renderer.VesselScene
+import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
+import com.velithorne.vessel.ui.components.VesselOrganSheet
 import com.velithorne.vessel.ui.components.VesselStatusOverlay
 import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
@@ -36,7 +44,15 @@ fun VesselScreen(
 ) {
     val physiology by viewModel.physiology.collectAsState()
     val scene by viewModel.vesselScene.collectAsState()
+    val selected by viewModel.selectedVesselOrgan.collectAsState()
+    val inspection by viewModel.organInspection.collectAsState()
+    val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
     var overlayExpanded by rememberSaveable { mutableStateOf(false) }
+
+    val tuning = remember { RenderTuning() }
+    val gestureController = remember(tuning) { VesselGestureController(tuning) }
+
+    var chamberOffset by remember { mutableStateOf(Offset.Zero) }
 
     Column(
         modifier = modifier
@@ -50,7 +66,7 @@ fun VesselScreen(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "Specimen 01 · live synthesis",
+            text = "Specimen 01 · live synthesis · pinch zoom · drag pan · two-finger tilt",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
@@ -61,17 +77,56 @@ fun VesselScreen(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            VesselScene(
-                physiology = physiology,
-                modifier = Modifier.fillMaxSize(),
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { coords ->
+                        chamberOffset = coords.positionInRoot()
+                    },
+            ) {
+                VesselScene(
+                    physiology = physiology,
+                    scene = scene,
+                    selectedOrgan = selected,
+                    gestureController = gestureController,
+                    renderOffset = chamberOffset,
+                    onSelectOrgan = { organ ->
+                        viewModel.selectVesselOrgan(organ)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VesselControlChip(
+                label = "Reset view",
+                onClick = {
+                    gestureController.resetCamera()
+                    viewModel.selectVesselOrgan(null)
+                },
+            )
+            VesselControlChip(
+                label = if (sheetVisible) "Hide detail" else "Anatomy",
+                onClick = {
+                    if (selected != null) {
+                        viewModel.showVesselSheet(!sheetVisible)
+                    }
+                },
             )
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         VesselStatusOverlay(
             stateLabel = scene.healthLabel,
             vitality = scene.vitalityDisplay,
             feverLabel = scene.feverLabel,
             hungerLabel = scene.hungerLabel,
+            selectedOrganName = selected?.let { organDisplayName(it) },
             statusLine = scene.statusLine,
             expanded = overlayExpanded,
             onToggleInfo = { overlayExpanded = !overlayExpanded },
@@ -98,4 +153,20 @@ fun VesselScreen(
         }
         Spacer(modifier = Modifier.height(12.dp))
     }
+
+    VesselOrganSheet(
+        inspection = inspection,
+        visible = sheetVisible && selected != null,
+        onDismiss = { viewModel.dismissVesselSheet() },
+    )
+}
+
+private fun organDisplayName(type: OrganType): String = when (type) {
+    OrganType.METABOLIC_HEART -> "Metabolic Heart"
+    OrganType.CORTEX_CLUSTER -> "Cortex Cluster"
+    OrganType.NEURAL_GEL -> "Neural Gel"
+    OrganType.ARCHIVE_VAULT -> "Archive Vault"
+    OrganType.SIGNAL_LUNGS -> "Signal Lungs"
+    OrganType.VESTIBULAR_MUSCULATURE -> "Vestibular Musculature"
+    OrganType.THERMAL_MEMBRANE -> "Thermal Membrane"
 }

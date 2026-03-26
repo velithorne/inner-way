@@ -12,7 +12,17 @@ class VesselAnimationController {
     var deltaSeconds: Float = 0f
         private set
 
+    /** Eased 0..1 for selection vignette/ring (updated in [onFrame]). */
+    var selectionFocus: Float = 0f
+        private set
+
     private var lastNs: Long = -1L
+
+    fun setSelectionFocusTarget(selected: Boolean) {
+        selectionFocusTarget = if (selected) 1f else 0f
+    }
+
+    private var selectionFocusTarget = 0f
 
     fun onFrame(frameTimeNanos: Long) {
         if (lastNs < 0) {
@@ -24,6 +34,9 @@ class VesselAnimationController {
         lastNs = frameTimeNanos
         deltaSeconds = dt
         seconds += dt
+        val speed = if (selectionFocusTarget > 0.5f) 3.5f else 2.6f
+        selectionFocus += (selectionFocusTarget - selectionFocus) * (speed * dt).coerceIn(0f, 1f)
+        selectionFocus = selectionFocus.coerceIn(0f, 1f)
     }
 
     fun pulsePhase(hz: Float): Float = (seconds * hz * Math.PI.toFloat() * 2f)

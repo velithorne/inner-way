@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import com.velithorne.vessel.physiology.OrganType
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.sin
 
 /**
@@ -28,14 +29,60 @@ object VesselPainter {
         tuning: RenderTuning,
         parallax: Offset,
         particles: List<ParticleDraw>,
+        camera: VesselCameraState,
+        selection: VesselSelectionState,
+        renderOffset: Offset,
     ) {
         val w = scope.size.width
         val h = scope.size.height
+        val vc = Offset(w / 2f, h / 2f)
+        val pulse = anim.pulsePhase(tuning.pulseFrequencyHz)
+        val breath = anim.pulsePhase(tuning.breathFrequencyHz)
+
+        scope.translate(renderOffset.x, renderOffset.y) {
+            translate(vc.x, vc.y) {
+                rotate(
+                    degrees = (camera.rotationDeg + camera.tiltDeg * 0.35f + scene.stressShiver * tuning.stressShiverDegrees * 0.25f),
+                    pivot = Offset.Zero,
+                ) {
+                    scale(camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom), camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom), pivot = Offset.Zero) {
+                        translate(-vc.x + camera.panX, -vc.y + camera.panY) {
+                            drawSpecimenContent(
+                                scope = this,
+                                w = w,
+                                h = h,
+                                scene = scene,
+                                anim = anim,
+                                tuning = tuning,
+                                parallax = parallax,
+                                particles = particles,
+                                pulse = pulse,
+                                breath = breath,
+                                selection = selection,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun drawSpecimenContent(
+        scope: DrawScope,
+        w: Float,
+        h: Float,
+        scene: VesselSceneState,
+        anim: VesselAnimationController,
+        tuning: RenderTuning,
+        parallax: Offset,
+        particles: List<ParticleDraw>,
+        pulse: Float,
+        breath: Float,
+        selection: VesselSelectionState,
+    ) {
         val cx = w * layout.bodyCenterX + parallax.x * 0.15f
         val cy = h * layout.bodyCenterY + parallax.y * 0.12f
 
-        val pulse = anim.pulsePhase(tuning.pulseFrequencyHz)
-        val breath = anim.pulsePhase(tuning.breathFrequencyHz)
         val shiver = scene.stressShiver * tuning.stressShiverDegrees
         val pulseScale = 1f + sin(pulse) * scene.bodyPulseAmplitude
         val breathScale = 1f + sin(breath) * scene.bodyBreathAmplitude * (0.4f + scene.respirationDrive * 0.6f)
@@ -43,6 +90,9 @@ object VesselPainter {
 
         val baseW = w * layout.bodyWidth * scene.bodyScale * pulseScale * breathScale
         val baseH = h * layout.bodyHeight * scene.bodyScale * breathScale * (0.98f + pulseScale * 0.02f)
+        val sel = selection.selectedOrgan
+        val dim = if (sel != null) tuning.selectionDimAlpha else 0f
+        val focus = selection.focusProgress.coerceIn(0f, 1f)
 
         // ---- Rear depth silhouettes
         scope.translate(parallax.x * 0.08f, parallax.y * 0.06f) {
@@ -65,8 +115,24 @@ object VesselPainter {
                     scene = scene,
                     tuning = tuning,
                     pulsePhase = pulse,
+                    dimAlpha = if (sel != null && sel != OrganType.THERMAL_MEMBRANE) dim * 0.35f else 0f,
                 )
             }
+        }
+
+        val focusCenter = sel?.let { type ->
+            when (type) {
+                OrganType.THERMAL_MEMBRANE -> Offset(cx, cy)
+                else -> scene.organVisuals.firstOrNull { it.type == type }?.let { ov ->
+                    Offset(
+                        w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f),
+                        h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f),
+                    )
+                }
+            }
+        }
+        if (focusCenter != null && focus > 0.02f) {
+            OrganHighlightPainter.drawFocusVignette(scope, focusCenter, focus * 0.85f)
         }
 
         // ---- Organs (excluding thermal full-body duplicate for inner organs only)
@@ -74,6 +140,9 @@ object VesselPainter {
         for (ov in innerOrgans) {
             val ox = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
             val oy = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
+            val isSel = sel == ov.type
+            val d = if (sel != null && !isSel) dim * (0.6f + focus * 0.35f) else 0f
+            val hl = if (isSel) tuning.selectionGlowStrength * (0.85f + focus * 0.5f) else 1f
             drawOrgan(
                 scope = scope,
                 ov = ov,
@@ -83,6 +152,10 @@ object VesselPainter {
                 tuning = tuning,
                 pulse = pulse,
                 breath = breath,
+                dimAlpha = d,
+                highlightMul = hl,
+                isSelected = isSel,
+                selectionPhase = pulse * 1.15f + focus * 2f,
             )
         }
 
@@ -92,17 +165,18 @@ object VesselPainter {
         if (heart != null && cortex != null) {
             val hPos = Offset(w * heart.anchorX + parallax.x * 0.1f, h * heart.anchorY + parallax.y * 0.08f)
             val cPos = Offset(w * cortex.anchorX + parallax.x * 0.12f, h * cortex.anchorY + parallax.y * 0.1f)
+            val linkBoost = if (sel == OrganType.METABOLIC_HEART || sel == OrganType.CORTEX_CLUSTER) 0.35f else 0f
             drawArcLink(
                 scope = scope,
                 a = cPos,
                 b = hPos,
-                color = scene.accentBias.copy(alpha = 0.25f + scene.vascularPulse * 0.35f),
+                color = scene.accentBias.copy(alpha = 0.25f + scene.vascularPulse * 0.35f + linkBoost),
                 phase = pulse + scene.neuralDrive * 1.7f,
             )
         }
 
         // ---- Thermal membrane overlay
-        scene.organVisuals.firstOrNull { it.type == OrganType.THERMAL_MEMBRANE }?.let { th ->
+        scene.organVisuals.firstOrNull { it.type == OrganType.THERMAL_MEMBRANE }?.let {
             drawThermalVeil(
                 scope = scope,
                 center = Offset(cx, cy),
@@ -111,6 +185,18 @@ object VesselPainter {
                 scene = scene,
                 anim = anim,
                 tuning = tuning,
+                membraneDim = if (sel == OrganType.THERMAL_MEMBRANE) 0f else if (sel != null) dim * 0.25f else 0f,
+            )
+        }
+
+        if (sel == OrganType.THERMAL_MEMBRANE && focus > 0.05f) {
+            OrganHighlightPainter.drawSelectionRing(
+                scope = scope,
+                center = Offset(cx, cy),
+                baseRadius = maxOf(baseW, baseH) * 0.38f,
+                accent = scene.thermalTint,
+                phase = pulse,
+                strength = focus * tuning.selectionGlowStrength,
             )
         }
 
@@ -138,9 +224,10 @@ object VesselPainter {
         scene: VesselSceneState,
         tuning: RenderTuning,
         pulsePhase: Float,
+        dimAlpha: Float = 0f,
     ) {
         val path = teardropPath(center, width, height)
-        val fillAlpha = (0.14f + scene.vitalityGlow * 0.18f) * (1f - scene.sleepDimming * 0.55f) * (1f - scene.hungerDim * 0.25f)
+        val fillAlpha = (0.14f + scene.vitalityGlow * 0.18f) * (1f - scene.sleepDimming * 0.55f) * (1f - scene.hungerDim * 0.25f) * (1f - dimAlpha)
         drawPath(
             path = path,
             brush = Brush.verticalGradient(
@@ -218,6 +305,10 @@ object VesselPainter {
         tuning: RenderTuning,
         pulse: Float,
         breath: Float,
+        dimAlpha: Float,
+        highlightMul: Float,
+        isSelected: Boolean,
+        selectionPhase: Float,
     ) {
         val r = w * ov.baseRadius * (0.85f + ov.reserveLevel * 0.25f + sin(pulse * ov.pulseCoupling) * 0.06f)
         val flick = sin(anim.pulsePhase(tuning.neuralFlickerHz) + ov.flickerIntensity * 3f) * 0.5f + 0.5f
@@ -230,48 +321,125 @@ object VesselPainter {
             OrganType.VESTIBULAR_MUSCULATURE -> Color(0xFF718096)
             OrganType.THERMAL_MEMBRANE -> Color(0xFFFFB347)
         }
-        val intensity = (ov.glowIntensity * (0.55f + flick * 0.45f * ov.flickerIntensity)).coerceIn(0.05f, 1.3f)
+        val dimF = (1f - dimAlpha).coerceIn(0.35f, 1f)
+        val intensity = (ov.glowIntensity * highlightMul * (0.55f + flick * 0.45f * ov.flickerIntensity)).coerceIn(0.05f, 1.8f) * dimF
         GlowSystem.radialBloom(
             scope = scope,
             center = center,
             radius = r * (1.1f + sin(breath) * 0.08f * ov.pulseCoupling),
-            core = glowC,
-            halo = glowC.copy(alpha = 0.5f),
+            core = glowC.copy(alpha = glowC.alpha * dimF),
+            halo = glowC.copy(alpha = 0.5f * dimF),
             intensity = intensity,
         )
+        val fillA = { base: Float -> (base * dimF).coerceIn(0.04f, 1f) }
         when (ov.type) {
             OrganType.CORTEX_CLUSTER -> {
-                for (i in 0 until 5) {
-                    val ang = i / 5f * Math.PI.toFloat() * 2f + pulse * 0.4f
-                    val br = r * (0.35f + i * 0.12f)
-                    val p = Offset(center.x + cos(ang) * r * 0.45f, center.y + sin(ang) * r * 0.35f)
-                    scope.drawCircle(glowC.copy(alpha = 0.35f + flick * 0.2f), br, p)
+                val stem = Path().apply {
+                    moveTo(center.x, center.y + r * 0.35f)
+                    quadraticTo(center.x + r * 0.15f, center.y - r * 0.05f, center.x, center.y - r * 0.55f)
+                    quadraticTo(center.x - r * 0.15f, center.y - r * 0.05f, center.x, center.y + r * 0.35f)
+                    close()
+                }
+                scope.drawPath(stem, color = glowC.copy(alpha = fillA(0.22f + intensity * 0.1f)))
+                for (i in 0 until 7) {
+                    val ang = i / 7f * Math.PI.toFloat() * 2f + pulse * 0.4f
+                    val br = r * (0.22f + (i % 3) * 0.1f)
+                    val rad = r * (0.52f + (i % 4) * 0.06f)
+                    val p = Offset(center.x + cos(ang) * rad, center.y + sin(ang) * rad * 0.72f - r * 0.1f)
+                    scope.drawCircle(glowC.copy(alpha = fillA(0.32f + flick * 0.18f)), br, p)
                 }
             }
             OrganType.ARCHIVE_VAULT -> {
-                val layers = (3 + ov.densityLines * 5f).toInt().coerceIn(3, 8)
+                val layers = (3 + ov.densityLines * 5f).toInt().coerceIn(3, 10)
                 for (i in 0 until layers) {
-                    val rr = r * (0.45f + i * 0.1f)
+                    val rr = r * (0.4f + i * 0.09f)
                     scope.drawCircle(
-                        color = glowC.copy(alpha = 0.08f + ov.densityLines * 0.06f),
+                        color = glowC.copy(alpha = fillA(0.07f + ov.densityLines * 0.065f)),
                         radius = rr,
                         center = center,
-                        style = Stroke(1.5f),
+                        style = Stroke(1.5f + i * 0.12f),
                     )
                 }
             }
             OrganType.SIGNAL_LUNGS -> {
+                val mirror = center.x < scope.size.width * 0.5f
+                val sx = if (mirror) -1f else 1f
                 val path = Path().apply {
-                    moveTo(center.x - r * 0.2f, center.y)
-                    quadraticTo(center.x, center.y - r * 0.9f, center.x + r * 0.85f, center.y - r * 0.1f)
-                    quadraticTo(center.x + r * 0.35f, center.y + r * 0.75f, center.x - r * 0.2f, center.y)
+                    moveTo(center.x, center.y - r * 0.15f)
+                    quadraticTo(
+                        center.x + sx * r * 0.42f,
+                        center.y - r * 0.92f,
+                        center.x + sx * r * 0.88f,
+                        center.y + r * 0.06f,
+                    )
+                    quadraticTo(center.x + sx * r * 0.22f, center.y + r * 0.58f, center.x, center.y - r * 0.15f)
                     close()
                 }
-                scope.drawPath(path, color = glowC.copy(alpha = 0.25f + intensity * 0.15f))
+                scope.drawPath(path, color = glowC.copy(alpha = fillA(0.22f + intensity * 0.14f)))
+                scope.drawPath(
+                    path,
+                    color = glowC.copy(alpha = fillA(0.12f)),
+                    style = Stroke(1.2f),
+                )
+            }
+            OrganType.NEURAL_GEL -> {
+                scope.drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            glowC.copy(alpha = fillA(0.08f)),
+                            glowC.copy(alpha = fillA(0.22f + intensity * 0.08f)),
+                            glowC.copy(alpha = fillA(0.05f)),
+                        ),
+                        center = center,
+                        radius = r * 1.1f,
+                    ),
+                    radius = r * 1.05f,
+                    center = center,
+                )
+                scope.drawCircle(
+                    color = glowC.copy(alpha = fillA(0.06f)),
+                    radius = r * 0.92f,
+                    center = center,
+                    style = Stroke(1f + ov.densityLines * 1.5f),
+                )
+            }
+            OrganType.METABOLIC_HEART -> {
+                val hp = heartPath(center, r)
+                scope.drawPath(hp, color = glowC.copy(alpha = fillA(0.28f + intensity * 0.18f)))
+                scope.drawPath(hp, color = Color(0xFFFF8FA8).copy(alpha = fillA(0.35f)), style = Stroke(1.8f))
             }
             else -> {
-                scope.drawCircle(glowC.copy(alpha = 0.22f + intensity * 0.15f), r * 0.75f, center)
+                scope.drawCircle(glowC.copy(alpha = fillA(0.22f + intensity * 0.15f)), r * 0.75f, center)
             }
+        }
+        if (isSelected) {
+            OrganHighlightPainter.drawSelectionRing(
+                scope = scope,
+                center = center,
+                baseRadius = r * 1.05f,
+                accent = Color(0xFFE8F1F2),
+                phase = selectionPhase,
+                strength = tuning.selectionGlowStrength,
+            )
+        }
+    }
+
+    private fun heartPath(center: Offset, r: Float): Path {
+        val c = center
+        val s = r * 1.1f
+        return Path().apply {
+            moveTo(c.x, c.y + s * 0.25f)
+            cubicTo(
+                c.x - s * 0.55f, c.y - s * 0.35f,
+                c.x - s * 0.45f, c.y - s * 0.75f,
+                c.x, c.y - s * 0.45f,
+            )
+            cubicTo(
+                c.x + s * 0.45f, c.y - s * 0.75f,
+                c.x + s * 0.55f, c.y - s * 0.35f,
+                c.x, c.y + s * 0.25f,
+            )
+            close()
         }
     }
 
@@ -292,17 +460,19 @@ object VesselPainter {
         scene: VesselSceneState,
         anim: VesselAnimationController,
         tuning: RenderTuning,
+        membraneDim: Float = 0f,
     ) {
         if (scene.feverIntensity < 0.04f && scene.stressTint < 0.55f) return
         val path = teardropPath(center, width, height)
         val shim = sin(anim.pulsePhase(0.35f)) * scene.feverIntensity * tuning.feverShimmerScale
+        val d = (1f - membraneDim).coerceIn(0.55f, 1f)
         scope.drawPath(
             path = path,
             brush = Brush.radialGradient(
                 colors = listOf(
                     scene.thermalTint.copy(alpha = 0f),
-                    scene.thermalTint.copy(alpha = scene.feverIntensity * 0.35f + shim * 0.08f),
-                    Color(0xFFFF4500).copy(alpha = scene.thermalAgitation * 0.18f),
+                    scene.thermalTint.copy(alpha = (scene.feverIntensity * 0.35f + shim * 0.08f) * d),
+                    Color(0xFFFF4500).copy(alpha = scene.thermalAgitation * 0.18f * d),
                 ),
                 center = Offset(center.x, center.y - height * 0.08f),
                 radius = height * 0.75f,
