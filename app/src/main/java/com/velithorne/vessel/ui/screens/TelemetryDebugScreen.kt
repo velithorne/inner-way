@@ -31,7 +31,7 @@ import com.velithorne.vessel.viewmodel.TelemetryViewModel
 /**
  * Live diagnostic surface — feeds the future physiology / organ-mapping spine.
  *
- * TODO Phase 2: overlay organ stress glyphs sourced from [com.velithorne.vessel.domain.phase2.PhysiologyEngine].
+ * Synthetic interpretation lives on the **Physiology** tab ([PhysiologyDebugScreen]).
  */
 @Composable
 fun TelemetryDebugScreen(
@@ -80,7 +80,7 @@ private fun HeaderRow(snapshot: TelemetrySnapshot) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Telemetry spine · phase 1",
+                text = "Raw substrate telemetry",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             )

@@ -57,6 +57,11 @@ object Formatters {
         return sdf.format(java.util.Date(ts))
     }
 
+    /** Normalized scalar for physiology bars (0..1). */
+    fun formatUnitInterval(value: Float, decimals: Int = 2): String {
+        return "%.${decimals}f".format(Locale.US, value.coerceIn(0f, 1f))
+    }
+
     fun unavailable(): String = "Unavailable"
 
     fun yesNo(value: Boolean?): String = when (value) {

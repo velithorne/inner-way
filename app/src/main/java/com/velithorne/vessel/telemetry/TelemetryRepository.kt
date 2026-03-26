@@ -24,10 +24,8 @@ import kotlinx.coroutines.launch
 /**
  * Aggregates monitors into a single [TelemetrySnapshot] stream.
  *
- * Phase 2+ hooks:
- * - Feed [snapshot] into PhysiologyEngine (map homeostasis / organ stress)
- * - Persist windows via Room for evolution replay
- * - Broadcast to VesselRenderer as read-only state
+ * Phase 2+: [com.velithorne.vessel.physiology.PhysiologyEngine] consumes [snapshot].
+ * Later: persist windows via Room; VesselRenderer as read-only consumer.
  */
 class TelemetryRepository(
     application: Application,

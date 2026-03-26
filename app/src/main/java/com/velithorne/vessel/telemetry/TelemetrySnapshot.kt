@@ -5,9 +5,9 @@ package com.velithorne.vessel.telemetry
  * on this device/build (never crash the UI on absent data).
  *
  * Downstream (Phase 2+):
- * - [com.velithorne.vessel.domain.physiology.PhysiologyEngine] ingests successive snapshots
+ * - [com.velithorne.vessel.physiology.PhysiologyEngine] ingests successive snapshots
  *   to drive organ stress / homeostasis.
- * - [SpeciesState] / [OrganState]: compact projections for evolution + renderer.
+ * - [com.velithorne.vessel.physiology.SpeciesState] / [com.velithorne.vessel.physiology.OrganState]
  */
 data class TelemetrySnapshot(
     val timestampMillis: Long,

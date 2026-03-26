@@ -1,17 +1,13 @@
 package com.velithorne.vessel.core
 
 import android.app.Application
+import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.telemetry.TelemetryRepository
 
 /**
- * Lightweight service locator for Phase 1.
+ * Lightweight service locator.
  *
- * Integration hooks (TODO — Phase 2+):
- * - [Constants.FuturePhases.PHYSIOLOGY_MODULE]: wire [TelemetryRepository.snapshot] → PhysiologyEngine
- * - Organ mapping: SpeciesState / OrganState derived from physiology deltas
- * - [Constants.FuturePhases.EVOLUTION_MODULE]: consume long-running fitness signals
- * - [Constants.FuturePhases.PERSISTENCE_MODULE]: Room DAOs / DataStore for snapshots
- * - [Constants.FuturePhases.RENDERER_MODULE]: read-only bind to latest vessel state
+ * Phase 3: add renderer-scoped presenters; Phase 4+: Room + evolution graph.
  */
 class AppContainer(app: Application) {
 
@@ -21,4 +17,7 @@ class AppContainer(app: Application) {
         application = app,
         timeProvider = timeProvider,
     )
+
+    /** Process-scoped to preserve EMA state across ticks. */
+    val physiologyEngine: PhysiologyEngine = PhysiologyEngine()
 }

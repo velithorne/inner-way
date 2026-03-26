@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.velithorne.vessel.ui.screens.TelemetryDebugScreen
+import com.velithorne.vessel.ui.screens.VesselMainScreen
 import com.velithorne.vessel.ui.theme.VelithorneVesselTheme
 import com.velithorne.vessel.ui.theme.VesselBg
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
@@ -26,7 +26,10 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = false
         }
         val container = (application as VesselApplication).appContainer
-        val factory = TelemetryViewModelFactory(container.telemetryRepository)
+        val factory = TelemetryViewModelFactory(
+            repository = container.telemetryRepository,
+            physiologyEngine = container.physiologyEngine,
+        )
         setContent {
             VelithorneVesselTheme {
                 Box(
@@ -35,7 +38,7 @@ class MainActivity : ComponentActivity() {
                         .background(VesselBg),
                 ) {
                     val vm: TelemetryViewModel = viewModel(factory = factory)
-                    TelemetryDebugScreen(viewModel = vm)
+                    VesselMainScreen(viewModel = vm)
                 }
             }
         }

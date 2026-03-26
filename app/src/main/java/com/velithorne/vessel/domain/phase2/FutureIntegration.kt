@@ -1,26 +1,17 @@
 package com.velithorne.vessel.domain.phase2
 
 /**
- * Phase 2+ integration anchors (stubs only — do not wire yet).
+ * Phase 3+ integration anchors beyond real-time physiology.
  *
- * - PhysiologyEngine: map TelemetrySnapshot streams → metabolic / stress scalars per organ.
- * - SpeciesState / OrganState: identity + phenotype for evolution + renderer binding.
- * - EvolutionEngine: generational pressure from long-window telemetry and survival proxies.
- * - VesselPersistence: Room entities / DAOs for snapshots, species seeds, replay.
- * - VesselRenderer: 2.5D presentation; read-only consumer of SpeciesState.
+ * Implemented in **Phase 2** (live mapping):
+ * - `com.velithorne.vessel.physiology.PhysiologyEngine`
+ * - `SpeciesState`, `OrganState`, `PhysiologySnapshot`
+ *
+ * Still future:
+ * - **EvolutionEngine**: generational pressure from long-window physiology integrals
+ * - **VesselPersistence**: Room / DataStore for traces and seeds
+ * - **VesselRenderer**: 2.5D organ field driven by [com.velithorne.vessel.physiology.PhysiologySnapshot]
  */
-interface PhysiologyEngine {
-    // TODO: fun ingest(snapshot: com.velithorne.vessel.telemetry.TelemetrySnapshot): PhysiologyDelta
-}
-
-data class SpeciesState(
-    val placeholder: String = "phase2",
-)
-
-data class OrganState(
-    val placeholder: String = "phase2",
-)
-
 interface EvolutionEngine {
     // TODO: fun observeFitness(): Flow<FitnessScalar>
 }
