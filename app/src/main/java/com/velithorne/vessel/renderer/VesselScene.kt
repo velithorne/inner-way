@@ -147,13 +147,15 @@ fun VesselScene(
             parallax = Offset(parallaxOff.x * 0.5f, parallaxOff.y * 0.5f),
         )
 
-        ChamberEffects.drawChamberBackdrop(this, scene.fogDensity, scene.feverIntensity)
-        ChamberEffects.drawGridSheen(this, 0.08f * (0.3f + scene.neuralDrive * 0.5f))
+        VesselAtmospherePainter.drawBackdrop(this, scene, scene.palette, tuning, parallaxOff)
+        ChamberEffects.drawGridSheen(this, 0.07f * (0.3f + scene.neuralDrive * 0.45f))
+        VesselAtmospherePainter.drawScanSheen(this, scene.neuralDrive, tuning)
 
+        val nearMul = tuning.chamberFogDepthNearMul
         for (p in motes) {
             if (p.depth < 0.5f) {
                 drawCircle(
-                    Color(0xFF445566).copy(alpha = p.alpha * 0.55f),
+                    scene.palette.shellBase.copy(alpha = p.alpha * nearMul * 0.5f),
                     p.radius * 0.85f,
                     p.position,
                 )
@@ -172,16 +174,17 @@ fun VesselScene(
             renderOffset = renderOffset,
         )
 
+        val farMul = tuning.chamberFogDepthFarMul
         for (p in motes) {
             if (p.depth >= 0.5f) {
-                val c = scene.accentBias.copy(alpha = p.alpha * (0.65f + scene.signalBrightness * 0.35f))
+                val c = scene.palette.accentSignal.copy(alpha = p.alpha * farMul * (0.65f + scene.signalBrightness * 0.35f))
                 drawCircle(c, p.radius, p.position)
             }
         }
 
         if (physiology.telemetry.isCharging == true) {
             val s = anim.pulsePhase(0.45f)
-            ChamberEffects.drawGlassReflection(this)
+            VesselGlassPainter.drawReflectionSweep(this, tuning, parallaxOff)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -196,8 +199,8 @@ fun VesselScene(
             )
         }
 
-        ChamberEffects.drawChamberFrame(this, 22f, scene.vitalityGlow)
-        ChamberEffects.drawGlassReflection(this)
+        VesselGlassPainter.drawFrame(this, scene.vitalityGlow, tuning, parallaxOff)
+        VesselGlassPainter.drawReflectionSweep(this, tuning, parallaxOff)
 
         val sleepVignette = scene.sleepDimming.coerceIn(0f, 1f)
         if (sleepVignette > 0.05f) {

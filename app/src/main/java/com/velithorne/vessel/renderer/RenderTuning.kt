@@ -36,8 +36,8 @@ data class RenderTuning(
     val maxPanFraction: Float = 0.42f,
     val maxRotationDeg: Float = 12f,
     val maxTiltDeg: Float = 8f,
-    val cameraSmoothing: Float = 0.18f,
-    val selectionDimAlpha: Float = 0.42f,
+    val cameraSmoothing: Float = 0.16f,
+    val selectionDimAlpha: Float = 0.38f,
     val selectionGlowStrength: Float = 1.35f,
     val organHitPadMultiplier: Float = 1.55f,
     val doubleTapAnimationCoarse: Float = 0.22f,
@@ -53,4 +53,39 @@ data class RenderTuning(
 
     /** Draw core centroid, fit rect, chamber center (development). */
     val showFramingDebug: Boolean = false,
+
+    // Phase 5 — shell / membrane / pathways / atmosphere
+    val shellFillOpacityBase: Float = 0.1f,
+    val shellFillOpacityVitalityScale: Float = 0.22f,
+    val shellFillOpacityMin: Float = 0.06f,
+    val shellFillOpacityMax: Float = 0.42f,
+
+    val shellEdgeAlphaBase: Float = 0.16f,
+    val shellEdgeAlphaVitalityScale: Float = 0.28f,
+    val shellEdgeThicknessMin: Float = 2.4f,
+    val shellEdgeThicknessStressScale: Float = 1.6f,
+
+    val innerHazeAlphaBase: Float = 0.04f,
+    val thermalTintDisplayScale: Float = 0.95f,
+    val thermalEdgeBleedScale: Float = 0.55f,
+    val thermalShimmerDisplayScale: Float = 0.85f,
+    val recoverySheenScale: Float = 0.65f,
+
+    val pathwayBaseAlpha: Float = 0.14f,
+    val pathwayPulseSpeed: Float = 1.15f,
+    val pathwayWidthMetabolic: Float = 1.6f,
+    val pathwayWidthNeural: Float = 1.35f,
+
+    val organHaloBase: Float = 0.92f,
+    val chamberFogDepthNearMul: Float = 0.65f,
+    val chamberFogDepthFarMul: Float = 1.15f,
+    val reflectionSweepAlpha: Float = 0.055f,
+    val scanSheenAlpha: Float = 0.035f,
+
+    val selectionNonSelectedDim: Float = 0.32f,
+    val selectionFocusIntensity: Float = 1.15f,
+
+    val rearParallaxMul: Float = 0.06f,
+    val shellParallaxMul: Float = 0.11f,
+    val organParallaxMul: Float = 0.14f,
 )

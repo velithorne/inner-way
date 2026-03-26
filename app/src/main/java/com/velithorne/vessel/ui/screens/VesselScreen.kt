@@ -59,22 +59,22 @@ fun VesselScreen(
             .fillMaxSize()
             .padding(horizontal = 16.dp),
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Observation chamber",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "Specimen 01 · live synthesis · pinch zoom · drag pan · two-finger tilt",
+            text = "Specimen 01 · contained silicon species · pinch · pan · tilt",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+            modifier = Modifier.padding(top = 3.dp, bottom = 6.dp),
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f, fill = true),
             contentAlignment = Alignment.Center,
         ) {
             Box(
@@ -100,7 +100,7 @@ fun VesselScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .padding(top = 4.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

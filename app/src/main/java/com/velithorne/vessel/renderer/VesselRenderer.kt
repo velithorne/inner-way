@@ -1,6 +1,8 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.model.VesselMaterialState
+import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.OrganState
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -90,6 +92,8 @@ class VesselRenderer(
             Color(0xFF5EEAD4),
             (signalBrightness * 0.4f).coerceIn(0f, 1f),
         )
+        val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, tuning)
+        val material: VesselMaterialState = VesselMaterialSystem.derive(s, tuning)
 
         return VesselSceneState(
             timestampMillis = snapshot.timestampMillis,
@@ -121,6 +125,8 @@ class VesselRenderer(
             hungerLabel = hungerWord(s.hunger),
             accentBias = accentBias,
             thermalTint = thermalTint,
+            palette = palette,
+            material = material,
         )
     }
 

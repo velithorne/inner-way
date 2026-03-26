@@ -19,18 +19,18 @@ object OrganHighlightPainter {
         strength: Float,
     ) {
         val s = strength.coerceIn(0f, 2f)
-        val pulse = 1f + sin(phase * 2f * Math.PI.toFloat()) * 0.06f
+        val pulse = 1f + sin(phase * 2f * Math.PI.toFloat()) * 0.045f
         scope.drawCircle(
-            color = accent.copy(alpha = (0.35f + sin(phase) * 0.15f) * s),
-            radius = baseRadius * pulse * 1.35f,
+            color = accent.copy(alpha = (0.28f + sin(phase) * 0.1f) * s),
+            radius = baseRadius * pulse * 1.28f,
             center = center,
-            style = Stroke(width = 3f),
+            style = Stroke(width = 2.4f),
         )
         scope.drawCircle(
-            color = accent.copy(alpha = (0.12f * s)),
-            radius = baseRadius * pulse * 1.55f,
+            color = accent.copy(alpha = (0.1f * s)),
+            radius = baseRadius * pulse * 1.45f,
             center = center,
-            style = Stroke(width = 1.3f),
+            style = Stroke(width = 1.1f),
         )
     }
 
@@ -45,10 +45,10 @@ object OrganHighlightPainter {
             brush = Brush.radialGradient(
                 colors = listOf(
                     Color.Black.copy(alpha = 0f),
-                    Color.Black.copy(alpha = v * 0.45f),
+                    Color(0xFF05080C).copy(alpha = v * 0.36f),
                 ),
                 center = focusCenter,
-                radius = scope.size.maxDimension * 0.9f,
+                radius = scope.size.maxDimension * 0.92f,
             ),
             radius = scope.size.maxDimension,
             center = focusCenter,

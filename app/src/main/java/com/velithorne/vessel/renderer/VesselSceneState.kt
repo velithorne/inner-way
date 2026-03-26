@@ -1,6 +1,8 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.model.VesselMaterialState
+import com.velithorne.vessel.model.VesselPaletteState
 
 /**
  * Renderer-ready frame derived from [com.velithorne.vessel.physiology.PhysiologySnapshot].
@@ -38,4 +40,7 @@ data class VesselSceneState(
     val hungerLabel: String,
     val accentBias: Color,
     val thermalTint: Color,
+    /** Phase 5 physiology-driven palette + material presentation. */
+    val palette: VesselPaletteState,
+    val material: VesselMaterialState,
 )

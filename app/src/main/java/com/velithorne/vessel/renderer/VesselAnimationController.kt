@@ -40,7 +40,7 @@ class VesselAnimationController {
         lastNs = frameTimeNanos
         deltaSeconds = dt
         seconds += dt
-        val speed = if (selectionFocusTarget > 0.5f) 3.5f else 2.6f
+        val speed = if (selectionFocusTarget > 0.5f) 3.15f else 2.35f
         selectionFocus += (selectionFocusTarget - selectionFocus) * (speed * dt).coerceIn(0f, 1f)
         selectionFocus = selectionFocus.coerceIn(0f, 1f)
     }
