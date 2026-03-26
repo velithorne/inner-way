@@ -140,11 +140,12 @@ private fun MemorySection(s: TelemetrySnapshot) {
     MetricCard {
         SectionHeader(
             title = "Memory",
-            subtitle = "Host memory class · coarse low-RAM hint only",
+            subtitle = "Host memory class · system low-memory signal when exposed",
         )
         val classStr = s.memoryClassMb?.let { "$it MB" } ?: Formatters.unavailable()
         metricLine("Memory class", classStr)
-        metricLine("Low-ram device", Formatters.yesNo(s.lowMemoryFlag))
+        metricLine("System low memory", Formatters.yesNo(s.lowMemoryFlag))
+        metricLine("Low-RAM tier device", Formatters.yesNo(s.lowRamDevice))
     }
 }
 

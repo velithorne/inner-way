@@ -21,7 +21,17 @@ class MemoryMonitor(
             null
         }
 
-        val lowRam = try {
+        val lowMemory = try {
+            activityManager?.let { am ->
+                val info = ActivityManager.MemoryInfo()
+                am.getMemoryInfo(info)
+                info.lowMemory
+            }
+        } catch (_: Throwable) {
+            null
+        }
+
+        val lowRamDevice = try {
             activityManager?.isLowRamDevice
         } catch (_: Throwable) {
             null
@@ -29,13 +39,16 @@ class MemoryMonitor(
 
         return MemoryReading(
             memoryClassMb = memoryClassMb,
-            lowMemoryFlag = lowRam,
+            lowMemoryFlag = lowMemory,
+            lowRamDevice = lowRamDevice,
         )
     }
 
     data class MemoryReading(
         val memoryClassMb: Int?,
-        /** Devices in low-RAM mode; not the same as “critical RAM right now”. */
+        /** From [ActivityManager.MemoryInfo.lowMemory] when available. */
         val lowMemoryFlag: Boolean?,
+        /** Tier flag from [ActivityManager.isLowRamDevice]. */
+        val lowRamDevice: Boolean?,
     )
 }

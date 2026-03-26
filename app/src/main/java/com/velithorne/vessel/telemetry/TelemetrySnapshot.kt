@@ -19,7 +19,10 @@ data class TelemetrySnapshot(
     val storageFreeBytes: Long?,
     val storageUsedPct: Float?,
     val memoryClassMb: Int?,
+    /** From [android.app.ActivityManager.MemoryInfo.lowMemory] when readable. */
     val lowMemoryFlag: Boolean?,
+    /** From [android.app.ActivityManager.isLowRamDevice]. */
+    val lowRamDevice: Boolean?,
     val networkConnected: Boolean?,
     val networkType: NetworkTransport,
     val networkMetered: Boolean?,
