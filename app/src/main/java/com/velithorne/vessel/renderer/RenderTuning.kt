@@ -48,16 +48,16 @@ data class RenderTuning(
     val thermalHitFullBodyMultiplier: Float = 1f,
 
     /** Vertical position (0..1 of chamber height) where core centroid is placed (smaller = higher on screen). */
-    val defaultCompositionY: Float = 0.44f,
+    val defaultCompositionY: Float = 0.34f,
     /** Fractional inset from chamber edges when fitting core bounds (0..0.5). */
-    val defaultFramingMargin: Float = 0.12f,
+    val defaultFramingMargin: Float = 0.13f,
     /** Upper cap on auto-fit zoom so default view is not overly zoomed-in on tall phones. */
     val defaultFitZoomCap: Float = 1.85f,
     /**
      * Applied to auto-fit zoom for the default whole-specimen view (lower = more zoomed out).
      * User pinch uses [fitZoom] × [userZoom] with [minZoom]/[maxZoom] on the product.
      */
-    val defaultFramingFitMultiplier: Float = 0.74f,
+    val defaultFramingFitMultiplier: Float = 0.71f,
 
     /** Draw core centroid, fit rect, chamber center (development). */
     val showFramingDebug: Boolean = false,

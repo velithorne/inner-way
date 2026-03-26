@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.2-camera-pan-fix"
+        versionCode = 9
+        versionName = "1.0.3-vessel-higher-frame"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -8,7 +8,8 @@ import com.velithorne.vessel.physiology.OrganType
  */
 data class VesselLayout(
     val bodyCenterX: Float = 0.5f,
-    val bodyCenterY: Float = 0.52f,
+    /** Lower Y = specimen sits higher in the chamber viewport (see also framing composition). */
+    val bodyCenterY: Float = 0.45f,
     val bodyWidth: Float = 0.42f,
     val bodyHeight: Float = 0.72f,
     val anchors: Map<OrganType, OrganAnchor> = defaultAnchors(),
