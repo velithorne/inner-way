@@ -30,10 +30,13 @@ data class RenderTuning(
 
     // Phase 4 — camera & inspection
     val defaultZoom: Float = 1f,
-    val minZoom: Float = 1f,
-    val maxZoom: Float = 2.85f,
-    val focusZoom: Float = 1.55f,
-    val maxPanFraction: Float = 0.42f,
+    /** Pinch can zoom out this far (total scale = fitZoom × userZoom). */
+    val minZoom: Float = 0.38f,
+    /** Pinch can zoom in this far. */
+    val maxZoom: Float = 5.75f,
+    /** Double-tap focus total zoom (clamped to [minZoom, maxZoom]). */
+    val focusZoom: Float = 2.35f,
+    val maxPanFraction: Float = 0.52f,
     val maxRotationDeg: Float = 12f,
     val maxTiltDeg: Float = 8f,
     val cameraSmoothing: Float = 0.16f,
@@ -45,11 +48,16 @@ data class RenderTuning(
     val thermalHitFullBodyMultiplier: Float = 1f,
 
     /** Vertical position (0..1 of chamber height) where core centroid is placed in default framing. */
-    val defaultCompositionY: Float = 0.47f,
+    val defaultCompositionY: Float = 0.5f,
     /** Fractional inset from chamber edges when fitting core bounds (0..0.5). */
-    val defaultFramingMargin: Float = 0.08f,
+    val defaultFramingMargin: Float = 0.12f,
     /** Upper cap on auto-fit zoom so default view is not overly zoomed-in on tall phones. */
-    val defaultFitZoomCap: Float = 1.12f,
+    val defaultFitZoomCap: Float = 1.85f,
+    /**
+     * Applied to auto-fit zoom for the default whole-specimen view (lower = more zoomed out).
+     * User pinch uses [fitZoom] × [userZoom] with [minZoom]/[maxZoom] on the product.
+     */
+    val defaultFramingFitMultiplier: Float = 0.74f,
 
     /** Draw core centroid, fit rect, chamber center (development). */
     val showFramingDebug: Boolean = false,

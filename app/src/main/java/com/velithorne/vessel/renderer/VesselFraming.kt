@@ -115,7 +115,11 @@ object VesselFraming {
         val margin = tuning.defaultFramingMargin
         val zFitW = (w * (0.5f - margin)) / max(core.halfWidth, 1f)
         val zFitH = (h * (0.5f - margin)) / max(core.halfHeight, 1f)
-        val fitZoom = min(zFitW, zFitH).coerceIn(tuning.minZoom, min(tuning.maxZoom, tuning.defaultFitZoomCap))
+        val fitRaw = min(zFitW, zFitH)
+        val fitZoom = (fitRaw * tuning.defaultFramingFitMultiplier).coerceIn(
+            tuning.minZoom,
+            min(tuning.maxZoom, tuning.defaultFitZoomCap),
+        )
 
         val targetY = h * tuning.defaultCompositionY
         val basePanX = (vc.x - core.centroid.x) * fitZoom
