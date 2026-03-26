@@ -6,8 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [KnowledgeItemEntity::class, KnowledgeItemFts::class],
-    version = 1,
+    entities = [
+        KnowledgeItemEntity::class,
+        KnowledgeItemFts::class,
+        TagEntity::class,
+        KnowledgeItemTagCrossRef::class,
+        KnowledgeManualLinkEntity::class,
+    ],
+    version = 2,
     exportSchema = false,
 )
 abstract class KnowledgeDatabase : RoomDatabase() {
@@ -19,7 +25,9 @@ abstract class KnowledgeDatabase : RoomDatabase() {
                 context.applicationContext,
                 KnowledgeDatabase::class.java,
                 "aura_knowledge.db",
-            ).build()
+            )
+                .addMigrations(KNOWLEDGE_MIGRATION_1_2)
+                .build()
         }
     }
 }

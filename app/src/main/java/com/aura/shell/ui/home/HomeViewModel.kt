@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
@@ -39,6 +41,9 @@ data class HomeUiState(
     /** One-shot: open Knowledge from a passive voice command. */
     val knowledgeNavNonce: Pair<String, Long>? = null,
     val latestKnowledgePreview: KnowledgeListItem? = null,
+    /** Small “continue work” slice for home card. */
+    val knowledgeClusterPreview: List<KnowledgeListItem> = emptyList(),
+    val knowledgeTrendingTag: String? = null,
     val passiveHandsFreeEnabled: Boolean = false,
     val handsFree: HandsFreeUiState = HandsFreeUiState.Disabled,
 )
@@ -74,6 +79,19 @@ class HomeViewModel(
         viewModelScope.launch {
             knowledgeRepository.observeRecent(1).collect { list ->
                 _uiState.update { it.copy(latestKnowledgePreview = list.firstOrNull()) }
+            }
+        }
+        viewModelScope.launch {
+            while (isActive) {
+                val cluster = knowledgeRepository.continueRecentCluster(3)
+                val tag = knowledgeRepository.getPopularTagKeys(1).firstOrNull()
+                _uiState.update {
+                    it.copy(
+                        knowledgeClusterPreview = cluster,
+                        knowledgeTrendingTag = tag,
+                    )
+                }
+                delay(6000)
             }
         }
     }

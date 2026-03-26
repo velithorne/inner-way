@@ -3,6 +3,8 @@ package com.aura.shell.knowledge
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FileOpen
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,7 +38,7 @@ import com.aura.shell.ui.theme.AuraSurfaceElevated
 import java.text.DateFormat
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun KnowledgeListScreen(
     state: KnowledgeListUiState,
@@ -44,6 +48,8 @@ fun KnowledgeListScreen(
     onNewNote: () -> Unit,
     onImportFile: () -> Unit,
     onClipboard: () -> Unit,
+    onTagFilter: (String?) -> Unit,
+    onOpenCluster: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -55,6 +61,9 @@ fun KnowledgeListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenCluster) {
+                        Icon(Icons.Filled.Hub, contentDescription = "Continue work cluster")
+                    }
                     IconButton(onClick = onNewNote) {
                         Icon(Icons.Filled.EditNote, contentDescription = "New note")
                     }
@@ -87,8 +96,11 @@ fun KnowledgeListScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FilterChip(
-                    selected = !state.filterImportsOnly,
-                    onClick = { onImportsToggle(false) },
+                    selected = !state.filterImportsOnly && state.filterTagKey == null,
+                    onClick = {
+                        onImportsToggle(false)
+                        onTagFilter(null)
+                    },
                     label = { Text("All") },
                 )
                 FilterChip(
@@ -96,6 +108,32 @@ fun KnowledgeListScreen(
                     onClick = { onImportsToggle(true) },
                     label = { Text("Imports") },
                 )
+                if (state.filterTagKey != null) {
+                    TextButton(onClick = { onTagFilter(null) }) {
+                        Text("Clear tag")
+                    }
+                }
+            }
+            if (state.popularTags.isNotEmpty()) {
+                Text(
+                    text = "Tags",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    state.popularTags.forEach { t ->
+                        FilterChip(
+                            selected = state.filterTagKey == t,
+                            onClick = {
+                                onTagFilter(if (state.filterTagKey == t) null else t)
+                            },
+                            label = { Text(t) },
+                        )
+                    }
+                }
             }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -110,6 +148,7 @@ fun KnowledgeListScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun KnowledgeRowCard(
     item: KnowledgeListItem,
@@ -146,6 +185,20 @@ private fun KnowledgeRowCard(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (item.tagKeys.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
+                    item.tagKeys.take(6).forEach { tag ->
+                        Text(
+                            text = tag,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                        )
+                    }
+                }
+            }
             Text(
                 text = item.snippet,
                 style = MaterialTheme.typography.bodyMedium,

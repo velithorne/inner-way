@@ -97,11 +97,80 @@ class CommandRouter(
             is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.SaveFromClipboard ->
                 CommandDispatch.OpenKnowledge("clipboard")
             is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.ContinueRecentWork -> {
-                val first = knowledgeRepository.getRecent(1).firstOrNull()
-                if (first == null) {
+                val cluster = knowledgeRepository.continueRecentCluster(8)
+                if (cluster.isEmpty()) {
                     CommandDispatch.Unknown("No saved knowledge yet. Try “new note”.")
                 } else {
-                    CommandDispatch.OpenKnowledge("item:${first.id}")
+                    CommandDispatch.OpenKnowledge("cluster")
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.ShowTagged -> {
+                val key = com.aura.shell.knowledge.TagNormalizer.normalize(k.tag)
+                if (key.length < 2) {
+                    CommandDispatch.Unknown("Tag is too short.")
+                } else {
+                    CommandDispatch.OpenKnowledge("tag:$key")
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.FindNotesTagged -> {
+                val tagKey = com.aura.shell.knowledge.TagNormalizer.normalize(k.tag)
+                val all = knowledgeRepository.searchNotes(null, 80)
+                val filtered = all.filter { item ->
+                    item.tagKeys.any { it.equals(tagKey, ignoreCase = true) }
+                }.take(24)
+                CommandDispatch.KnowledgeSearchResults(
+                    title = "Notes · tag ${k.tag}",
+                    subtitle = if (filtered.isEmpty()) "No notes with that tag." else "Tap to open",
+                    items = filtered,
+                )
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.RelatedCurrent -> {
+                val cid = com.aura.shell.knowledge.KnowledgeContextStore.currentKnowledgeItemId
+                if (cid == null) {
+                    CommandDispatch.Unknown("Open a knowledge item first, or try “show related to compression”.")
+                } else {
+                    val related = knowledgeRepository.relatedAsListItems(cid, 16)
+                    if (related.isEmpty()) {
+                        CommandDispatch.Unknown("No related links yet. Add tags or link items in Knowledge.")
+                    } else {
+                        CommandDispatch.KnowledgeSearchResults(
+                            title = "Related",
+                            subtitle = "Some links are suggestions — tap to review",
+                            items = related,
+                        )
+                    }
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.RelatedTopic -> {
+                val items = knowledgeRepository.searchKnowledgeWithOptionalTag(k.topic, null, 24)
+                CommandDispatch.KnowledgeSearchResults(
+                    title = "Related · ${k.topic}",
+                    subtitle = "From text search on device — loosely related items",
+                    items = items,
+                )
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.AddTagCurrent -> {
+                val cid = com.aura.shell.knowledge.KnowledgeContextStore.currentKnowledgeItemId
+                if (cid == null) {
+                    CommandDispatch.Unknown("Open a knowledge item first to tag it.")
+                } else {
+                    knowledgeRepository.addTagToItem(cid, k.tag)
+                    CommandDispatch.KnowledgeFeedback(
+                        message = "Tagged current item",
+                        subtitle = k.tag,
+                    )
+                }
+            }
+            is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.RemoveTagCurrent -> {
+                val cid = com.aura.shell.knowledge.KnowledgeContextStore.currentKnowledgeItemId
+                if (cid == null) {
+                    CommandDispatch.Unknown("Open a knowledge item first.")
+                } else {
+                    knowledgeRepository.removeTagFromItem(cid, k.tag)
+                    CommandDispatch.KnowledgeFeedback(
+                        message = "Removed tag",
+                        subtitle = k.tag,
+                    )
                 }
             }
             is com.aura.shell.knowledge.KnowledgeCommandParser.Intent.SearchKnowledge -> {
@@ -317,6 +386,8 @@ class CommandRouter(
             "Knowledge (local on device): new note · show my notes · search notes for …",
             "show knowledge · show recent imports · search knowledge for … · import file in app",
             "open saved link about … · continue my work · save from clipboard",
+            "Tags: show items tagged benchmark · find notes tagged launcher · add tag research (open item first)",
+            "show related items (open detail first) · show compression related items · browse tag phase9",
         )
 
         private fun isHelpIntent(n: String): Boolean {
@@ -332,6 +403,9 @@ class CommandRouter(
             if (Regex("^find .+ notes$").matches(normalized) ||
                 normalized.startsWith("find knowledge")
             ) {
+                return null
+            }
+            if (Regex("^find .+ related items$").matches(normalized)) {
                 return null
             }
             if (normalized.startsWith("find ")) {

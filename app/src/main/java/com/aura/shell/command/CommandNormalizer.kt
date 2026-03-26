@@ -62,7 +62,9 @@ object CommandNormalizer {
         val showVerb = Regex("^show ([^?]+)$")
         showVerb.find(out)?.let { m ->
             val rest = m.groupValues[1].trim()
-            if (!isDrawerPhrase(rest) && !isRecentsPhrase(rest)) {
+            val knowledgeTagBrowse = rest.startsWith("items tagged ") ||
+                rest.startsWith("notes tagged ")
+            if (!knowledgeTagBrowse && !isDrawerPhrase(rest) && !isRecentsPhrase(rest)) {
                 out = "open $rest"
             }
         }

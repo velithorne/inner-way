@@ -653,7 +653,7 @@ private fun KnowledgeResultRow(
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = item.snippet,
+            text = item.relationHint ?: item.snippet,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,

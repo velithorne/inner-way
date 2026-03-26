@@ -10,9 +10,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.viewModels
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.navigation.NavType
@@ -22,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.aura.shell.ui.theme.AuraShellTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class KnowledgeActivity : ComponentActivity() {
 
@@ -37,9 +43,11 @@ class KnowledgeActivity : ComponentActivity() {
         setContent {
             AuraShellTheme {
                 val listState by viewModel.listState.collectAsState()
-                val detail by viewModel.detailState.collectAsState()
+                val detailUi by viewModel.detailUi.collectAsState()
                 val navController = rememberNavController()
                 val clipboard = LocalClipboardManager.current
+                val scope = rememberCoroutineScope()
+                var showLinkPicker by remember { mutableStateOf(false) }
 
                 val importLauncher = rememberLauncherForActivityResult(
                     contract = object : ActivityResultContract<Array<String>, Uri?>() {
@@ -65,7 +73,6 @@ class KnowledgeActivity : ComponentActivity() {
                                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
                             )
                         } catch (_: SecurityException) {
-                            // Still readable in-session for some providers
                         }
                         val mime = contentResolver.getType(uri)
                         val name = uri.lastPathSegment
@@ -76,6 +83,7 @@ class KnowledgeActivity : ComponentActivity() {
                 LaunchedEffect(startRoute) {
                     when {
                         startRoute == null || startRoute == "list" -> {
+                            viewModel.setTagFilter(null)
                             navController.navigate(KnowledgeRoutes.List) {
                                 popUpTo(KnowledgeRoutes.List) { inclusive = true }
                                 launchSingleTop = true
@@ -83,10 +91,22 @@ class KnowledgeActivity : ComponentActivity() {
                         }
                         startRoute == "imports" -> {
                             viewModel.setImportsOnly(true)
+                            viewModel.setTagFilter(null)
                             navController.navigate(KnowledgeRoutes.List) {
                                 popUpTo(KnowledgeRoutes.List) { inclusive = true }
                                 launchSingleTop = true
                             }
+                        }
+                        startRoute.startsWith("tag:") -> {
+                            viewModel.setTagFilter(startRoute.removePrefix("tag:"))
+                            viewModel.setImportsOnly(false)
+                            navController.navigate(KnowledgeRoutes.List) {
+                                popUpTo(KnowledgeRoutes.List) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                        startRoute == "cluster" -> {
+                            navController.navigate(KnowledgeRoutes.Cluster) { launchSingleTop = true }
                         }
                         startRoute == "import" -> {
                             navController.navigate(KnowledgeRoutes.List) {
@@ -134,6 +154,23 @@ class KnowledgeActivity : ComponentActivity() {
                                 val t = clipboard.getText()?.text?.trim().orEmpty()
                                 if (t.isNotEmpty()) viewModel.saveClipboard(t)
                             },
+                            onTagFilter = { key -> viewModel.setTagFilter(key) },
+                            onOpenCluster = {
+                                navController.navigate(KnowledgeRoutes.Cluster)
+                            },
+                        )
+                    }
+                    composable(KnowledgeRoutes.Cluster) {
+                        val clusterItems = remember { mutableStateOf<List<KnowledgeListItem>>(emptyList()) }
+                        LaunchedEffect(Unit) {
+                            clusterItems.value = viewModel.continueCluster()
+                        }
+                        KnowledgeClusterScreen(
+                            items = clusterItems.value,
+                            onBack = { navController.popBackStack() },
+                            onItemClick = { id ->
+                                navController.navigate(KnowledgeRoutes.detail(id))
+                            },
                         )
                     }
                     composable(KnowledgeRoutes.EditorNew) {
@@ -155,12 +192,18 @@ class KnowledgeActivity : ComponentActivity() {
                     ) { backStackEntry ->
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
                         LaunchedEffect(id) {
+                            viewModel.onEnterDetail(id)
                             viewModel.loadDetail(id)
                         }
-                        val entity = detail.takeIf { it?.id == id }
-                        if (entity != null) {
+                        DisposableEffect(id) {
+                            onDispose {
+                                viewModel.onLeaveDetail(id)
+                            }
+                        }
+                        val d = detailUi?.takeIf { it.entity.id == id }
+                        if (d != null) {
                             KnowledgeDetailScreen(
-                                entity = entity,
+                                detail = d,
                                 onBack = { navController.popBackStack() },
                                 onDelete = {
                                     viewModel.deleteItem(id)
@@ -175,6 +218,27 @@ class KnowledgeActivity : ComponentActivity() {
                                         startActivity(Intent(Intent.ACTION_VIEW, u))
                                     } catch (_: Exception) { }
                                 },
+                                onAddTag = { t -> viewModel.addTag(id, t) },
+                                onRemoveTag = { t -> viewModel.removeTag(id, t) },
+                                onApplySuggestion = { t -> viewModel.applySuggestion(id, t) },
+                                onRelatedClick = { rid ->
+                                    navController.navigate(KnowledgeRoutes.detail(rid)) {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onUnlinkManual = { rid -> viewModel.unlinkManual(id, rid) },
+                                onOpenLinkPicker = { showLinkPicker = true },
+                            )
+                        }
+                        if (showLinkPicker) {
+                            LinkItemPickerDialog(
+                                excludeItemId = id,
+                                loadItems = { q -> viewModel.itemsToLink(id, q) },
+                                onDismiss = { showLinkPicker = false },
+                                onPick = { toId ->
+                                    viewModel.linkToItem(id, toId)
+                                    showLinkPicker = false
+                                },
                             )
                         }
                     }
@@ -183,10 +247,10 @@ class KnowledgeActivity : ComponentActivity() {
                         arguments = listOf(navArgument("id") { type = NavType.StringType }),
                     ) { backStackEntry ->
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
+                        val entity = detailUi?.entity?.takeIf { it.id == id }
                         LaunchedEffect(id) {
                             viewModel.loadDetail(id)
                         }
-                        val entity = detail.takeIf { it?.id == id }
                         if (entity != null && entity.isAuraAuthored) {
                             NoteEditorScreen(
                                 existingId = entity.id,

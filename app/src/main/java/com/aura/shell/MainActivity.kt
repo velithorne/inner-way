@@ -117,10 +117,19 @@ class MainActivity : ComponentActivity() {
                 HomeScreen(
                     state = state,
                     knowledgePreview = state.latestKnowledgePreview,
+                    knowledgeClusterPreview = state.knowledgeClusterPreview,
+                    knowledgeTrendingTag = state.knowledgeTrendingTag,
                     onOpenKnowledge = {
                         startActivity(
                             Intent(this@MainActivity, KnowledgeActivity::class.java).apply {
                                 putExtra(KnowledgeActivity.EXTRA_ROUTE, "list")
+                            },
+                        )
+                    },
+                    onOpenKnowledgeCluster = {
+                        startActivity(
+                            Intent(this@MainActivity, KnowledgeActivity::class.java).apply {
+                                putExtra(KnowledgeActivity.EXTRA_ROUTE, "cluster")
                             },
                         )
                     },

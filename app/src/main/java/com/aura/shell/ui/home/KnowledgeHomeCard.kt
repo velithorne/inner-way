@@ -18,7 +18,10 @@ import com.aura.shell.ui.theme.AuraSurfaceElevated
 @Composable
 fun KnowledgeHomeCard(
     preview: KnowledgeListItem?,
+    clusterPreview: List<KnowledgeListItem>,
+    trendingTag: String?,
     onOpenKnowledge: () -> Unit,
+    onOpenCluster: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -36,7 +39,7 @@ fun KnowledgeHomeCard(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
         )
-        if (preview == null) {
+        if (preview == null && clusterPreview.isEmpty()) {
             Text(
                 text = "Notes and imports stay on this device. Tap to open.",
                 style = MaterialTheme.typography.bodySmall,
@@ -44,21 +47,52 @@ fun KnowledgeHomeCard(
                 modifier = Modifier.padding(top = 6.dp),
             )
         } else {
-            Text(
-                text = "Latest · ${preview.title}",
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            Text(
-                text = preview.snippet,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            preview?.let { p ->
+                Text(
+                    text = "Latest · ${p.title}",
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            if (clusterPreview.size > 1) {
+                Text(
+                    text = clusterPreview.drop(1).joinToString(" · ") { it.title },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Text(
+                    text = "Tap for full list · hub icon in Knowledge opens this cluster",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .clickable(onClick = onOpenCluster),
+                )
+            } else {
+                preview?.let { p ->
+                    Text(
+                        text = p.snippet,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            trendingTag?.let { t ->
+                Text(
+                    text = "Recurring tag: $t",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 }

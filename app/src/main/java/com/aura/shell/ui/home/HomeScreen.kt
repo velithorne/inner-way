@@ -92,7 +92,10 @@ fun HomeScreen(
     drawerRequest: DrawerRequest? = null,
     onDrawerRequestConsumed: () -> Unit = {},
     knowledgePreview: KnowledgeListItem? = null,
+    knowledgeClusterPreview: List<KnowledgeListItem> = emptyList(),
+    knowledgeTrendingTag: String? = null,
     onOpenKnowledge: () -> Unit = {},
+    onOpenKnowledgeCluster: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val pinned = remember { defaultPinnedCards() }
@@ -207,9 +210,15 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(14.dp))
                 KnowledgeHomeCard(
                     preview = knowledgePreview,
+                    clusterPreview = knowledgeClusterPreview,
+                    trendingTag = knowledgeTrendingTag,
                     onOpenKnowledge = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onOpenKnowledge()
+                    },
+                    onOpenCluster = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onOpenKnowledgeCluster()
                     },
                 )
 

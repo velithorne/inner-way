@@ -65,4 +65,7 @@ sealed class CommandDispatch {
         val subtitle: String?,
         val items: List<KnowledgeListItem>,
     ) : CommandDispatch()
+
+    /** Short confirmation after a knowledge tag/link mutation from commands. */
+    data class KnowledgeFeedback(val message: String, val subtitle: String? = null) : CommandDispatch()
 }

@@ -16,11 +16,48 @@ object KnowledgeCommandParser {
         data class SearchKnowledge(val query: String) : Intent()
         data class SearchNotes(val query: String?) : Intent()
         data class OpenLinkAbout(val query: String) : Intent()
+        // Phase 4.1
+        data class ShowTagged(val tag: String) : Intent()
+        data class FindNotesTagged(val tag: String) : Intent()
+        data object RelatedCurrent : Intent()
+        data class RelatedTopic(val topic: String) : Intent()
+        data class AddTagCurrent(val tag: String) : Intent()
+        data class RemoveTagCurrent(val tag: String) : Intent()
     }
 
     fun parse(normalized: String): Intent {
         val n = normalized.trim()
         if (n.isEmpty()) return Intent.None
+
+        // Tag mutations on current item (require open detail in Knowledge)
+        extractAfterPrefixes(n, listOf("tag this as ", "tag this ", "add tag ", "tag add "))?.let { t ->
+            return Intent.AddTagCurrent(t)
+        }
+        extractAfterPrefixes(n, listOf("remove tag ", "delete tag ", "untag "))?.let { t ->
+            return Intent.RemoveTagCurrent(t)
+        }
+
+        // Browse by tag
+        extractAfterPrefixes(n, listOf("show items tagged ", "items tagged ", "browse tag ", "filter tag "))?.let { t ->
+            return Intent.ShowTagged(t)
+        }
+        extractAfterPrefixes(n, listOf("find notes tagged ", "notes tagged ", "show notes tagged "))?.let { t ->
+            return Intent.FindNotesTagged(t)
+        }
+
+        // Related
+        Regex("^find (.+) related items$").find(n)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            return Intent.RelatedTopic(it)
+        }
+        if (n == "show related items" || n == "show related" || n == "related items" || n == "show related to this") {
+            return Intent.RelatedCurrent
+        }
+        extractAfterPrefix(n, "show related to ")?.let {
+            return Intent.RelatedTopic(it)
+        }
+        Regex("^show (.+) related items$").find(n)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            return Intent.RelatedTopic(it)
+        }
 
         if (n == "show my notes" || n == "my notes" || n == "list notes") {
             return Intent.SearchNotes(null)

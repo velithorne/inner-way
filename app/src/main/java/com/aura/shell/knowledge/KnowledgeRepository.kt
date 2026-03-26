@@ -5,10 +5,14 @@ import android.net.Uri
 import com.aura.shell.AuraApplication
 import com.aura.shell.knowledge.db.KnowledgeDao
 import com.aura.shell.knowledge.db.KnowledgeItemEntity
+import com.aura.shell.knowledge.db.KnowledgeItemTagCrossRef
+import com.aura.shell.knowledge.db.KnowledgeManualLinkEntity
+import com.aura.shell.knowledge.db.TagEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.util.LinkedHashSet
 import java.util.UUID
 
 class KnowledgeRepository(
@@ -17,6 +21,7 @@ class KnowledgeRepository(
 ) {
     private val appContext = context.applicationContext
     private val dao: KnowledgeDao = (database ?: (appContext as AuraApplication).knowledgeDatabase).knowledgeDao()
+    private val relatedEngine = RelatedKnowledgeEngine(dao)
 
     fun observeRecent(limit: Int = 40): Flow<List<KnowledgeListItem>> {
         return dao.observeRecent(limit).map { list -> list.map { it.toListItem() } }
@@ -29,6 +34,140 @@ class KnowledgeRepository(
     suspend fun getById(id: String): KnowledgeItemEntity? = withContext(Dispatchers.IO) {
         dao.getById(id)
     }
+
+    suspend fun getTagKeysForItem(itemId: String): List<String> = withContext(Dispatchers.IO) {
+        dao.getTagKeysForItem(itemId)
+    }
+
+    suspend fun getAllTagKeys(limit: Int = 200): List<String> = withContext(Dispatchers.IO) {
+        dao.getAllTagKeys(limit)
+    }
+
+    suspend fun getPopularTagKeys(limit: Int = 14): List<String> = withContext(Dispatchers.IO) {
+        dao.getPopularTagKeys(limit)
+    }
+
+    suspend fun addTagToItem(itemId: String, rawTag: String) = withContext(Dispatchers.IO) {
+        val key = TagNormalizer.normalize(rawTag)
+        if (key.length < 2) return@withContext
+        dao.insertTag(TagEntity(key))
+        dao.insertItemTag(KnowledgeItemTagCrossRef(itemId, key))
+        syncTagsCsv(itemId)
+    }
+
+    suspend fun removeTagFromItem(itemId: String, rawTag: String) = withContext(Dispatchers.IO) {
+        val key = TagNormalizer.normalize(rawTag)
+        dao.deleteItemTag(itemId, key)
+        syncTagsCsv(itemId)
+    }
+
+    suspend fun tagSuggestionsFor(itemId: String): List<String> = withContext(Dispatchers.IO) {
+        val e = dao.getById(itemId) ?: return@withContext emptyList()
+        val existing = dao.getTagKeysForItem(itemId).toSet()
+        val freq = dao.getPopularTagKeys(40).filter { it !in existing }
+        TagSuggestionEngine.suggestionsForItem(e, existing, freq)
+    }
+
+    suspend fun linkItemsManually(fromId: String, toId: String) = withContext(Dispatchers.IO) {
+        if (fromId == toId) return@withContext
+        dao.insertManualLink(
+            KnowledgeManualLinkEntity(
+                fromItemId = fromId,
+                toItemId = toId,
+                createdAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun unlinkItemsManually(a: String, b: String) = withContext(Dispatchers.IO) {
+        dao.deleteManualLinkBidirectional(a, b)
+    }
+
+    suspend fun relatedFor(itemId: String, limit: Int = 12): List<RelatedKnowledgeItem> = withContext(Dispatchers.IO) {
+        relatedEngine.relatedForItem(itemId, limit)
+    }
+
+    suspend fun relatedAsListItems(centerId: String, limit: Int = 16): List<KnowledgeListItem> = withContext(Dispatchers.IO) {
+        relatedEngine.relatedForItem(centerId, limit).mapNotNull { r ->
+            dao.getById(r.id)?.toListItem()?.copy(relationHint = r.reason)
+        }
+    }
+
+    suspend fun searchByTag(tagRaw: String, limit: Int = 40): List<KnowledgeListItem> = withContext(Dispatchers.IO) {
+        val key = TagNormalizer.normalize(tagRaw)
+        if (key.length < 2) return@withContext emptyList()
+        dao.getItemsWithTag(key, limit).map { it.toListItem() }
+    }
+
+    suspend fun searchKnowledgeWithOptionalTag(
+        textQuery: String,
+        tagRaw: String?,
+        limit: Int = 24,
+    ): List<KnowledgeListItem> = withContext(Dispatchers.IO) {
+        val tagKey = tagRaw?.let { TagNormalizer.normalize(it) }?.takeIf { it.length >= 2 }
+        val text = textQuery.trim()
+        val base: List<KnowledgeItemEntity> = when {
+            text.isEmpty() && tagKey != null -> dao.getItemsWithTag(tagKey, limit)
+            tagKey == null && text.isNotEmpty() -> dao.searchFts(buildFtsQuery(text), limit * 2)
+            tagKey != null && text.isNotEmpty() -> {
+                val fts = dao.searchFts(buildFtsQuery(text), limit * 3).filter { e ->
+                    dao.getTagKeysForItem(e.id).contains(tagKey)
+                }
+                if (fts.isNotEmpty()) fts else {
+                    dao.getItemsWithTag(tagKey, limit * 2).filter { e ->
+                        val blob = "${e.title} ${e.fullText}".lowercase()
+                        text.lowercase().split(Regex("\\s+")).any { it.length >= 2 && blob.contains(it) }
+                    }
+                }
+            }
+            else -> emptyList()
+        }
+        base.take(limit).map { it.toListItem() }
+    }
+
+    /**
+     * Cluster for “continue work”: anchor + co-view/session + tag overlap with recents.
+     */
+    suspend fun continueRecentCluster(limit: Int = 8): List<KnowledgeListItem> = withContext(Dispatchers.IO) {
+        val recentIds = dao.getRecent(12).map { it.id }
+        if (recentIds.isEmpty()) return@withContext emptyList()
+        val anchor = recentIds.first()
+        val relatedList = relatedAsListItems(anchor, limit * 3)
+        val hintById = relatedList.associate { it.id to it.relationHint }
+        val ordered = LinkedHashSet<String>()
+        ordered.add(anchor)
+        relatedList.forEach { r ->
+            if (ordered.size >= limit) return@forEach
+            ordered.add(r.id)
+        }
+        recentIds.drop(1).forEach { id ->
+            if (ordered.size >= limit) return@forEach
+            if (!ordered.contains(id)) ordered.add(id)
+        }
+        ordered.take(limit).mapNotNull { id ->
+            val base = dao.getById(id)?.toListItem() ?: return@mapNotNull null
+            val hint = when (id) {
+                anchor -> "Latest in Knowledge"
+                else -> hintById[id] ?: "Recent nearby"
+            }
+            base.copy(relationHint = hint)
+        }
+    }
+
+    suspend fun itemsForPickLinkDialog(excludeId: String, query: String, limit: Int = 30): List<KnowledgeListItem> =
+        withContext(Dispatchers.IO) {
+            val q = query.trim().lowercase()
+            dao.getRecent(120)
+                .filter { it.id != excludeId }
+                .filter {
+                    if (q.isEmpty()) true else {
+                        it.title.lowercase().contains(q) ||
+                            it.snippetPreview.lowercase().contains(q)
+                    }
+                }
+                .take(limit)
+                .map { it.toListItem() }
+        }
 
     suspend fun insertNote(title: String, body: String) = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
@@ -161,7 +300,7 @@ class KnowledgeRepository(
         if (!existing.isAuraAuthored || existing.sourceType != KnowledgeSourceType.AURA_NOTE.name) return@withContext
         val full = body.trim()
         val t = title.ifBlank { KnowledgeTextExtractor.snippet(full, 48).ifBlank { "Note" } }
-        dao.insert(
+        dao.update(
             existing.copy(
                 title = t,
                 fullText = full,
@@ -172,7 +311,20 @@ class KnowledgeRepository(
     }
 
     suspend fun delete(id: String) = withContext(Dispatchers.IO) {
+        KnowledgeContextStore.clearCurrentIfMatches(id)
         dao.getById(id)?.let { dao.delete(it) }
+    }
+
+    private suspend fun syncTagsCsv(itemId: String) {
+        val keys = dao.getTagKeysForItem(itemId)
+        val csv = keys.joinToString(",")
+        val existing = dao.getById(itemId) ?: return
+        dao.update(
+            existing.copy(
+                tagsCsv = csv.ifEmpty { null },
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
     }
 
     suspend fun searchAll(query: String, limit: Int = 24): List<KnowledgeListItem> = withContext(Dispatchers.IO) {
@@ -218,6 +370,8 @@ class KnowledgeRepository(
         } catch (_: Exception) {
             KnowledgeExtractionStatus.METADATA_ONLY
         },
+        tagKeys = tagsCsv?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
+        relationHint = null,
     )
 
     /**

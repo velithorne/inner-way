@@ -89,6 +89,10 @@ suspend fun executeCommandPipeline(
             surface = surfaceFromDispatch(dispatch),
             history = history,
         )
+        is CommandDispatch.KnowledgeFeedback -> PipelineResult.SurfaceOnly(
+            surface = surfaceFromDispatch(dispatch),
+            history = history,
+        )
         else -> PipelineResult.SurfaceOnly(
             surface = surfaceFromDispatch(dispatch),
             history = history,
@@ -148,6 +152,10 @@ internal fun surfaceFromDispatch(dispatch: CommandDispatch): CommandSurfaceState
             title = dispatch.title,
             subtitle = dispatch.subtitle,
             items = dispatch.items,
+        )
+        is CommandDispatch.KnowledgeFeedback -> CommandSurfaceState.Success(
+            message = dispatch.message,
+            hint = dispatch.subtitle,
         )
         is CommandDispatch.Unknown -> CommandSurfaceState.Unknown(dispatch.message)
     }
