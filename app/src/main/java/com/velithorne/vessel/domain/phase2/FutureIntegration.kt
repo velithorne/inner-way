@@ -10,7 +10,7 @@ package com.velithorne.vessel.domain.phase2
  * Still future:
  * - **EvolutionEngine**: generational pressure from long-window physiology integrals
  * - **VesselPersistence**: Room / DataStore for traces and seeds
- * - **VesselRenderer**: 2.5D organ field driven by [com.velithorne.vessel.physiology.PhysiologySnapshot]
+ * - **VesselRenderer**: real-time layer in `com.velithorne.vessel.renderer` (Phase 3); evolution overlays later
  */
 interface EvolutionEngine {
     // TODO: fun observeFitness(): Flow<FitnessScalar>

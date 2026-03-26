@@ -25,8 +25,7 @@ import com.velithorne.vessel.ui.theme.VesselBg
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
 /**
- * Phase 2 shell: raw substrate readout vs synthetic anatomy.
- * Phase 3: add vessel tab consuming the same [TelemetryViewModel.physiology] stream.
+ * Phase 3: **Vessel** is the primary tab; raw telemetry and physiology remain available.
  */
 @Composable
 fun VesselMainScreen(
@@ -56,11 +55,16 @@ fun VesselMainScreen(
                 Tab(
                     selected = tab == 0,
                     onClick = { tab = 0 },
-                    text = { Text("Telemetry") },
+                    text = { Text("Vessel") },
                 )
                 Tab(
                     selected = tab == 1,
                     onClick = { tab = 1 },
+                    text = { Text("Telemetry") },
+                )
+                Tab(
+                    selected = tab == 2,
+                    onClick = { tab = 2 },
                     text = { Text("Physiology") },
                 )
             }
@@ -73,8 +77,9 @@ fun VesselMainScreen(
                 .padding(top = 4.dp),
         ) {
             when (tab) {
-                0 -> TelemetryDebugScreen(viewModel = viewModel)
-                1 -> PhysiologyDebugScreen(viewModel = viewModel)
+                0 -> VesselScreen(viewModel = viewModel)
+                1 -> TelemetryDebugScreen(viewModel = viewModel)
+                2 -> PhysiologyDebugScreen(viewModel = viewModel)
             }
         }
     }

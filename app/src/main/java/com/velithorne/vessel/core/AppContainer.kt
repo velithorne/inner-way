@@ -2,6 +2,7 @@ package com.velithorne.vessel.core
 
 import android.app.Application
 import com.velithorne.vessel.physiology.PhysiologyEngine
+import com.velithorne.vessel.renderer.VesselRenderer
 import com.velithorne.vessel.telemetry.TelemetryRepository
 
 /**
@@ -20,4 +21,7 @@ class AppContainer(app: Application) {
 
     /** Process-scoped to preserve EMA state across ticks. */
     val physiologyEngine: PhysiologyEngine = PhysiologyEngine()
+
+    /** Telemetry → scene mapping (stateless); animation state lives in composables. */
+    val vesselRenderer: VesselRenderer = VesselRenderer()
 }

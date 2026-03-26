@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         val factory = TelemetryViewModelFactory(
             repository = container.telemetryRepository,
             physiologyEngine = container.physiologyEngine,
+            vesselRenderer = container.vesselRenderer,
         )
         setContent {
             VelithorneVesselTheme {

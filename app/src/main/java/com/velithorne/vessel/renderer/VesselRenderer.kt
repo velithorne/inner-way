@@ -1,0 +1,269 @@
+package com.velithorne.vessel.renderer
+
+import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.physiology.OrganState
+import com.velithorne.vessel.physiology.OrganType
+import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.physiology.SpeciesState
+import com.velithorne.vessel.telemetry.NetworkTransport
+
+/**
+ * Physiology → [VesselSceneState]. Separates simulation mapping from Canvas code.
+ *
+ * Future: evolution traits adjust [VesselLayout] and palette; Room stores keyframe traces.
+ */
+class VesselRenderer(
+    private val layout: VesselLayout = VesselLayout(),
+    private val tuning: RenderTuning = RenderTuning(),
+) {
+
+    fun map(snapshot: PhysiologySnapshot): VesselSceneState {
+        val s = snapshot.species
+        val telem = snapshot.telemetry
+        val organs = snapshot.organs.associateBy { it.organType }
+
+        val vitalityGlow = (s.vitality * tuning.vitalityGlowScale).coerceIn(0f, 1.4f)
+        val stressTint = s.stress.coerceIn(0f, 1f)
+        val feverIntensity = s.fever.coerceIn(0f, 1f)
+        val recoveryGlow = s.recovery.coerceIn(0f, 1f)
+        val mobilitySway = s.mobility.coerceIn(0f, 1f)
+        val signalBrightness = (s.signalArousal * tuning.signalCyanBoost).coerceIn(0f, 1.2f)
+        val sleepDim = (s.sleepPressure * tuning.sleepDimMax).coerceIn(0f, tuning.sleepDimMax)
+        val structuralMass = (s.structuralLoad * 0.85f + stressTint * 0.15f).coerceIn(0f, 1f)
+
+        val basePulse = tuning.pulseAmplitudeVitalityScale * (0.55f + s.vitality * 0.45f)
+        val stressPulseBoost = s.stress * tuning.pulseAmplitudeStressBoost
+        val hungerPulseDamp = 1f - s.hunger * 0.35f
+        val bodyPulseAmplitude = (basePulse + stressPulseBoost) * hungerPulseDamp
+
+        val breath = tuning.breathAmplitudeRespirationScale * (0.45f + s.respiration * 0.9f)
+
+        val bodyScale = (0.96f + s.vitality * 0.06f + s.recovery * 0.02f) * tuning.bodyProfileScale
+
+        val neuralDrive = s.neuralActivity.coerceIn(0f, 1f)
+        val vascularPulse = (s.vitality * 0.35f + neuralDrive * 0.45f + s.signalArousal * 0.35f)
+            .coerceIn(0f, 1f)
+
+        val thermalAgitation = (
+            feverIntensity * 0.8f +
+                (organs[OrganType.THERMAL_MEMBRANE]?.inflammation ?: 0f) * 0.9f
+            ).coerceIn(0f, 1f)
+
+        val particleDensity = (
+            0.25f + s.respiration * 0.2f + neuralDrive * 0.25f + feverIntensity * 0.15f +
+                s.signalArousal * 0.2f + structuralMass * 0.12f
+            ).coerceIn(0f, 1f) * tuning.fogDensityScale
+
+        val fogDensity = (0.2f + structuralMass * 0.35f + feverIntensity * 0.25f).coerceIn(0f, 1f)
+
+        val signalStrained = when {
+            telem.networkConnected == false -> 0.55f
+            telem.networkType == NetworkTransport.CELLULAR && telem.networkMetered == true -> 0.45f
+            else -> 0.12f
+        }
+
+        val hungerDim = s.hunger.coerceIn(0f, 1f)
+        val stressShiver = (s.stress * tuning.stressShiverDegrees / 8f).coerceIn(0f, 1f)
+
+        val organVisuals = OrganType.values().flatMap { type ->
+            when (type) {
+                OrganType.SIGNAL_LUNGS -> {
+                    val left = layout.anchors[OrganType.SIGNAL_LUNGS]
+                        ?: VesselLayout.OrganAnchor(0.35f, 0.48f, 0.065f)
+                    val rightAnchor = left.copy(x = 1f - left.x)
+                    listOf(
+                        mapOrganAt(type, organs[type], s, feverIntensity, left),
+                        mapOrganAt(type, organs[type], s, feverIntensity, rightAnchor),
+                    )
+                }
+                else -> listOf(mapOrganAt(type, organs[type], s, feverIntensity, layout.anchors[type]))
+            }
+        }
+
+        val thermalTint = lerpColor(
+            Color(0xFF1A2A28),
+            Color(0xFFFF6B35).copy(alpha = 0.55f),
+            feverIntensity * tuning.feverThermalTint,
+        )
+        val accentBias = lerpColor(
+            Color(0xFF4ECDC4),
+            Color(0xFF5EEAD4),
+            (signalBrightness * 0.4f).coerceIn(0f, 1f),
+        )
+
+        return VesselSceneState(
+            timestampMillis = snapshot.timestampMillis,
+            bodyScale = bodyScale,
+            bodyPulseAmplitude = bodyPulseAmplitude,
+            bodyBreathAmplitude = breath,
+            vitalityGlow = vitalityGlow,
+            stressTint = stressTint,
+            feverIntensity = feverIntensity,
+            recoveryGlow = recoveryGlow,
+            mobilitySway = mobilitySway,
+            signalBrightness = signalBrightness,
+            sleepDimming = sleepDim,
+            structuralMass = structuralMass,
+            stressShiver = stressShiver,
+            neuralDrive = neuralDrive,
+            respirationDrive = s.respiration,
+            hungerDim = hungerDim,
+            thermalAgitation = thermalAgitation,
+            particleDensity = particleDensity,
+            fogDensity = fogDensity,
+            signalStrained = signalStrained,
+            organVisuals = organVisuals,
+            vascularPulse = vascularPulse,
+            statusLine = statusSentence(s),
+            healthLabel = s.healthLabel,
+            vitalityDisplay = s.vitality,
+            feverLabel = feverWord(s.fever),
+            hungerLabel = hungerWord(s.hunger),
+            accentBias = accentBias,
+            thermalTint = thermalTint,
+        )
+    }
+
+    private fun mapOrganAt(
+        type: OrganType,
+        state: OrganState?,
+        species: SpeciesState,
+        globalFever: Float,
+        anchor: VesselLayout.OrganAnchor?,
+    ): OrganVisualModel {
+        val a = anchor ?: return defaultOrgan(type)
+        val h = state?.health ?: 0.55f
+        val load = state?.load ?: 0.35f
+        val activity = state?.activity ?: 0.4f
+        val infl = state?.inflammation ?: 0.2f
+        val reserve = state?.reserve ?: 0.5f
+
+        val scale = tuning.organScaleGlobal
+        val baseR = a.radius * scale
+
+        return when (type) {
+            OrganType.METABOLIC_HEART -> OrganVisualModel(
+                type, a.x, a.y, baseR,
+                glowIntensity = (species.vitality * 0.55f + reserve * 0.45f + activity * 0.25f).coerceIn(0f, 1.2f),
+                pulseCoupling = (0.45f + load * 0.6f + activity * 0.35f).coerceIn(0f, 1.3f),
+                flickerIntensity = 0.08f,
+                strain = load,
+                densityLines = species.hunger * 0.5f,
+                thermalCoupling = globalFever * 0.35f,
+                reserveLevel = reserve,
+            )
+            OrganType.CORTEX_CLUSTER -> OrganVisualModel(
+                type, a.x, a.y, baseR * 1.05f,
+                glowIntensity = (species.neuralActivity * 0.7f + h * 0.35f).coerceIn(0f, 1.2f),
+                pulseCoupling = 0.35f,
+                flickerIntensity = (species.neuralActivity * 0.85f + species.stress * 0.35f).coerceIn(0f, 1f),
+                strain = species.stress,
+                densityLines = species.neuralActivity * 0.4f,
+                thermalCoupling = globalFever * 0.2f,
+                reserveLevel = h,
+            )
+            OrganType.NEURAL_GEL -> OrganVisualModel(
+                type, a.x, a.y, baseR * 1.35f,
+                glowIntensity = (h * 0.5f + (1f - load) * 0.35f).coerceIn(0f, 0.9f),
+                pulseCoupling = 0.25f,
+                flickerIntensity = ((1f - h) * 0.5f + species.neuralActivity * 0.3f).coerceIn(0f, 1f),
+                strain = load,
+                densityLines = (1f - h) * 0.7f + species.structuralLoad * 0.15f,
+                thermalCoupling = 0.15f,
+                reserveLevel = reserve,
+            )
+            OrganType.ARCHIVE_VAULT -> OrganVisualModel(
+                type, a.x, a.y, baseR * 1.15f,
+                glowIntensity = (species.structuralLoad * 0.5f + load * 0.35f).coerceIn(0f, 1f),
+                pulseCoupling = 0.2f,
+                flickerIntensity = 0.12f,
+                strain = load,
+                densityLines = (species.structuralLoad * 0.9f + (1f - reserve) * 0.3f).coerceIn(0f, 1f),
+                thermalCoupling = globalFever * 0.25f,
+                reserveLevel = reserve,
+            )
+            OrganType.SIGNAL_LUNGS -> OrganVisualModel(
+                type, a.x, a.y, baseR,
+                glowIntensity = (species.respiration * 0.45f + species.signalArousal * 0.55f).coerceIn(0f, 1.1f),
+                pulseCoupling = (0.4f + species.respiration * 0.5f).coerceIn(0f, 1.2f),
+                flickerIntensity = species.signalArousal * 0.45f,
+                strain = 1f - species.respiration,
+                densityLines = 0.2f,
+                thermalCoupling = 0.1f,
+                reserveLevel = activity,
+            )
+            OrganType.VESTIBULAR_MUSCULATURE -> OrganVisualModel(
+                type, a.x, a.y, baseR * 1.4f,
+                glowIntensity = (species.mobility * 0.4f + h * 0.3f).coerceIn(0f, 0.85f),
+                pulseCoupling = 0.3f,
+                flickerIntensity = species.mobility * 0.25f,
+                strain = load.coerceIn(0f, 1f),
+                densityLines = species.mobility * 0.65f,
+                thermalCoupling = globalFever * 0.15f,
+                reserveLevel = h,
+            )
+            OrganType.THERMAL_MEMBRANE -> OrganVisualModel(
+                type, a.x, a.y, baseR * 2.2f,
+                glowIntensity = (globalFever * 0.7f + infl * 0.45f + species.stress * 0.25f).coerceIn(0f, 1.1f),
+                pulseCoupling = 0.5f + globalFever * 0.3f,
+                flickerIntensity = globalFever * 0.55f,
+                strain = infl,
+                densityLines = 0.15f,
+                thermalCoupling = 1f,
+                reserveLevel = 1f - globalFever,
+            )
+        }
+    }
+
+    private fun defaultOrgan(type: OrganType) = OrganVisualModel(
+        type = type,
+        anchorX = 0.5f,
+        anchorY = 0.5f,
+        baseRadius = 0.05f,
+        glowIntensity = 0f,
+        pulseCoupling = 0.5f,
+        flickerIntensity = 0f,
+        strain = 0f,
+        densityLines = 0f,
+        thermalCoupling = 0f,
+        reserveLevel = 0.5f,
+    )
+
+    private fun feverWord(f: Float): String = when {
+        f > 0.65f -> "High"
+        f > 0.38f -> "Elevated"
+        f > 0.15f -> "Mild"
+        else -> "Norm"
+    }
+
+    private fun hungerWord(h: Float): String = when {
+        h > 0.7f -> "Severe"
+        h > 0.45f -> "Moderate"
+        h > 0.22f -> "Light"
+        else -> "Satiated"
+    }
+
+    private fun statusSentence(s: SpeciesState): String {
+        val parts = mutableListOf<String>()
+        if (s.fever > 0.35f) parts += "Thermal compensation active."
+        if (s.hunger > 0.5f) parts += "Core reserve drawing down."
+        if (s.structuralLoad > 0.55f) parts += "Archive strata compressing."
+        if (s.recovery > 0.55f && s.stress < 0.5f) parts += "Regenerative tone elevated."
+        if (s.neuralActivity > 0.6f) parts += "Bioelectric traffic dense."
+        if (parts.isEmpty()) {
+            parts += if (s.vitality > 0.55f) "Specimen within nominal envelope." else "Homeostasis adapting."
+        }
+        val core = if (s.vitality > 0.48f) "Core reserve stable." else "Core reserve soft."
+        return (parts.take(2) + core).distinct().joinToString(" ")
+    }
+
+    private fun lerpColor(a: Color, b: Color, t: Float): Color {
+        val tt = t.coerceIn(0f, 1f)
+        return Color(
+            red = a.red + (b.red - a.red) * tt,
+            green = a.green + (b.green - a.green) * tt,
+            blue = a.blue + (b.blue - a.blue) * tt,
+            alpha = a.alpha + (b.alpha - a.alpha) * tt,
+        )
+    }
+}
