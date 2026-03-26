@@ -13,9 +13,10 @@ import kotlin.math.floor
  */
 class MorphogenesisEngine(
     private val tuning: GrowthTuning = GrowthTuning(),
-    lineageId: Long = 0x4E564C_01L,
+    initialLineageId: Long = 0x4E564C_01L,
 ) {
-    private val seed = SpeciesSeed.fromLineageId(lineageId)
+    private var lineageId: Long = initialLineageId
+    private var seed: SpeciesSeed = SpeciesSeed.fromLineageId(initialLineageId)
     private var genome: SpeciesGenome = SpeciesGenome.initial(seed)
     private var accumulator = PressureAccumulator()
     private var field = GrowthPressureField(0f, 0f, 0f, 0f, 0f, 0f)
@@ -29,6 +30,25 @@ class MorphogenesisEngine(
     private var budding: BuddingStructure? = null
     private var growthPhase = 0f
     private val eventLog = ArrayDeque<GrowthEvent>(16)
+
+    /** Fresh organism for new dev APK / lineage change. */
+    fun resetForNewBuild(newLineageId: Long = System.currentTimeMillis()) {
+        lineageId = newLineageId
+        seed = SpeciesSeed.fromLineageId(newLineageId)
+        genome = SpeciesGenome.initial(seed)
+        accumulator = PressureAccumulator()
+        field = GrowthPressureField(0f, 0f, 0f, 0f, 0f, 0f)
+        graph = null
+        contour = null
+        tissue = null
+        pathwaySpec = null
+        seedCore = null
+        chamberMass = null
+        bodyMass = null
+        budding = null
+        growthPhase = 0f
+        eventLog.clear()
+    }
 
     fun update(snapshot: PhysiologySnapshot): MorphogenesisSnapshot {
         val telem = snapshot.telemetry
@@ -115,6 +135,7 @@ class MorphogenesisEngine(
             growthStatusLabel = statusLabel,
             growthStatusLine = statusLine,
             explainerLines = explainer,
+            seedFormBlendDisplay = null,
         )
     }
 

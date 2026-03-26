@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +32,9 @@ import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.renderer.RenderTuning
 import com.velithorne.vessel.renderer.VesselGestureController
 import com.velithorne.vessel.renderer.VesselScene
+import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.GrowthStatusChip
+import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselStageChip
@@ -51,6 +54,12 @@ fun VesselScreen(
     val inspection by viewModel.organInspection.collectAsState()
     val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
     val growth by viewModel.growthVisual.collectAsState()
+    val returnSummaryFlow by viewModel.growthReturnSummary.collectAsState()
+    var showReturnSummarySheet by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(returnSummaryFlow) {
+        val s = returnSummaryFlow
+        showReturnSummarySheet = s != null && s.deltas.isNotEmpty()
+    }
     var overlayExpanded by rememberSaveable { mutableStateOf(false) }
 
     val tuning = remember { RenderTuning() }
@@ -107,6 +116,12 @@ fun VesselScreen(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            GrowthProgressCard(
+                progress = growth.growthProgressFraction,
+                activeBudgetChannelLabel = growth.activeBudgetChannelLabel,
+                recentAwayLine = growth.recentAwayLine,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
         Box(
             modifier = Modifier
@@ -196,6 +211,15 @@ fun VesselScreen(
         inspection = inspection,
         visible = sheetVisible && selected != null,
         onDismiss = { viewModel.dismissVesselSheet() },
+    )
+
+    ReturnGrowthSummarySheet(
+        summary = returnSummaryFlow,
+        visible = showReturnSummarySheet,
+        onDismiss = {
+            showReturnSummarySheet = false
+            viewModel.dismissReturnGrowthSummary()
+        },
     )
 }
 

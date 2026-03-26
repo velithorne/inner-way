@@ -29,4 +29,8 @@ data class MorphogenesisSnapshot(
     val growthStatusLabel: String,
     val growthStatusLine: String,
     val explainerLines: List<String>,
+    /**
+     * When set by temporal growth, overrides mapper seed silhouette blend (lagging display).
+     */
+    val seedFormBlendDisplay: Float? = null,
 )

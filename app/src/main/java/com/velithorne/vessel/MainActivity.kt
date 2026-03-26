@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
             physiologyEngine = container.physiologyEngine,
             vesselRenderer = container.vesselRenderer,
             morphogenesisEngine = container.morphogenesisEngine,
+            growthTimeCoordinator = container.growthTimeCoordinator,
         )
         setContent {
             VelithorneVesselTheme {

@@ -6,6 +6,11 @@ import com.velithorne.vessel.model.GrowthVisualState
 import com.velithorne.vessel.model.OrganInspectionState
 import com.velithorne.vessel.model.VesselVisualState
 import com.velithorne.vessel.morphogenesis.GrowthExplainer
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.velithorne.vessel.growthtime.GrowthSessionSummary
+import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.physiology.OrganType
@@ -32,7 +37,16 @@ class TelemetryViewModel(
     private val physiologyEngine: PhysiologyEngine,
     private val vesselRenderer: VesselRenderer,
     private val morphogenesisEngine: MorphogenesisEngine,
+    private val growthTimeCoordinator: GrowthTimeCoordinator,
 ) : ViewModel() {
+
+    init {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                growthTimeCoordinator.markBackground()
+            }
+        })
+    }
 
     val telemetry: StateFlow<TelemetrySnapshot> = repository.snapshot
         .stateIn(
@@ -51,16 +65,21 @@ class TelemetryViewModel(
             initialValue = initialPhysiology,
         )
 
-    private val initialMorph = morphogenesisEngine.update(initialPhysiology)
+    private val initialMorphRaw = morphogenesisEngine.update(initialPhysiology)
+    private val initialMorph = growthTimeCoordinator.process(initialMorphRaw)
     private val initialScene = vesselRenderer.map(initialPhysiology, initialMorph)
 
     val morphogenesis: StateFlow<MorphogenesisSnapshot> = physiology
-        .map { morphogenesisEngine.update(it) }
+        .map { raw ->
+            growthTimeCoordinator.process(morphogenesisEngine.update(raw))
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = initialMorph,
+            initialValue = growthTimeCoordinator.process(initialMorph),
         )
+
+    val growthReturnSummary: StateFlow<GrowthSessionSummary?> = growthTimeCoordinator.returnSummary
 
     val vesselScene: StateFlow<VesselSceneState> = combine(
         physiology,
@@ -75,14 +94,18 @@ class TelemetryViewModel(
 
     val growthVisual: StateFlow<GrowthVisualState> = combine(
         morphogenesis,
-        vesselScene,
-    ) { morph, scene ->
+        growthReturnSummary,
+    ) { morph, ret ->
         GrowthVisualState(
             snapshot = morph,
             statusLabel = morph.growthStatusLabel,
             statusLine = morph.growthStatusLine,
             visibleActivity = morph.visibleGrowthActivity,
             germinationStageLabel = GrowthExplainer.stageDisplayName(morph.germinationStage),
+            growthProgressFraction = growthTimeCoordinator.displayProgressFraction(),
+            activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
+            recentAwayLine = growthTimeCoordinator.recentAwayLine(),
+            returnSummary = ret,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -93,8 +116,16 @@ class TelemetryViewModel(
             statusLine = initialMorph.growthStatusLine,
             visibleActivity = initialMorph.visibleGrowthActivity,
             germinationStageLabel = GrowthExplainer.stageDisplayName(initialMorph.germinationStage),
+            growthProgressFraction = growthTimeCoordinator.displayProgressFraction(),
+            activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
+            recentAwayLine = growthTimeCoordinator.recentAwayLine(),
+            returnSummary = growthTimeCoordinator.returnSummary.value,
         ),
     )
+
+    fun dismissReturnGrowthSummary() {
+        growthTimeCoordinator.dismissReturnSummary()
+    }
 
     val vesselVisual: StateFlow<VesselVisualState> = vesselScene
         .map { VesselVisualState(scene = it) }
