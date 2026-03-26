@@ -43,4 +43,14 @@ data class RenderTuning(
     val doubleTapAnimationCoarse: Float = 0.22f,
     val focusTransitionSeconds: Float = 0.38f,
     val thermalHitFullBodyMultiplier: Float = 1f,
+
+    /** Vertical position (0..1 of chamber height) where core centroid is placed in default framing. */
+    val defaultCompositionY: Float = 0.47f,
+    /** Fractional inset from chamber edges when fitting core bounds (0..0.5). */
+    val defaultFramingMargin: Float = 0.08f,
+    /** Upper cap on auto-fit zoom so default view is not overly zoomed-in on tall phones. */
+    val defaultFitZoomCap: Float = 1.12f,
+
+    /** Draw core centroid, fit rect, chamber center (development). */
+    val showFramingDebug: Boolean = false,
 )

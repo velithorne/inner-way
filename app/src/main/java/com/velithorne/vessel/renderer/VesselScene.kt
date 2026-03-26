@@ -75,7 +75,7 @@ fun VesselScene(
                         val w = size.width.toFloat()
                         val h = size.height.toFloat()
                         if (selectedOrgan == null) {
-                            gestureController.resetCamera()
+                            gestureController.requestResetNextFrame()
                             onSelectOrgan(null)
                             return@detectTapGestures
                         }
@@ -113,6 +113,15 @@ fun VesselScene(
             },
     ) {
         if (frame == 0L) return@Canvas
+        val parallaxOff = parallax.step(
+            physiology.telemetry.orientationPitchDeg,
+            physiology.telemetry.orientationRollDeg,
+            physiology.species.mobility,
+        )
+        if (gestureController.consumePendingReset(scene, size.width, size.height, parallaxOff)) {
+            anim.resetSelectionFocus()
+        }
+        gestureController.refreshBaseFramingIfNeutral(scene, size.width, size.height, parallaxOff)
         anim.setSelectionFocusTarget(selectedOrgan != null)
         anim.onFrame(frame)
         gestureController.smoothTowardsTargets(size.width, size.height)
@@ -122,12 +131,6 @@ fun VesselScene(
             selectedOrgan = selectedOrgan,
             isSheetVisible = false,
             focusProgress = anim.selectionFocus,
-        )
-
-        val parallaxOff = parallax.step(
-            physiology.telemetry.orientationPitchDeg,
-            physiology.telemetry.orientationRollDeg,
-            physiology.species.mobility,
         )
 
         val seed = (physiology.timestampMillis / 1000L).toInt() and 0x7fffffff

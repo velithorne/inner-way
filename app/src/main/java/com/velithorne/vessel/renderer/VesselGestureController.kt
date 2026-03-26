@@ -1,12 +1,13 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import com.velithorne.vessel.physiology.OrganType
 import kotlin.math.PI
-import kotlin.math.hypot
+import kotlin.math.abs
 
 /**
- * Camera + pinch/pan/rotate for the specimen viewport. Selection lives in ViewModel.
+ * Base framing from [VesselFraming]; user fields from gestures. Reset reapplies default fit.
  */
 class VesselGestureController(
     private val tuning: RenderTuning,
@@ -14,17 +15,88 @@ class VesselGestureController(
     var camera: VesselCameraState = VesselCameraState.default(tuning)
         private set
 
-    fun resetCamera() {
-        camera = VesselCameraState.default(tuning)
+    /** Reset on next frame when parallax is available (used from UI callbacks). */
+    private var pendingClearUserAndRefit: Boolean = false
+
+    private fun copyTargetsFromCurrent(c: VesselCameraState) = c.copy(
+        targetZoom = c.zoom,
+        targetPanX = c.panX,
+        targetPanY = c.panY,
+        targetUserZoom = c.userZoom,
+        targetUserPanX = c.userPanX,
+        targetUserPanY = c.userPanY,
+        targetRotationDeg = c.rotationDeg,
+        targetTiltDeg = c.tiltDeg,
+    )
+
+    fun resetToDefault(
+        scene: VesselSceneState,
+        viewportW: Float,
+        viewportH: Float,
+        parallax: Offset,
+    ) {
+        camera = copyTargetsFromCurrent(
+            VesselFraming.computeDefaultCamera(
+                scene = scene,
+                viewportSize = Size(viewportW, viewportH),
+                parallax = parallax,
+                tuning = tuning,
+            ),
+        )
     }
 
-    fun setCamera(c: VesselCameraState) {
-        camera = c.clamped(tuning)
+    /** Schedule neutral whole-specimen framing on the next draw (parallax from that frame). */
+    fun requestResetNextFrame() {
+        pendingClearUserAndRefit = true
+    }
+
+    fun consumePendingReset(
+        scene: VesselSceneState,
+        viewportW: Float,
+        viewportH: Float,
+        parallax: Offset,
+    ): Boolean {
+        if (!pendingClearUserAndRefit) return false
+        pendingClearUserAndRefit = false
+        resetToDefault(scene, viewportW, viewportH, parallax)
+        return true
     }
 
     /**
-     * Compose [detectTransformGestures]: incremental pan, multiplicative zoom, rotation radians.
+     * While the user is not offsetting the camera, keep base fit aligned with scene + parallax
+     * (whole-specimen default framing tracks telemetry tilt smoothly).
      */
+    fun refreshBaseFramingIfNeutral(
+        scene: VesselSceneState,
+        viewportW: Float,
+        viewportH: Float,
+        parallax: Offset,
+    ) {
+        val c = camera
+        val neutralUser = abs(c.userPanX) < 0.02f && abs(c.userPanY) < 0.02f &&
+            abs(c.targetUserPanX) < 0.02f && abs(c.targetUserPanY) < 0.02f &&
+            abs(c.userZoom - 1f) < 0.002f && abs(c.targetUserZoom - 1f) < 0.002f
+        val neutralRot = abs(c.rotationDeg) < 0.02f && abs(c.tiltDeg) < 0.02f &&
+            abs(c.targetRotationDeg) < 0.02f && abs(c.targetTiltDeg) < 0.02f
+        if (!neutralUser || !neutralRot) return
+
+        val next = VesselFraming.computeDefaultCamera(
+            scene = scene,
+            viewportSize = Size(viewportW, viewportH),
+            parallax = parallax,
+            tuning = tuning,
+        )
+        camera = c.copy(
+            basePanX = next.basePanX,
+            basePanY = next.basePanY,
+            fitZoom = next.fitZoom,
+        ).clampUserZoom(tuning).recomputeCombined(tuning).let(::copyTargetsFromCurrent)
+    }
+
+    fun setCamera(c: VesselCameraState) {
+        camera = copyTargetsFromCurrent(c.clampUserZoom(tuning).recomputeCombined(tuning))
+    }
+
     fun applyTransform(
         pan: Offset,
         zoomFactor: Float,
@@ -32,49 +104,59 @@ class VesselGestureController(
         viewportW: Float,
         viewportH: Float,
     ) {
-        val z = (camera.zoom * zoomFactor).coerceIn(tuning.minZoom, tuning.maxZoom)
-        val (px, py) = VesselHitTest.clampPan(
-            camera.panX + pan.x,
-            camera.panY + pan.y,
-            viewportW,
-            viewportH,
-            tuning,
-        )
-        val rotDeg = camera.rotationDeg + (rotationRad * (180.0 / PI).toFloat()) * 0.42f
-        val r = rotDeg.coerceIn(-tuning.maxRotationDeg, tuning.maxRotationDeg)
+        val nextUz = camera.targetUserZoom * zoomFactor
+        val r = (camera.targetRotationDeg + (rotationRad * (180.0 / PI).toFloat()) * 0.42f)
+            .coerceIn(-tuning.maxRotationDeg, tuning.maxRotationDeg)
         val tiltDelta = pan.y * 0.035f + (zoomFactor - 1f) * 2.8f
-        val t = (camera.tiltDeg + tiltDelta).coerceIn(-tuning.maxTiltDeg, tuning.maxTiltDeg)
-        camera = camera.copy(
-            zoom = z,
-            targetZoom = z,
-            panX = px,
-            panY = py,
-            targetPanX = px,
-            targetPanY = py,
-            rotationDeg = r,
+        val t = (camera.targetTiltDeg + tiltDelta).coerceIn(-tuning.maxTiltDeg, tuning.maxTiltDeg)
+        var tpx = camera.targetUserPanX + pan.x
+        var tpy = camera.targetUserPanY + pan.y
+        val panTotX = camera.basePanX + tpx
+        val panTotY = camera.basePanY + tpy
+        val clamped = VesselHitTest.clampPan(panTotX, panTotY, viewportW, viewportH, tuning)
+        tpx = clamped.first - camera.basePanX
+        tpy = clamped.second - camera.basePanY
+        var next = camera.copy(
+            targetUserZoom = nextUz,
+            targetUserPanX = tpx,
+            targetUserPanY = tpy,
             targetRotationDeg = r,
-            tiltDeg = t,
             targetTiltDeg = t,
-        )
+        ).clampUserZoom(tuning)
+        next = next.copy(
+            userZoom = next.targetUserZoom,
+            userPanX = next.targetUserPanX,
+            userPanY = next.targetUserPanY,
+            rotationDeg = next.targetRotationDeg,
+            tiltDeg = next.targetTiltDeg,
+        ).recomputeCombined(tuning)
+        camera = copyTargetsFromCurrent(next)
     }
 
     fun smoothTowardsTargets(viewportW: Float, viewportH: Float) {
         val a = tuning.cameraSmoothing.coerceIn(0.05f, 1f)
-        val z = camera.zoom + (camera.targetZoom - camera.zoom) * a
-        var px = camera.panX + (camera.targetPanX - camera.panX) * a
-        var py = camera.panY + (camera.targetPanY - camera.panY) * a
+        val uz = camera.userZoom + (camera.targetUserZoom - camera.userZoom) * a
+        var upx = camera.userPanX + (camera.targetUserPanX - camera.userPanX) * a
+        var upy = camera.userPanY + (camera.targetUserPanY - camera.userPanY) * a
         val pr = camera.rotationDeg + (camera.targetRotationDeg - camera.rotationDeg) * a
         val pt = camera.tiltDeg + (camera.targetTiltDeg - camera.tiltDeg) * a
-        val clamped = VesselHitTest.clampPan(px, py, viewportW, viewportH, tuning)
-        px = clamped.first
-        py = clamped.second
-        camera = camera.copy(
-            zoom = z.coerceIn(tuning.minZoom, tuning.maxZoom),
-            panX = px,
-            panY = py,
+        var next = camera.copy(
+            userZoom = uz,
+            userPanX = upx,
+            userPanY = upy,
             rotationDeg = pr,
             tiltDeg = pt,
-        )
+        ).clampUserZoom(tuning).recomputeCombined(tuning)
+        val clamped = VesselHitTest.clampPan(next.panX, next.panY, viewportW, viewportH, tuning)
+        val ddx = clamped.first - next.panX
+        val ddy = clamped.second - next.panY
+        next = next.copy(
+            userPanX = next.userPanX + ddx,
+            userPanY = next.userPanY + ddy,
+            targetUserPanX = next.targetUserPanX + ddx,
+            targetUserPanY = next.targetUserPanY + ddy,
+        ).recomputeCombined(tuning)
+        camera = copyTargetsFromCurrent(next)
     }
 
     fun focusCameraOn(
@@ -84,33 +166,17 @@ class VesselGestureController(
         viewportW: Float,
         viewportH: Float,
     ) {
-        val next = VesselHitTest.focusCameraOnOrgan(
-            organ = organ,
-            scene = scene,
-            parallax = parallax,
-            viewportW = viewportW,
-            viewportH = viewportH,
-            tuning = tuning,
-            zoom = tuning.focusZoom,
-        )
-        camera = camera.copy(
-            zoom = next.zoom,
-            targetZoom = next.targetZoom,
-            panX = next.panX,
-            panY = next.panY,
-            targetPanX = next.targetPanX,
-            targetPanY = next.targetPanY,
-            rotationDeg = next.rotationDeg,
-            tiltDeg = next.tiltDeg,
-            targetRotationDeg = next.targetRotationDeg,
-            targetTiltDeg = next.targetTiltDeg,
+        camera = copyTargetsFromCurrent(
+            VesselHitTest.focusCameraOnOrgan(
+                organ = organ,
+                scene = scene,
+                parallax = parallax,
+                viewportW = viewportW,
+                viewportH = viewportH,
+                tuning = tuning,
+                focusZoomTotal = tuning.focusZoom,
+            ),
         )
     }
 
-    companion object {
-        fun span(pointers: List<Offset>): Float {
-            if (pointers.size < 2) return 1f
-            return hypot(pointers[1].x - pointers[0].x, pointers[1].y - pointers[0].y).coerceAtLeast(1f)
-        }
-    }
 }

@@ -107,7 +107,7 @@ fun VesselScreen(
             VesselControlChip(
                 label = "Reset view",
                 onClick = {
-                    gestureController.resetCamera()
+                    gestureController.requestResetNextFrame()
                     viewModel.selectVesselOrgan(null)
                 },
             )

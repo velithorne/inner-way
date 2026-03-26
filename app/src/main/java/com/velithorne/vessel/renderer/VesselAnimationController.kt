@@ -24,6 +24,12 @@ class VesselAnimationController {
 
     private var selectionFocusTarget = 0f
 
+    /** Snap outline/vignette immediately (e.g. after reset view). */
+    fun resetSelectionFocus() {
+        selectionFocus = 0f
+        selectionFocusTarget = 0f
+    }
+
     fun onFrame(frameTimeNanos: Long) {
         if (lastNs < 0) {
             lastNs = frameTimeNanos

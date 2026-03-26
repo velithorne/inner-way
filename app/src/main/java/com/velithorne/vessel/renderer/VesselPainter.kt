@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import com.velithorne.vessel.physiology.OrganType
+import androidx.compose.ui.geometry.Rect
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -64,7 +65,47 @@ object VesselPainter {
                     }
                 }
             }
+            if (tuning.showFramingDebug) {
+                drawFramingDebug(
+                    scope = this,
+                    w = w,
+                    h = h,
+                    scene = scene,
+                    parallax = parallax,
+                    tuning = tuning,
+                )
+            }
         }
+    }
+
+    private fun drawFramingDebug(
+        scope: DrawScope,
+        w: Float,
+        h: Float,
+        scene: VesselSceneState,
+        parallax: Offset,
+        tuning: RenderTuning,
+    ) {
+        val core = VesselFraming.computeCoreSpecimenBounds(w, h, scene, parallax)
+        val vc = Offset(w / 2f, h / 2f)
+        val tc = Offset(core.centroid.x, h * tuning.defaultCompositionY)
+        val envelope = VesselFraming.computeFxEnvelope(w, h, scene, parallax)
+
+        val dbg = Color(0xFF00FFAA).copy(alpha = 0.55f)
+        val dbg2 = Color(0xFFFF8800).copy(alpha = 0.35f)
+        scope.drawLine(dbg, start = Offset(vc.x - 18f, vc.y), end = Offset(vc.x + 18f, vc.y), strokeWidth = 2f)
+        scope.drawLine(dbg, start = Offset(vc.x, vc.y - 18f), end = Offset(vc.x, vc.y + 18f), strokeWidth = 2f)
+        scope.drawCircle(dbg, radius = 5f, center = vc)
+        scope.drawCircle(dbg2, radius = 4f, center = core.centroid)
+        scope.drawCircle(dbg, radius = 4f, center = tc)
+        val fitRect = Rect(
+            left = core.centroid.x - core.halfWidth,
+            top = core.centroid.y - core.halfHeight,
+            right = core.centroid.x + core.halfWidth,
+            bottom = core.centroid.y + core.halfHeight,
+        )
+        scope.drawRect(color = dbg, style = Stroke(width = 2f), topLeft = fitRect.topLeft, size = fitRect.size)
+        scope.drawCircle(dbg2.copy(alpha = 0.2f), radius = envelope.radius, center = envelope.center, style = Stroke(width = 1.5f))
     }
 
     private fun drawSpecimenContent(

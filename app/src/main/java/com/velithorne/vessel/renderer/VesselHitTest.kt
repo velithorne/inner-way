@@ -1,12 +1,13 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import com.velithorne.vessel.physiology.OrganType
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
-/** Screen-space ↔ specimen space for organ taps (matches [VesselPainter] camera stack). */
+/** Screen-space ↔ specimen space (matches [VesselPainter] camera stack including base+user pan). */
 object VesselHitTest {
 
     data class BodyBasis(
@@ -34,7 +35,6 @@ object VesselHitTest {
         return BodyBasis(cx, cy, baseW, baseH)
     }
 
-    /** Map canvas tap to organ space (same coords as [VesselPainter] cx, cy, organ anchors). */
     fun screenToSpecimenPlane(
         tapCanvas: Offset,
         renderOffset: Offset,
@@ -51,12 +51,14 @@ object VesselHitTest {
         val c = cos(rad)
         val s = sin(rad)
         val z = camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom)
+        val panX = camera.panX
+        val panY = camera.panY
 
         val p = tapCanvas - renderOffset - vc
         val prx = p.x * c - p.y * s
         val pry = p.x * s + p.y * c
-        val u = prx / z + vc.x - camera.panX
-        val v = pry / z + vc.y - camera.panY
+        val u = prx / z + vc.x - panX
+        val v = pry / z + vc.y - panY
         return Offset(u, v)
     }
 
@@ -99,6 +101,10 @@ object VesselHitTest {
         return candidates.minByOrNull { it.second }?.first
     }
 
+    /**
+     * Centers [organ] at viewport center at total zoom [focusZoomTotal].
+     * Refreshes base framing from core fit, then sets user pan/zoom relative to that baseline.
+     */
     fun focusCameraOnOrgan(
         organ: OrganType,
         scene: VesselSceneState,
@@ -106,40 +112,49 @@ object VesselHitTest {
         viewportW: Float,
         viewportH: Float,
         tuning: RenderTuning,
-        zoom: Float = tuning.focusZoom,
+        focusZoomTotal: Float,
         layout: VesselLayout = VesselLayout(),
     ): VesselCameraState {
+        val base = VesselFraming.computeDefaultCamera(
+            scene = scene,
+            viewportSize = Size(viewportW, viewportH),
+            parallax = parallax,
+            tuning = tuning,
+        )
         val basis = computeBasis(viewportW, viewportH, scene, parallax, layout)
-        val w = viewportW
-        val h = viewportH
         val (ox, oy) = when (organ) {
             OrganType.THERMAL_MEMBRANE -> basis.centerX to basis.centerY
             else -> {
                 val ov = scene.organVisuals.firstOrNull { it.type == organ }
-                    ?: return VesselCameraState.default(tuning)
-                val x = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
-                val y = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
+                    ?: return base
+                val x = viewportW * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
+                val y = viewportH * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
                 x to y
             }
         }
-        val z = zoom.coerceIn(tuning.minZoom, tuning.maxZoom)
+        val z = focusZoomTotal.coerceIn(tuning.minZoom, tuning.maxZoom)
         val vpCx = viewportW / 2f
         val vpCy = viewportH / 2f
-        val panX = vpCx - (ox - basis.centerX) * z - basis.centerX
-        val panY = vpCy - (oy - basis.centerY) * z - basis.centerY
-        val (clampedPanX, clampedPanY) = clampPan(panX, panY, viewportW, viewportH, tuning)
-        return VesselCameraState(
-            zoom = z,
-            targetZoom = z,
-            panX = clampedPanX,
-            panY = clampedPanY,
-            targetPanX = clampedPanX,
-            targetPanY = clampedPanY,
+        var panTotX = vpCx - ox
+        var panTotY = vpCy - oy
+        val clamped = clampPan(panTotX, panTotY, viewportW, viewportH, tuning)
+        panTotX = clamped.first
+        panTotY = clamped.second
+        val uz = z / maxOf(base.fitZoom, 1e-3f)
+        val upx = panTotX - base.basePanX
+        val upy = panTotY - base.basePanY
+        return base.copy(
+            userZoom = uz,
+            userPanX = upx,
+            userPanY = upy,
+            targetUserZoom = uz,
+            targetUserPanX = upx,
+            targetUserPanY = upy,
             rotationDeg = 0f,
             tiltDeg = 0f,
             targetRotationDeg = 0f,
             targetTiltDeg = 0f,
-        )
+        ).clampUserZoom(tuning).recomputeCombined(tuning)
     }
 
     fun clampPan(
