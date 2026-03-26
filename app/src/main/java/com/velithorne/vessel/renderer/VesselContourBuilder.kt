@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Path
 import kotlin.math.sin
 
 /**
- * Synthetic shell outline: crown, thoracic chamber, core waist, tapered reservoir tail.
+ * Adult spindle vs compact **seed** vesica; [GeneratedAnatomyParams.seedFormBlend] morphs between them.
  */
 object VesselContourBuilder {
 
@@ -15,6 +15,15 @@ object VesselContourBuilder {
         height: Float,
         gen: GeneratedAnatomyParams = GeneratedAnatomyParams.identity,
     ): Path {
+        val t = gen.seedFormBlend.coerceIn(0f, 1f)
+        return if (t > 0.35f) {
+            seedVesicaPath(center, width, height, gen, t)
+        } else {
+            adultSpindlePath(center, width, height, gen)
+        }
+    }
+
+    private fun adultSpindlePath(center: Offset, width: Float, height: Float, gen: GeneratedAnatomyParams): Path {
         val hw = width * 0.5f * gen.thoraxWidthMul * (1f + gen.crownWidthMul * 0.15f - 0.15f)
         val h = height * gen.tailLengthMul
         val ax = gen.asymmetryX * width * 0.08f
@@ -34,7 +43,6 @@ object VesselContourBuilder {
         val shoulderL = Offset(c.x - crownW * 0.48f, c.y - h * 0.1f)
 
         path.moveTo(apex.x, apex.y)
-        // Crown facet → right shoulder (engineered widening)
         path.cubicTo(
             c.x + crownW * 0.26f, c.y - h * 0.38f,
             c.x + crownW * 0.4f, c.y - h * 0.22f,
@@ -57,6 +65,51 @@ object VesselContourBuilder {
             c.x - crownW * 0.4f, c.y - h * 0.22f,
             c.x - crownW * 0.26f, c.y - h * 0.38f,
             apex.x, apex.y,
+        )
+        path.close()
+        return path
+    }
+
+    /**
+     * Compact silicon **seed**: short vesica / double lobe (distinct from adult spindle).
+     */
+    private fun seedVesicaPath(
+        center: Offset,
+        width: Float,
+        height: Float,
+        gen: GeneratedAnatomyParams,
+        seedStrength: Float,
+    ): Path {
+        val ax = gen.asymmetryX * width * 0.05f
+        val c = Offset(center.x + ax, center.y - gen.thermalBulge * height * 0.012f)
+        val compact = 0.55f + (1f - seedStrength.coerceIn(0f, 1f)) * 0.12f
+        val hw = width * 0.24f * compact * gen.thoraxWidthMul.coerceIn(0.9f, 1.1f)
+        val hh = height * 0.34f * compact * gen.tailLengthMul.coerceIn(0.88f, 1.05f)
+        val path = Path()
+        val top = Offset(c.x, c.y - hh * 0.92f)
+        val bottom = Offset(c.x, c.y + hh * 0.88f)
+        val midR = Offset(c.x + hw * 0.92f, c.y + hh * 0.02f)
+        val midL = Offset(c.x - hw * 0.92f, c.y + hh * 0.02f)
+        path.moveTo(top.x, top.y)
+        path.cubicTo(
+            c.x + hw * 0.5f, c.y - hh * 0.38f,
+            c.x + hw * 0.88f, c.y - hh * 0.08f,
+            midR.x, midR.y,
+        )
+        path.cubicTo(
+            c.x + hw * 0.42f, c.y + hh * 0.42f,
+            c.x + hw * 0.18f, c.y + hh * 0.78f,
+            bottom.x, bottom.y,
+        )
+        path.cubicTo(
+            c.x - hw * 0.18f, c.y + hh * 0.78f,
+            c.x - hw * 0.42f, c.y + hh * 0.42f,
+            midL.x, midL.y,
+        )
+        path.cubicTo(
+            c.x - hw * 0.88f, c.y - hh * 0.08f,
+            c.x - hw * 0.5f, c.y - hh * 0.38f,
+            top.x, top.y,
         )
         path.close()
         return path

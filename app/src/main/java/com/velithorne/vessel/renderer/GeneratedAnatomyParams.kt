@@ -18,6 +18,8 @@ data class GeneratedAnatomyParams(
     val gelEnvelopeMul: Float,
     val archiveLamellaDensityMul: Float,
     val coolingVeilMul: Float,
+    /** 0 = adult spindle, 1 = compact seed/embryo silhouette (morphogenesis baseline). */
+    val seedFormBlend: Float,
 ) {
     companion object {
         /** Identity until first morphogenesis tick. */
@@ -36,6 +38,7 @@ data class GeneratedAnatomyParams(
             gelEnvelopeMul = 1f,
             archiveLamellaDensityMul = 0.5f,
             coolingVeilMul = 0.4f,
+            seedFormBlend = 0.82f,
         )
     }
 }

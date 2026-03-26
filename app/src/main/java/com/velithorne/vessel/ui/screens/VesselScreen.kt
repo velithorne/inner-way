@@ -67,23 +67,36 @@ fun VesselScreen(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Row(
+        // Avoid Row+weight squeezing text to 0 width (per-character wrap glitch when sheet opens).
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 3.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                text = "Specimen 01 · morphogenesis active · pinch · pan · tilt",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-                modifier = Modifier.weight(1f),
-            )
-            GrowthStatusChip(
-                label = growth.statusLabel,
-                subtitle = growth.statusLine,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Specimen 01 · seed-stage morphogenesis · pinch · pan · tilt",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                    modifier = Modifier.weight(1f),
+                )
+                GrowthStatusChip(
+                    label = growth.statusLabel,
+                    subtitle = null,
+                )
+            }
+            if (growth.statusLine.isNotEmpty()) {
+                Text(
+                    text = growth.statusLine,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
         Box(
             modifier = Modifier
