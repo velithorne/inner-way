@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.0.1-camera-zoom-range"
+        versionCode = 8
+        versionName = "1.0.2-camera-pan-fix"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

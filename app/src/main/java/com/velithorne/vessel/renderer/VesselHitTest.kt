@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Size
 import com.velithorne.vessel.physiology.OrganType
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.sin
 
 /** Screen-space ↔ specimen space (matches [VesselPainter] camera stack including base+user pan). */
@@ -133,10 +134,13 @@ object VesselHitTest {
             }
         }
         val z = focusZoomTotal.coerceIn(tuning.minZoom, tuning.maxZoom)
+        val invZ = 1f / max(z, 1e-3f)
         val vpCx = viewportW / 2f
         val vpCy = viewportH / 2f
-        var panTotX = vpCx - ox
-        var panTotY = vpCy - oy
+        val vcX = viewportW / 2f
+        val vcY = viewportH / 2f
+        var panTotX = (vcX - ox) + (vpCx - vcX) * invZ
+        var panTotY = (vcY - oy) + (vpCy - vcY) * invZ
         val clamped = clampPan(panTotX, panTotY, viewportW, viewportH, tuning)
         panTotX = clamped.first
         panTotY = clamped.second

@@ -121,9 +121,12 @@ object VesselFraming {
             min(tuning.maxZoom, tuning.defaultFitZoomCap),
         )
 
+        // Pan is in *specimen* space before scale: screen = vc + z * (specimen - vc + pan).
+        // So to place core.centroid at (vc.x, targetY): pan = (target - vc) / z + vc - centroid.
         val targetY = h * tuning.defaultCompositionY
-        val basePanX = (vc.x - core.centroid.x) * fitZoom
-        val basePanY = (targetY - core.centroid.y) * fitZoom
+        val invZ = 1f / max(fitZoom, 1e-3f)
+        val basePanX = vc.x - core.centroid.x
+        val basePanY = (vc.y - core.centroid.y) + (targetY - vc.y) * invZ
 
         val c = VesselCameraState(
             basePanX = basePanX,
