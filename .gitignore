@@ -1,0 +1,9 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Local SDK (CI/agents may use a different path)
+android-sdk/
