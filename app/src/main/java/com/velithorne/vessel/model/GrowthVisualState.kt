@@ -7,4 +7,5 @@ data class GrowthVisualState(
     val statusLabel: String,
     val statusLine: String,
     val visibleActivity: Float,
+    val germinationStageLabel: String,
 )

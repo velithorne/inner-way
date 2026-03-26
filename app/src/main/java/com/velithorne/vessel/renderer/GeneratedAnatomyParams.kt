@@ -20,6 +20,16 @@ data class GeneratedAnatomyParams(
     val coolingVeilMul: Float,
     /** 0 = adult spindle, 1 = compact seed/embryo silhouette (morphogenesis baseline). */
     val seedFormBlend: Float,
+    /** Body fill / internal mass presence (0..1). */
+    val tissueBodyFillMul: Float,
+    val chamberInteriorMul: Float,
+    val growthFrontMul: Float,
+    val budSignalFrondMul: Float,
+    val budThermalVeilMul: Float,
+    val budArchiveLamellaMul: Float,
+    val budNeuralCrownMul: Float,
+    /** Average organ tissue embedding (0..1). */
+    val organEmbedMul: Float,
 ) {
     companion object {
         /** Identity until first morphogenesis tick. */
@@ -39,6 +49,14 @@ data class GeneratedAnatomyParams(
             archiveLamellaDensityMul = 0.5f,
             coolingVeilMul = 0.4f,
             seedFormBlend = 0.82f,
+            tissueBodyFillMul = 0.45f,
+            chamberInteriorMul = 0.5f,
+            growthFrontMul = 0.35f,
+            budSignalFrondMul = 0.25f,
+            budThermalVeilMul = 0.22f,
+            budArchiveLamellaMul = 0.28f,
+            budNeuralCrownMul = 0.24f,
+            organEmbedMul = 0.5f,
         )
     }
 }

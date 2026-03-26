@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.velithorne.vessel.model.GrowthVisualState
 import com.velithorne.vessel.model.OrganInspectionState
 import com.velithorne.vessel.model.VesselVisualState
+import com.velithorne.vessel.morphogenesis.GrowthExplainer
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.physiology.OrganType
@@ -81,6 +82,7 @@ class TelemetryViewModel(
             statusLabel = morph.growthStatusLabel,
             statusLine = morph.growthStatusLine,
             visibleActivity = morph.visibleGrowthActivity,
+            germinationStageLabel = GrowthExplainer.stageDisplayName(morph.germinationStage),
         )
     }.stateIn(
         scope = viewModelScope,
@@ -90,6 +92,7 @@ class TelemetryViewModel(
             statusLabel = initialMorph.growthStatusLabel,
             statusLine = initialMorph.growthStatusLine,
             visibleActivity = initialMorph.visibleGrowthActivity,
+            germinationStageLabel = GrowthExplainer.stageDisplayName(initialMorph.germinationStage),
         ),
     )
 

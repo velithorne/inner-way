@@ -32,7 +32,9 @@ object OrganShapeBuilder {
         gelEnvelopeMul: Float = 1f,
         archiveLamellaMul: Float = 1f,
     ) {
-        val r = w * ov.baseRadius * (0.85f + ov.reserveLevel * 0.22f +
+        val embed = ov.tissueEmbedding.coerceIn(0f, 1f)
+        val embedScale = 1f - embed * 0.12f
+        val r = w * ov.baseRadius * embedScale * (0.85f + ov.reserveLevel * 0.22f +
             sin(pulse * ov.pulseCoupling * 1.05f) * 0.055f)
         val flick = sin(anim.pulsePhase(tuning.neuralFlickerHz) + ov.flickerIntensity * 3f) * 0.5f + 0.5f
         val dimF = (1f - dimAlpha).coerceIn(0.42f, 1f)
@@ -41,13 +43,14 @@ object OrganShapeBuilder {
         val intensity = (ov.glowIntensity * highlightMul * (0.5f + flick * 0.45f * ov.flickerIntensity.coerceIn(0.05f, 1f)))
             .coerceIn(0.06f, 1.6f) * dimF * haloMul
 
+        val embedHalo = 0.65f + embed * 0.35f
         GlowSystem.radialBloom(
             scope = scope,
             center = center,
             radius = r * (1.05f + sin(breath * ov.pulseCoupling) * 0.06f),
-            core = organPalette.core.copy(alpha = organPalette.core.alpha * dimF * 0.55f),
-            halo = organPalette.halo.copy(alpha = organPalette.halo.alpha * dimF * 0.35f),
-            intensity = intensity * 0.5f,
+            core = organPalette.core.copy(alpha = organPalette.core.alpha * dimF * 0.55f * embedHalo),
+            halo = organPalette.halo.copy(alpha = organPalette.halo.alpha * dimF * 0.35f * (0.5f + embed * 0.5f)),
+            intensity = intensity * 0.5f * (0.75f + embed * 0.25f),
         )
 
         val fillA = { base: Float -> (base * dimF).coerceIn(0.04f, 1f) }

@@ -84,7 +84,8 @@ object VesselHitTest {
         for (ov in scene.organVisuals) {
             val ox = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
             val oy = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
-            val hitR = w * ov.baseRadius * tuning.organHitPadMultiplier
+            val embedBoost = 1f + ov.tissueEmbedding * 0.28f
+            val hitR = w * ov.baseRadius * tuning.organHitPadMultiplier * embedBoost
             val d = hypot(p.x - ox, p.y - oy)
             if (d <= hitR) {
                 candidates += ov.type to d

@@ -1,6 +1,8 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.model.GrowthStageVisualState
+import com.velithorne.vessel.model.SeedVisualState
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.morphogenesis.StructuralGraph
@@ -48,4 +50,7 @@ data class VesselSceneState(
     val generated: GeneratedAnatomyParams,
     /** Live structural graph for framing / future hit refinement. */
     val structuralGraph: StructuralGraph,
+    /** Seed nucleus + germination (visual bridge). */
+    val seedVisual: SeedVisualState,
+    val growthStageVisual: GrowthStageVisualState,
 )

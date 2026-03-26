@@ -23,6 +23,10 @@ class MorphogenesisEngine(
     private var contour: ContourParams? = null
     private var tissue: TissueEnvelopeState? = null
     private var pathwaySpec: PathwaySpec? = null
+    private var seedCore: SeedCore? = null
+    private var chamberMass: ChamberMassModel? = null
+    private var bodyMass: BodyMassFieldState? = null
+    private var budding: BuddingStructure? = null
     private var growthPhase = 0f
     private val eventLog = ArrayDeque<GrowthEvent>(16)
 
@@ -42,15 +46,37 @@ class MorphogenesisEngine(
         tissue = TissueLayerGenerator.envelope(genome, field, accumulator, tissue, tuning)
         pathwaySpec = PathwayGrowthEngine.spec(graph!!, genome, accumulator, tuning, pathwaySpec)
 
+        seedCore = GerminationEngine.step(seed, genome, accumulator, field, seedCore, tuning)
+        chamberMass = TissueAccretionEngine.stepChamber(genome, field, accumulator, seedCore!!, chamberMass, tuning)
+        bodyMass = BodyMassField.sample(seedCore!!, genome, field, accumulator, chamberMass!!, tuning)
+        budding = TissueAccretionEngine.computeBudding(accumulator, field, genome, seedCore!!, tuning)
+        val visible = computeVisibleGrowth(accumulator, field)
+        val growthFront = TissueAccretionEngine.computeGrowthFront(accumulator, field, budding!!, visible, tuning)
+        val organEmbedding = OrganEmbeddingFactors.compute(accumulator, field, bodyMass!!, chamberMass!!, tuning)
+        val germinationStage = GrowthStageClassifier.classify(
+            seed = seedCore!!,
+            chamber = chamberMass!!,
+            field = field,
+            acc = accumulator,
+            genome = genome,
+            bodyMass = bodyMass!!,
+        )
+
         growthPhase += 0.018f + accumulator.signal * 0.01f + accumulator.thermal * 0.008f
         if (growthPhase > 1000f) growthPhase -= 1000f
 
-        val visible = computeVisibleGrowth(accumulator, field)
         maybeAppendEvents(snapshot.timestampMillis, accumulator)
 
-        val explainer = GrowthExplainer.explain(accumulator, genome, field, tuning)
-        val statusLabel = GrowthExplainer.statusLabel(accumulator, visible)
-        val statusLine = GrowthExplainer.statusLine(accumulator)
+        val explainer = GrowthExplainer.explain(
+            accumulator, genome, field, tuning,
+            seedCore = seedCore!!,
+            chamberMass = chamberMass!!,
+            bodyMass = bodyMass!!,
+            growthFront = growthFront,
+            germinationStage = germinationStage,
+        )
+        val statusLabel = GrowthExplainer.activityLabel(accumulator, visible)
+        val statusLine = GrowthExplainer.statusLine(accumulator, germinationStage, growthFront, chamberMass!!)
 
         return MorphogenesisSnapshot(
             timestampMillis = snapshot.timestampMillis,
@@ -63,6 +89,13 @@ class MorphogenesisEngine(
             contour = contour!!,
             tissue = tissue!!,
             pathways = pathwaySpec!!,
+            seedCore = seedCore!!,
+            chamberMass = chamberMass!!,
+            bodyMass = bodyMass!!,
+            growthFront = growthFront,
+            budding = budding!!,
+            organEmbedding = organEmbedding,
+            germinationStage = germinationStage,
             visibleGrowthActivity = visible,
             growthStatusLabel = statusLabel,
             growthStatusLine = statusLine,

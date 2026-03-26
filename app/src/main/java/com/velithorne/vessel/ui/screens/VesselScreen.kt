@@ -33,6 +33,7 @@ import com.velithorne.vessel.renderer.VesselScene
 import com.velithorne.vessel.ui.components.GrowthStatusChip
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
+import com.velithorne.vessel.ui.components.VesselStageChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
 import com.velithorne.vessel.ui.components.VesselStatusOverlay
 import com.velithorne.vessel.util.Formatters
@@ -84,6 +85,7 @@ fun VesselScreen(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
                     modifier = Modifier.weight(1f),
                 )
+                VesselStageChip(label = growth.germinationStageLabel)
                 GrowthStatusChip(
                     label = growth.statusLabel,
                     subtitle = null,

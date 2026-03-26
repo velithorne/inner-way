@@ -138,6 +138,26 @@ object VesselPainter {
             drawPath(path = rearPath, color = Color(0xFF0A1018).copy(alpha = 0.52f + scene.structuralMass * 0.22f))
         }
 
+        SeedPainter.draw(
+            scope = scope,
+            center = Offset(cx, cy),
+            specimenWidth = baseW,
+            specimenHeight = baseH,
+            scene = scene,
+            palette = palette,
+            pulse = pulse,
+        )
+
+        ChamberMassPainter.draw(
+            scope = scope,
+            center = Offset(cx, cy),
+            width = baseW,
+            height = baseH,
+            scene = scene,
+            palette = palette,
+            breath = breath,
+        )
+
         val focusCenter = sel?.let { type ->
             when (type) {
                 OrganType.THERMAL_MEMBRANE -> Offset(cx, cy)
@@ -199,6 +219,26 @@ object VesselPainter {
                     height = baseH,
                     activity = scene.generated.visibleGrowthActivity,
                     phase = anim.seconds,
+                )
+
+                BuddingPainter.draw(
+                    scope = this,
+                    center = Offset(cx, cy),
+                    width = baseW,
+                    height = baseH,
+                    scene = scene,
+                    palette = palette,
+                    phase = anim.seconds,
+                )
+
+                GrowthFrontPainter.draw(
+                    scope = this,
+                    center = Offset(cx, cy),
+                    width = baseW,
+                    height = baseH,
+                    scene = scene,
+                    palette = palette,
+                    animSeconds = anim.seconds,
                 )
 
                 if (focusCenter != null && focus > 0.02f) {

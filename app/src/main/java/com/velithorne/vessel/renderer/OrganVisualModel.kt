@@ -18,4 +18,6 @@ data class OrganVisualModel(
     val densityLines: Float,
     val thermalCoupling: Float,
     val reserveLevel: Float,
+    /** 0..1 — depth inside accreted tissue (higher = more embedded). */
+    val tissueEmbedding: Float = 0.5f,
 )

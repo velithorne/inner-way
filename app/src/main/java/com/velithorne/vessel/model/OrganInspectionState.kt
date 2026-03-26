@@ -44,7 +44,7 @@ data class OrganInspectionState(
                 OrganType.THERMAL_MEMBRANE -> "thermal ${"%.2f".format(acc.thermal)} · shell field ${"%.2f".format(m.field.perimeterShell)}"
             }
             val logic = m.explainerLines.firstOrNull()
-                ?: "Structural graph stable under current pressure envelope."
+                ?: "Germination field stable; tissue accretion within nominal envelope."
             return driver to logic
         }
 

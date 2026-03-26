@@ -1,8 +1,11 @@
 package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.model.GrowthStageVisualState
+import com.velithorne.vessel.model.SeedVisualState
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.morphogenesis.GrowthExplainer
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.morphogenesis.StructuralGraph
 import com.velithorne.vessel.physiology.OrganState
@@ -69,7 +72,26 @@ class VesselRenderer(
         val hungerDim = s.hunger.coerceIn(0f, 1f)
         val stressShiver = (s.stress * tuning.stressShiverDegrees / 8f).coerceIn(0f, 1f)
 
-        val organVisuals = buildOrganVisuals(organs, s, feverIntensity, structuralGraph)
+        val organVisuals = buildOrganVisuals(organs, s, feverIntensity, structuralGraph, morphogenesis)
+
+        val seedVisual = SeedVisualState(
+            coreRadiusNorm = morphogenesis.seedCore.coreRadius,
+            seedDensity = morphogenesis.seedCore.seedDensity,
+            reserveLuminance = morphogenesis.seedCore.reserveLuminance,
+            shellCoherence = morphogenesis.seedCore.shellCoherence,
+            germinationProgress = morphogenesis.seedCore.germinationProgress,
+            branchLatentEnergy = morphogenesis.seedCore.branchLatentEnergy,
+            latticeStress = morphogenesis.seedCore.latticeStress,
+        )
+        val growthStageVisual = GrowthStageVisualState(
+            stage = morphogenesis.germinationStage,
+            stageLabel = GrowthExplainer.stageDisplayName(morphogenesis.germinationStage),
+            growthFrontIntensity = morphogenesis.growthFront.activeIntensity,
+            growthFrontDirX = morphogenesis.growthFront.directionX,
+            growthFrontDirY = morphogenesis.growthFront.directionY,
+            primaryFront = morphogenesis.growthFront.primaryType,
+            secondaryFront = morphogenesis.growthFront.secondaryType,
+        )
 
         val thermalTint = lerpColor(
             Color(0xFF1A2A28),
@@ -119,6 +141,8 @@ class VesselRenderer(
             material = material,
             generated = generated,
             structuralGraph = structuralGraph,
+            seedVisual = seedVisual,
+            growthStageVisual = growthStageVisual,
         )
     }
 
@@ -127,11 +151,12 @@ class VesselRenderer(
         species: SpeciesState,
         globalFever: Float,
         graph: com.velithorne.vessel.morphogenesis.StructuralGraph,
+        morph: MorphogenesisSnapshot,
     ): List<OrganVisualModel> {
         return OrganType.values().flatMap { type ->
             val anchors = anchorsForType(type, graph)
             anchors.map { anchor ->
-                mapOrganAt(type, organs[type], species, globalFever, anchor)
+                mapOrganAt(type, organs[type], species, globalFever, anchor, morph)
             }
         }
     }
@@ -170,8 +195,10 @@ class VesselRenderer(
         species: SpeciesState,
         globalFever: Float,
         anchor: VesselLayout.OrganAnchor?,
+        morph: MorphogenesisSnapshot,
     ): OrganVisualModel {
         val a = anchor ?: return defaultOrgan(type)
+        val embed = morph.organEmbedding.forType(type)
         val h = state?.health ?: 0.55f
         val load = state?.load ?: 0.35f
         val activity = state?.activity ?: 0.4f
@@ -191,6 +218,7 @@ class VesselRenderer(
                 densityLines = species.hunger * 0.5f,
                 thermalCoupling = globalFever * 0.35f,
                 reserveLevel = reserve,
+                tissueEmbedding = embed,
             )
             OrganType.CORTEX_CLUSTER -> OrganVisualModel(
                 type, a.x, a.y, baseR * 1.05f,
@@ -201,6 +229,7 @@ class VesselRenderer(
                 densityLines = species.neuralActivity * 0.4f,
                 thermalCoupling = globalFever * 0.2f,
                 reserveLevel = h,
+                tissueEmbedding = embed,
             )
             OrganType.NEURAL_GEL -> OrganVisualModel(
                 type, a.x, a.y, baseR * 1.35f,
@@ -211,6 +240,7 @@ class VesselRenderer(
                 densityLines = (1f - h) * 0.7f + species.structuralLoad * 0.15f,
                 thermalCoupling = 0.15f,
                 reserveLevel = reserve,
+                tissueEmbedding = embed,
             )
             OrganType.ARCHIVE_VAULT -> OrganVisualModel(
                 type, a.x, a.y, baseR * 1.15f,
@@ -221,6 +251,7 @@ class VesselRenderer(
                 densityLines = (species.structuralLoad * 0.9f + (1f - reserve) * 0.3f).coerceIn(0f, 1f),
                 thermalCoupling = globalFever * 0.25f,
                 reserveLevel = reserve,
+                tissueEmbedding = embed,
             )
             OrganType.SIGNAL_LUNGS -> OrganVisualModel(
                 type, a.x, a.y, baseR,
@@ -231,6 +262,7 @@ class VesselRenderer(
                 densityLines = 0.2f,
                 thermalCoupling = 0.1f,
                 reserveLevel = activity,
+                tissueEmbedding = embed,
             )
             OrganType.VESTIBULAR_MUSCULATURE -> OrganVisualModel(
                 type, a.x, a.y, baseR * 1.4f,
@@ -241,6 +273,7 @@ class VesselRenderer(
                 densityLines = species.mobility * 0.65f,
                 thermalCoupling = globalFever * 0.15f,
                 reserveLevel = h,
+                tissueEmbedding = embed,
             )
             OrganType.THERMAL_MEMBRANE -> OrganVisualModel(
                 type, a.x, a.y, baseR * 2.2f,
@@ -251,6 +284,7 @@ class VesselRenderer(
                 densityLines = 0.15f,
                 thermalCoupling = 1f,
                 reserveLevel = 1f - globalFever,
+                tissueEmbedding = embed,
             )
         }
     }
@@ -267,6 +301,7 @@ class VesselRenderer(
         densityLines = 0f,
         thermalCoupling = 0f,
         reserveLevel = 0.5f,
+        tissueEmbedding = 0.5f,
     )
 
     private fun feverWord(f: Float): String = when {

@@ -14,6 +14,14 @@ data class MorphogenesisSnapshot(
     val contour: ContourParams,
     val tissue: TissueEnvelopeState,
     val pathways: PathwaySpec,
+    /** Crystalline seed nucleus + germination state. */
+    val seedCore: SeedCore,
+    val chamberMass: ChamberMassModel,
+    val bodyMass: BodyMassFieldState,
+    val growthFront: GrowthFront,
+    val budding: BuddingStructure,
+    val organEmbedding: OrganEmbeddingFactors,
+    val germinationStage: GerminationStage,
     /** 0..1 visible growth shimmer intensity */
     val visibleGrowthActivity: Float,
     val growthStatusLabel: String,
