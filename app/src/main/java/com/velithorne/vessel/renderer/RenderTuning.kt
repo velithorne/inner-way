@@ -47,8 +47,12 @@ data class RenderTuning(
     val focusTransitionSeconds: Float = 0.38f,
     val thermalHitFullBodyMultiplier: Float = 1f,
 
-    /** Vertical position (0..1 of chamber height) where core centroid is placed (smaller = higher on screen). */
-    val defaultCompositionY: Float = 0.34f,
+    /** @deprecated use [defaultVisualCentroidTargetY] */
+    val defaultCompositionY: Float = 0.44f,
+    /**
+     * Normalized viewport Y (0 = top) where **visual mass** centroid is placed — ~0.43–0.47 = suspended upper-mid.
+     */
+    val defaultVisualCentroidTargetY: Float = 0.44f,
     /** Fractional inset from chamber edges when fitting core bounds (0..0.5). */
     val defaultFramingMargin: Float = 0.13f,
     /** Upper cap on auto-fit zoom so default view is not overly zoomed-in on tall phones. */

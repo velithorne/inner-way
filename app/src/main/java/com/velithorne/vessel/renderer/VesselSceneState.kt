@@ -5,6 +5,7 @@ import com.velithorne.vessel.model.GrowthStageVisualState
 import com.velithorne.vessel.model.SeedVisualState
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.morphogenesis.GrowthVisualCues
 import com.velithorne.vessel.morphogenesis.StructuralGraph
 
 /**
@@ -53,9 +54,10 @@ data class VesselSceneState(
     /** Seed nucleus + germination (visual bridge). */
     val seedVisual: SeedVisualState,
     val growthStageVisual: GrowthStageVisualState,
+    /** Morphogenesis → explicit canvas growth intensities. */
+    val growthVisuals: GrowthVisualCues,
     /**
-     * When true, draw a **seed specimen** only: vesica shell + tissue + nucleus — no organ blobs or conduit lines
-     * (avoids the “graph creature” read). Anatomy remains available via the sheet / data when needed.
+     * Legacy flag — kept false so growth layers + organs render; seed read comes from vesica + visualizer.
      */
     val seedPresentationActive: Boolean,
 )

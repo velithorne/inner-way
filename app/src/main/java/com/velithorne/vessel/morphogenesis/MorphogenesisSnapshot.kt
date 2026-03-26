@@ -22,6 +22,8 @@ data class MorphogenesisSnapshot(
     val budding: BuddingStructure,
     val organEmbedding: OrganEmbeddingFactors,
     val germinationStage: GerminationStage,
+    /** Explicit renderable growth intensities (canvas + text gating). */
+    val growthVisuals: GrowthVisualCues,
     /** 0..1 visible growth shimmer intensity */
     val visibleGrowthActivity: Float,
     val growthStatusLabel: String,

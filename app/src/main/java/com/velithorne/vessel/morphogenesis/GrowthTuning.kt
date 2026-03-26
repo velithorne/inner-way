@@ -41,4 +41,13 @@ data class GrowthTuning(
     val organEmbedNeuralMul: Float = 1.1f,
     val organEmbedArchiveMul: Float = 1.05f,
     val organEmbedSignalMul: Float = 1f,
+    // Text ↔ canvas alignment (only describe growth when visuals exceed threshold)
+    val textCrownBloomThreshold: Float = 0.22f,
+    val textFrondBudThreshold: Float = 0.2f,
+    val textReservoirThreshold: Float = 0.22f,
+    val textShellThickenThreshold: Float = 0.22f,
+    val textThermalVeilThreshold: Float = 0.24f,
+    val textArchiveBandThreshold: Float = 0.22f,
+    val textSignalBranchPressure: Float = 0.32f,
+    val textNeuralCrownPressure: Float = 0.38f,
 )

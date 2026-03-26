@@ -67,6 +67,19 @@ class MorphogenesisEngine(
 
         maybeAppendEvents(snapshot.timestampMillis, accumulator)
 
+        val growthVisuals = GrowthVisualizer.compute(
+            acc = accumulator,
+            field = field,
+            genome = genome,
+            chamberMass = chamberMass!!,
+            bodyMass = bodyMass!!,
+            budding = budding!!,
+            growthFront = growthFront,
+            seedCore = seedCore!!,
+            germinationStage = germinationStage,
+            visibleGrowthActivity = visible,
+        )
+
         val explainer = GrowthExplainer.explain(
             accumulator, genome, field, tuning,
             seedCore = seedCore!!,
@@ -74,9 +87,10 @@ class MorphogenesisEngine(
             bodyMass = bodyMass!!,
             growthFront = growthFront,
             germinationStage = germinationStage,
+            gv = growthVisuals,
         )
-        val statusLabel = GrowthExplainer.activityLabel(accumulator, visible)
-        val statusLine = GrowthExplainer.statusLine(accumulator, germinationStage, growthFront, chamberMass!!)
+        val statusLabel = GrowthExplainer.activityLabel(accumulator, visible, growthVisuals, tuning)
+        val statusLine = GrowthExplainer.statusLine(accumulator, germinationStage, growthFront, chamberMass!!, growthVisuals, tuning)
 
         return MorphogenesisSnapshot(
             timestampMillis = snapshot.timestampMillis,
@@ -96,6 +110,7 @@ class MorphogenesisEngine(
             budding = budding!!,
             organEmbedding = organEmbedding,
             germinationStage = germinationStage,
+            growthVisuals = growthVisuals,
             visibleGrowthActivity = visible,
             growthStatusLabel = statusLabel,
             growthStatusLine = statusLine,

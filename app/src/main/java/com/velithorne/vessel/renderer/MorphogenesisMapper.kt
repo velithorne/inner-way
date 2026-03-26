@@ -22,13 +22,14 @@ object MorphogenesisMapper {
                 m.chamberMass.lateralSignal * 0.18f + m.chamberMass.lowerArchiveBasin * 0.2f +
                 m.chamberMass.perimeterShell * 0.12f
             ).coerceIn(0f, 1f)
+        val gv = m.growthVisuals
         return GeneratedAnatomyParams(
             crownWidthMul = m.contour.crownWidthMul,
             thoraxWidthMul = m.contour.thoraxWidthMul,
             tailLengthMul = m.contour.tailLengthMul,
             asymmetryX = m.contour.asymmetryX,
             thermalBulge = m.contour.thermalBulge,
-            visibleGrowthActivity = m.visibleGrowthActivity,
+            visibleGrowthActivity = (m.visibleGrowthActivity * 0.45f + gv.activeAccretionPulse * 0.35f + gv.growthFrontEdgeIntensity * 0.2f).coerceIn(0f, 1f),
             metabolicPathwayMul = m.pathways.metabolicThickness,
             neuralPathwayMul = m.pathways.neuralThickness,
             signalBranchCount = m.pathways.signalBranchCount,
@@ -38,13 +39,13 @@ object MorphogenesisMapper {
             archiveLamellaDensityMul = m.tissue.archiveLamellaDensity,
             coolingVeilMul = m.tissue.coolingVeilStrength,
             seedFormBlend = seedBlend,
-            tissueBodyFillMul = m.bodyMass.totalOccupancy.coerceIn(0.15f, 1f),
-            chamberInteriorMul = chamberInterior,
-            growthFrontMul = m.growthFront.activeIntensity.coerceIn(0f, 1f),
-            budSignalFrondMul = m.budding.signalFrond,
-            budThermalVeilMul = m.budding.thermalVeilSpine,
-            budArchiveLamellaMul = m.budding.archiveLamella,
-            budNeuralCrownMul = m.budding.neuralCrownBloom,
+            tissueBodyFillMul = (m.bodyMass.totalOccupancy * 0.5f + gv.chamberFillVisual * 0.5f).coerceIn(0.15f, 1f),
+            chamberInteriorMul = (chamberInterior * 0.55f + gv.chamberFillVisual * 0.45f).coerceIn(0f, 1f),
+            growthFrontMul = (m.growthFront.activeIntensity * 0.45f + gv.growthFrontEdgeIntensity * 0.55f).coerceIn(0f, 1f),
+            budSignalFrondMul = (m.budding.signalFrond * 0.45f + gv.frondBudLengthLeft * 0.55f).coerceIn(0f, 1f),
+            budThermalVeilMul = (m.budding.thermalVeilSpine * 0.5f + gv.thermalVeilIntensity * 0.5f).coerceIn(0f, 1f),
+            budArchiveLamellaMul = (m.budding.archiveLamella * 0.45f + gv.archiveDensityBands * 0.55f).coerceIn(0f, 1f),
+            budNeuralCrownMul = (m.budding.neuralCrownBloom * 0.45f + gv.crownBloomIntensity * 0.55f).coerceIn(0f, 1f),
             organEmbedMul = embed.coerceIn(0.2f, 0.95f),
         )
     }

@@ -20,11 +20,13 @@ object SeedPainter {
     ) {
         val sv = scene.seedVisual
         val gen = scene.generated
-        // Prominent crystalline core — primary “seed” read when organs are hidden.
-        val r = specimenWidth * sv.coreRadiusNorm.coerceIn(0.07f, 0.14f) * (0.95f + gen.tissueBodyFillMul * 0.12f)
+        val gv = scene.growthVisuals
+        val unfold = (sv.germinationProgress * 0.5f + gv.activeAccretionPulse * 0.5f).coerceIn(0f, 1f)
+        // Prominent crystalline core — “unfold” reads as radius + halo breathe with growth cues.
+        val r = specimenWidth * sv.coreRadiusNorm.coerceIn(0.07f, 0.14f) * (0.92f + gen.tissueBodyFillMul * 0.1f + unfold * 0.12f)
         val stress = sv.latticeStress.coerceIn(0f, 1f)
         val lum = sv.reserveLuminance.coerceIn(0.1f, 1f)
-        val pulseWobble = sin(pulse * 1.15f) * 0.04f * stress
+        val pulseWobble = sin(pulse * (1.15f + unfold * 0.35f)) * (0.035f + unfold * 0.04f) * (0.4f + stress * 0.6f)
 
         val core = palette.cortexNode.copy(alpha = 0.22f * lum * (1f + sv.seedDensity * 0.35f))
         val halo = palette.shellRimCool.copy(alpha = 0.14f * sv.shellCoherence)
@@ -41,7 +43,7 @@ object SeedPainter {
                 center = center,
                 radius = r * (1.65f + sv.branchLatentEnergy * 0.15f),
             ),
-            radius = r * (1.55f + sv.germinationProgress * 0.25f),
+            radius = r * (1.5f + sv.germinationProgress * 0.22f + unfold * 0.18f),
             center = center,
         )
         // Inner wafer ring

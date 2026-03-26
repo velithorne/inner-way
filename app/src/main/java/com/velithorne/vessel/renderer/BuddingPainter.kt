@@ -23,12 +23,13 @@ object BuddingPainter {
         phase: Float,
     ) {
         val gen = scene.generated
+        val gv = scene.growthVisuals
         val shellPath = VesselContourBuilder.bodyShellPath(center, width, height, gen)
 
         scope.clipPath(shellPath) {
             // Lateral fronds (signal)
-            val fr = gen.budSignalFrondMul.coerceIn(0f, 1f)
-            if (fr > 0.06f) {
+            val fr = (gen.budSignalFrondMul * 0.5f + gv.frondBudLengthLeft * 0.5f).coerceIn(0f, 1f)
+            if (fr > 0.04f) {
                 for (side in listOf(-1f, 1f)) {
                     val base = Offset(center.x + side * width * 0.22f, center.y + height * 0.06f)
                     val path = Path().apply {
@@ -44,8 +45,8 @@ object BuddingPainter {
                         path = path,
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                palette.accentSignal.copy(alpha = fr * 0.14f),
-                                palette.lungFrond.copy(alpha = fr * 0.08f),
+                                palette.accentSignal.copy(alpha = fr * 0.2f),
+                                palette.lungFrond.copy(alpha = fr * 0.12f),
                             ),
                             start = base,
                             end = Offset(base.x + side * width * 0.2f, base.y),
@@ -55,21 +56,21 @@ object BuddingPainter {
                 }
             }
             // Thermal veil spines (upper arc)
-            val th = gen.budThermalVeilMul.coerceIn(0f, 1f)
-            if (th > 0.06f) {
+            val th = (gen.budThermalVeilMul * 0.5f + gv.thermalVeilIntensity * 0.5f).coerceIn(0f, 1f)
+            if (th > 0.04f) {
                 val p = Path().apply {
                     moveTo(center.x - width * 0.2f, center.y - height * 0.35f)
                     quadraticTo(center.x, center.y - height * (0.48f + th * 0.06f), center.x + width * 0.2f, center.y - height * 0.35f)
                 }
                 scope.drawPath(
                     path = p,
-                    color = palette.thermalEdge.copy(alpha = th * 0.1f),
+                    color = palette.thermalEdge.copy(alpha = th * 0.14f + gv.shellThickeningIntensity * 0.04f),
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f + th * 1f),
                 )
             }
             // Archive lamellae (lower strata lines)
-            val ar = gen.budArchiveLamellaMul.coerceIn(0f, 1f)
-            if (ar > 0.06f) {
+            val ar = (gen.budArchiveLamellaMul * 0.5f + gv.archiveDensityBands * 0.5f).coerceIn(0f, 1f)
+            if (ar > 0.04f) {
                 val y0 = center.y + height * 0.22f
                 for (i in 0 until 4) {
                     val t = i / 3f
@@ -84,14 +85,14 @@ object BuddingPainter {
                 }
             }
             // Neural crown bloom (upper)
-            val cr = gen.budNeuralCrownMul.coerceIn(0f, 1f)
-            if (cr > 0.05f) {
+            val cr = (gen.budNeuralCrownMul * 0.45f + gv.crownBloomIntensity * 0.55f).coerceIn(0f, 1f)
+            if (cr > 0.04f) {
                 val crown = Offset(center.x + cos(phase) * width * 0.04f, center.y - height * 0.36f)
                 scope.drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            palette.cortexNode.copy(alpha = cr * 0.12f),
-                            palette.cortexFilament.copy(alpha = cr * 0.06f),
+                            palette.cortexNode.copy(alpha = cr * 0.18f),
+                            palette.cortexFilament.copy(alpha = cr * 0.1f),
                             Color(0xFF000000).copy(alpha = 0f),
                         ),
                         center = crown,

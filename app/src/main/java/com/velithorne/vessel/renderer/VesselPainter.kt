@@ -78,7 +78,7 @@ object VesselPainter {
     ) {
         val core = VesselFraming.computeCoreSpecimenBounds(w, h, scene, parallax)
         val vc = Offset(w / 2f, h / 2f)
-        val tc = Offset(core.centroid.x, h * tuning.defaultCompositionY)
+        val tc = Offset(core.centroid.x, h * tuning.defaultVisualCentroidTargetY)
         val envelope = VesselFraming.computeFxEnvelope(w, h, scene, parallax)
         val dbg = Color(0xFF00FFAA).copy(alpha = 0.55f)
         val dbg2 = Color(0xFFFF8800).copy(alpha = 0.35f)
@@ -151,17 +151,15 @@ object VesselPainter {
             pulse = pulse,
         )
 
-        if (!scene.seedPresentationActive) {
-            ChamberMassPainter.draw(
-                scope = scope,
-                center = Offset(cx, cy),
-                width = baseW,
-                height = baseH,
-                scene = scene,
-                palette = palette,
-                breath = breath,
-            )
-        }
+        ChamberMassPainter.draw(
+            scope = scope,
+            center = Offset(cx, cy),
+            width = baseW,
+            height = baseH,
+            scene = scene,
+            palette = palette,
+            breath = breath,
+        )
 
         val focusCenter = sel?.let { type ->
             when (type) {
@@ -224,7 +222,7 @@ object VesselPainter {
                     center = Offset(cx, cy),
                     width = baseW,
                     height = baseH,
-                    activity = scene.generated.visibleGrowthActivity,
+                    scene = scene,
                     phase = anim.seconds,
                 )
 

@@ -23,8 +23,9 @@ object GrowthFrontPainter {
     ) {
         val gen = scene.generated
         val g = scene.growthStageVisual
-        val a = gen.growthFrontMul * (0.35f + g.growthFrontIntensity * 0.65f)
-        if (a < 0.04f) return
+        val gv = scene.growthVisuals
+        val a = (gen.growthFrontMul * 0.45f + gv.growthFrontEdgeIntensity * 0.55f) * (0.35f + g.growthFrontIntensity * 0.65f)
+        if (a < 0.03f) return
 
         val shellPath = VesselContourBuilder.bodyShellPath(center, width, height, scene.generated)
         val shim = sin(animSeconds * 2.4f + g.growthFrontDirX * 2f) * 0.5f + 0.5f
@@ -39,8 +40,8 @@ object GrowthFrontPainter {
         scope.clipPath(shellPath) {
             scope.drawPath(
                 path = shellPath,
-                color = edgeCol.copy(alpha = a * 0.06f * (0.6f + shim * 0.4f)),
-                style = Stroke(width = 2.8f + a * 2f),
+                color = edgeCol.copy(alpha = a * 0.1f * (0.55f + shim * 0.45f)),
+                style = Stroke(width = 2.8f + a * 2.4f),
             )
             val tip = Offset(
                 center.x + g.growthFrontDirX * width * 0.22f,
@@ -49,7 +50,7 @@ object GrowthFrontPainter {
             scope.drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        edgeCol.copy(alpha = a * 0.14f * shim),
+                        edgeCol.copy(alpha = a * 0.2f * shim),
                         Color(0xFF000000).copy(alpha = 0f),
                     ),
                     center = tip,

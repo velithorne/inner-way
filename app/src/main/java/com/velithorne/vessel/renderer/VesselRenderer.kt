@@ -6,6 +6,7 @@ import com.velithorne.vessel.model.SeedVisualState
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.morphogenesis.GrowthExplainer
+import com.velithorne.vessel.morphogenesis.GrowthVisualCues
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.morphogenesis.StructuralGraph
 import com.velithorne.vessel.physiology.OrganState
@@ -106,6 +107,7 @@ class VesselRenderer(
         val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, tuning)
         val material: VesselMaterialState = VesselMaterialSystem.derive(s, tuning)
         val generated = MorphogenesisMapper.toGeneratedParams(morphogenesis)
+        val growthVisuals: GrowthVisualCues = morphogenesis.growthVisuals
 
         return VesselSceneState(
             timestampMillis = snapshot.timestampMillis,
@@ -143,7 +145,8 @@ class VesselRenderer(
             structuralGraph = structuralGraph,
             seedVisual = seedVisual,
             growthStageVisual = growthStageVisual,
-            seedPresentationActive = true,
+            growthVisuals = growthVisuals,
+            seedPresentationActive = false,
         )
     }
 

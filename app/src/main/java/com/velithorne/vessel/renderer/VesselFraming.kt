@@ -10,8 +10,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * **Core** specimen bounds: silhouette + organ anchors — drives default fit/centering.
- * **FX** bounds — for debug overlay only; must not shift default framing.
+ * **Core** specimen bounds for default fit/centering — uses **visual mass** centroid (seed + silhouette),
+ * not raw organ-graph average (which pulled the read toward the lower body).
  */
 data class CoreSpecimenBounds(
     val centroid: Offset,
@@ -43,15 +43,21 @@ object VesselFraming {
         val breathApprox = 1f
         val baseW = w * layout.bodyWidth * scene.bodyScale * pulseApprox * breathApprox
         val baseH = h * layout.bodyHeight * scene.bodyScale * breathApprox * (0.98f + pulseApprox * 0.02f)
+        val seedBlend = scene.generated.seedFormBlend.coerceIn(0f, 1f)
 
-        val silhouetteSamples = listOf(
-            Offset(cx, cy - baseH * 0.48f),
-            Offset(cx, cy + baseH * 0.5f),
-            Offset(cx - baseW * 0.42f, cy + baseH * 0.05f),
-            Offset(cx + baseW * 0.42f, cy + baseH * 0.05f),
+        // Vesica / seed silhouette — weighted samples (top lobe + waist dominate visual mass; downweight tail apex).
+        val silhouetteWeighted: List<Pair<Offset, Float>> = listOf(
+            Offset(cx, cy - baseH * 0.42f) to 0.22f,
+            Offset(cx - baseW * 0.18f, cy - baseH * 0.12f) to 0.14f,
+            Offset(cx + baseW * 0.18f, cy - baseH * 0.12f) to 0.14f,
+            Offset(cx, cy + baseH * 0.08f) to 0.18f,
+            Offset(cx - baseW * 0.32f, cy + baseH * 0.06f) to 0.1f,
+            Offset(cx + baseW * 0.32f, cy + baseH * 0.06f) to 0.1f,
+            Offset(cx, cy + baseH * 0.38f) to 0.06f,
         )
 
         val organPoints = mutableListOf<Offset>()
+        val organWeights = mutableListOf<Float>()
         val seenLungs = mutableSetOf<String>()
         if (morphGraph != null) {
             for (n in morphGraph.nodes) {
@@ -60,7 +66,14 @@ object VesselFraming {
                     val key = "${"%.4f".format(n.nx)}_${"%.4f".format(n.ny)}"
                     if (!seenLungs.add(key)) continue
                 }
-                organPoints += Offset(w * n.nx + parallax.x * 0.12f, h * n.ny + parallax.y * 0.1f)
+                val p = Offset(w * n.nx + parallax.x * 0.12f, h * n.ny + parallax.y * 0.1f)
+                organPoints += p
+                val ow = when (n.organType) {
+                    OrganType.ARCHIVE_VAULT, OrganType.METABOLIC_HEART -> 0.85f
+                    OrganType.CORTEX_CLUSTER, OrganType.NEURAL_GEL -> 1f
+                    else -> 0.75f
+                }
+                organWeights += ow
             }
         } else {
             for (ov in scene.organVisuals) {
@@ -69,32 +82,51 @@ object VesselFraming {
                     val key = "${"%.4f".format(ov.anchorX)}_${"%.4f".format(ov.anchorY)}"
                     if (!seenLungs.add(key)) continue
                 }
-                val ox = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
-                val oy = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
-                organPoints += Offset(ox, oy)
+                val p = Offset(
+                    w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f),
+                    h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f),
+                )
+                organPoints += p
+                organWeights += 0.9f
             }
         }
 
-        val allPts = silhouetteSamples + organPoints
+        var sw = 0f
         var sx = 0f
         var sy = 0f
-        val n = max(1, allPts.size)
-        for (p in allPts) {
-            sx += p.x
-            sy += p.y
+        for (pair in silhouetteWeighted) {
+            val p = pair.first
+            val wt = pair.second
+            sw += wt
+            sx += p.x * wt
+            sy += p.y * wt
         }
-        var centroid = Offset(sx / n, sy / n)
+        val organBlend = (0.18f + (1f - seedBlend) * 0.22f).coerceIn(0.12f, 0.38f)
+        for (i in organPoints.indices) {
+            val wt = organWeights[i] * organBlend
+            sw += wt
+            sx += organPoints[i].x * wt
+            sy += organPoints[i].y * wt
+        }
+        if (sw < 1e-3f) sw = 1f
+        var centroid = Offset(sx / sw, sy / sw)
 
-        val organSpreadY = organPoints.map { abs(it.y - centroid.y) }.maxOrNull() ?: baseH * 0.35f
-        val organSpreadX = organPoints.map { abs(it.x - centroid.x) }.maxOrNull() ?: baseW * 0.35f
-
+        // Seed nucleus pulls visual mass slightly toward core (not fog/particles).
+        val nucleusY = cy - baseH * 0.02f * seedBlend
         centroid = Offset(
-            x = cx * 0.12f + centroid.x * 0.88f,
-            y = (cy + baseH * tuningCoreLift(scene)) * 0.22f + centroid.y * 0.78f,
+            centroid.x * 0.88f + cx * 0.08f,
+            centroid.y * 0.82f + nucleusY * 0.18f,
         )
 
-        val halfW = max(baseW * 0.48f, organSpreadX + baseW * 0.08f)
-        val halfH = max(baseH * 0.52f, organSpreadY + baseH * 0.06f)
+        // Lift suspended specimen: vesica mass reads lower than path centroid — bias upward (smaller Y).
+        val suspendedLift = baseH * (0.065f + scene.growthVisuals.stageVisualBias * 0.025f)
+        centroid = Offset(centroid.x, centroid.y - suspendedLift)
+
+        val organSpreadY = if (organPoints.isEmpty()) baseH * 0.32f else organPoints.map { abs(it.y - centroid.y) }.maxOrNull() ?: baseH * 0.32f
+        val organSpreadX = if (organPoints.isEmpty()) baseW * 0.32f else organPoints.map { abs(it.x - centroid.x) }.maxOrNull() ?: baseW * 0.32f
+
+        val halfW = max(baseW * 0.46f, organSpreadX + baseW * 0.1f)
+        val halfH = max(baseH * 0.5f, organSpreadY + baseH * 0.12f)
 
         return CoreSpecimenBounds(centroid = centroid, halfWidth = halfW, halfHeight = halfH)
     }
@@ -135,9 +167,7 @@ object VesselFraming {
             min(tuning.maxZoom, tuning.defaultFitZoomCap),
         )
 
-        // Pan is in *specimen* space before scale: screen = vc + z * (specimen - vc + pan).
-        // So to place core.centroid at (vc.x, targetY): pan = (target - vc) / z + vc - centroid.
-        val targetY = h * tuning.defaultCompositionY
+        val targetY = h * tuning.defaultVisualCentroidTargetY
         val invZ = 1f / max(fitZoom, 1e-3f)
         val basePanX = vc.x - core.centroid.x
         val basePanY = (vc.y - core.centroid.y) + (targetY - vc.y) * invZ
@@ -164,7 +194,4 @@ object VesselFraming {
             targetPanY = c.panY,
         )
     }
-
-    private fun tuningCoreLift(scene: VesselSceneState): Float =
-        -(0.022f + scene.structuralMass * 0.012f)
 }
