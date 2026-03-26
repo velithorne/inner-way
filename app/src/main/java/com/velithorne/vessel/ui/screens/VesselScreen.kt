@@ -33,7 +33,6 @@ import com.velithorne.vessel.renderer.RenderTuning
 import com.velithorne.vessel.renderer.VesselGestureController
 import com.velithorne.vessel.renderer.VesselScene
 import com.velithorne.vessel.ui.components.GrowthProgressCard
-import com.velithorne.vessel.ui.components.GrowthStatusChip
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
@@ -95,17 +94,14 @@ fun VesselScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(modifier = Modifier.weight(1f))
+                // Single primary stage chip — activity lives in statusLine below (no duplicate "Branching").
                 VesselStageChip(
                     label = growth.germinationStageLabel,
                     modifier = Modifier.widthIn(max = 200.dp),
-                )
-                GrowthStatusChip(
-                    label = growth.statusLabel,
-                    subtitle = null,
                 )
             }
             if (growth.statusLine.isNotEmpty()) {

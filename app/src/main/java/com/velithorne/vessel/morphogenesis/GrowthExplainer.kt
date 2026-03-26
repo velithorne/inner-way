@@ -100,13 +100,19 @@ object GrowthExplainer {
         visibleActivity: Float,
         gv: GrowthVisualCues,
         tuning: GrowthTuning,
-    ): String = when {
-        gv.frondBudLengthLeft > tuning.textFrondBudThreshold && visibleActivity > 0.4f -> "Branching"
-        gv.frondBudLengthLeft > tuning.textFrondBudThreshold -> "Signal adapting"
-        gv.thermalVeilIntensity > tuning.textThermalVeilThreshold -> "Cooling adaptation"
-        gv.archiveDensityBands > tuning.textArchiveBandThreshold -> "Archive densifying"
-        acc.recovery > 0.5f && acc.thermal < 0.35f -> "Stabilizing"
-        else -> "Growing"
+        germinationStage: GerminationStage,
+    ): String {
+        // Avoid duplicating the primary stage chip (e.g. both "Branching").
+        val frondActive = gv.frondBudLengthLeft > tuning.textFrondBudThreshold
+        return when {
+            frondActive && visibleActivity > 0.4f && germinationStage != GerminationStage.BRANCHING -> "Branching"
+            frondActive && germinationStage == GerminationStage.BRANCHING -> "Frond extension"
+            frondActive -> "Signal adapting"
+            gv.thermalVeilIntensity > tuning.textThermalVeilThreshold -> "Cooling adaptation"
+            gv.archiveDensityBands > tuning.textArchiveBandThreshold -> "Archive densifying"
+            acc.recovery > 0.5f && acc.thermal < 0.35f -> "Stabilizing"
+            else -> "Growing"
+        }
     }
 
     fun statusLine(

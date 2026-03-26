@@ -21,14 +21,17 @@ object BuddingPainter {
         scene: VesselSceneState,
         palette: VesselPaletteState,
         phase: Float,
+        visibilityMul: Float = 1f,
     ) {
+        val vm = visibilityMul.coerceIn(0f, 1f)
+        if (vm < 0.02f) return
         val gen = scene.generated
         val gv = scene.growthVisuals
         val shellPath = VesselContourBuilder.bodyShellPath(center, width, height, gen)
 
         scope.clipPath(shellPath) {
             // Lateral fronds (signal)
-            val fr = (gen.budSignalFrondMul * 0.5f + gv.frondBudLengthLeft * 0.5f).coerceIn(0f, 1f)
+            val fr = (gen.budSignalFrondMul * 0.5f + gv.frondBudLengthLeft * 0.5f).coerceIn(0f, 1f) * vm
             if (fr > 0.04f) {
                 for (side in listOf(-1f, 1f)) {
                     val base = Offset(center.x + side * width * 0.22f, center.y + height * 0.06f)
@@ -56,7 +59,7 @@ object BuddingPainter {
                 }
             }
             // Thermal veil spines (upper arc)
-            val th = (gen.budThermalVeilMul * 0.5f + gv.thermalVeilIntensity * 0.5f).coerceIn(0f, 1f)
+            val th = (gen.budThermalVeilMul * 0.5f + gv.thermalVeilIntensity * 0.5f).coerceIn(0f, 1f) * vm
             if (th > 0.04f) {
                 val p = Path().apply {
                     moveTo(center.x - width * 0.2f, center.y - height * 0.35f)
@@ -69,7 +72,7 @@ object BuddingPainter {
                 )
             }
             // Archive lamellae (lower strata lines)
-            val ar = (gen.budArchiveLamellaMul * 0.5f + gv.archiveDensityBands * 0.5f).coerceIn(0f, 1f)
+            val ar = (gen.budArchiveLamellaMul * 0.5f + gv.archiveDensityBands * 0.5f).coerceIn(0f, 1f) * vm
             if (ar > 0.04f) {
                 val y0 = center.y + height * 0.22f
                 for (i in 0 until 4) {
@@ -85,7 +88,7 @@ object BuddingPainter {
                 }
             }
             // Neural crown bloom (upper)
-            val cr = (gen.budNeuralCrownMul * 0.45f + gv.crownBloomIntensity * 0.55f).coerceIn(0f, 1f)
+            val cr = (gen.budNeuralCrownMul * 0.45f + gv.crownBloomIntensity * 0.55f).coerceIn(0f, 1f) * vm
             if (cr > 0.04f) {
                 val crown = Offset(center.x + cos(phase) * width * 0.04f, center.y - height * 0.36f)
                 scope.drawCircle(

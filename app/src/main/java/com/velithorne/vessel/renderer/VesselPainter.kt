@@ -62,7 +62,7 @@ object VesselPainter {
                     }
                 }
             }
-            if (tuning.showFramingDebug) {
+            if (tuning.showFramingDebug || tuning.showSeedFirstDebug) {
                 drawFramingDebug(scope = this, w = w, h = h, scene = scene, parallax = parallax, tuning = tuning)
             }
         }
@@ -78,15 +78,23 @@ object VesselPainter {
     ) {
         val core = VesselFraming.computeCoreSpecimenBounds(w, h, scene, parallax)
         val vc = Offset(w / 2f, h / 2f)
-        val tc = Offset(core.centroid.x, h * tuning.defaultVisualCentroidTargetY)
+        val sp = scene.seedPlacement
+        val seedPt = Offset(w * sp.anchorXNormalized + parallax.x * 0.15f, h * sp.anchorYNormalized + parallax.y * 0.12f)
+        val tc = Offset(core.centroid.x, h * if (scene.seedFirstFramingActive) sp.anchorYNormalized else tuning.defaultVisualCentroidTargetY)
         val envelope = VesselFraming.computeFxEnvelope(w, h, scene, parallax)
         val dbg = Color(0xFF00FFAA).copy(alpha = 0.55f)
         val dbg2 = Color(0xFFFF8800).copy(alpha = 0.35f)
+        val dbg3 = Color(0xFFFF44CC).copy(alpha = 0.65f)
         scope.drawLine(dbg, start = Offset(vc.x - 18f, vc.y), end = Offset(vc.x + 18f, vc.y), strokeWidth = 2f)
         scope.drawLine(dbg, start = Offset(vc.x, vc.y - 18f), end = Offset(vc.x, vc.y + 18f), strokeWidth = 2f)
         scope.drawCircle(dbg, radius = 5f, center = vc)
         scope.drawCircle(dbg2, radius = 4f, center = core.centroid)
         scope.drawCircle(dbg, radius = 4f, center = tc)
+        scope.drawCircle(dbg3, radius = 6f, center = seedPt)
+        scope.drawLine(dbg3, start = Offset(seedPt.x - 10f, seedPt.y), end = Offset(seedPt.x + 10f, seedPt.y), strokeWidth = 1.5f)
+        scope.drawLine(dbg3, start = Offset(seedPt.x, seedPt.y - 10f), end = Offset(seedPt.x, seedPt.y + 10f), strokeWidth = 1.5f)
+        // Chamber rect (viewport)
+        scope.drawRect(color = dbg.copy(alpha = 0.35f), style = Stroke(width = 1.5f), topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, h))
         val fitRect = Rect(
             left = core.centroid.x - core.halfWidth,
             top = core.centroid.y - core.halfHeight,
@@ -112,16 +120,17 @@ object VesselPainter {
     ) {
         val palette = scene.palette
         val material = scene.material
-        val cx = w * layout.bodyCenterX + parallax.x * 0.15f
-        val cy = h * layout.bodyCenterY + parallax.y * 0.12f
+        val sp = scene.seedPlacement
+        val cx = w * sp.anchorXNormalized + parallax.x * 0.15f
+        val cy = h * sp.anchorYNormalized + parallax.y * 0.12f
 
         val shiver = scene.stressShiver * tuning.stressShiverDegrees
         val pulseScale = 1f + sin(pulse) * scene.bodyPulseAmplitude
         val breathScale = 1f + sin(breath) * scene.bodyBreathAmplitude * (0.4f + scene.respirationDrive * 0.6f)
         val bodyJitter = anim.slowNoise(0.2f) * scene.stressTint * 2.5f
 
-        val baseW = w * layout.bodyWidth * scene.bodyScale * pulseScale * breathScale
-        val baseH = h * layout.bodyHeight * scene.bodyScale * breathScale * (0.98f + pulseScale * 0.02f)
+        val baseW = w * layout.bodyWidth * scene.bodyScale * sp.seedViewportScale * pulseScale * breathScale
+        val baseH = h * layout.bodyHeight * scene.bodyScale * sp.seedViewportScale * breathScale * (0.98f + pulseScale * 0.02f)
         val sel = selection.selectedOrgan
         val dim = if (sel != null) tuning.selectionDimAlpha * material.selectionPeerDim else 0f
         val focus = selection.focusProgress.coerceIn(0f, 1f)
@@ -129,16 +138,26 @@ object VesselPainter {
         val seedOnly = scene.seedPresentationActive
         val seedOrganVeil = if (seedOnly) 1f else ((seedBlend - 0.5f) / 0.5f).coerceIn(0f, 1f)
 
+        val mode = scene.stageRenderMode
+        val leg = scene.legacyScaffoldVisibility.coerceIn(0f, 1f)
+        val seedEmergence = scene.seedLocalEmergence.coerceIn(0f, 1f)
+
+        if (scene.seedFirstCanvasActive && leg < 0.95f) {
+            ChamberPainter.drawSeedChamberFloor(scope, w, h, Offset(cx, cy), 0.55f + leg * 0.25f)
+        }
+
         val rearParallax = Offset(parallax.x * tuning.rearParallaxMul, parallax.y * tuning.rearParallaxMul)
-        scope.translate(rearParallax.x, rearParallax.y) {
-            val rearPath = VesselContourBuilder.rearSilhouettePath(
-                Offset(cx, cy + h * 0.015f),
-                baseW * 1.06f,
-                baseH * 1.04f,
-                microBreathe = pulse * 0.3f,
-                gen = scene.generated,
-            )
-            drawPath(path = rearPath, color = Color(0xFF0A1018).copy(alpha = 0.52f + scene.structuralMass * 0.22f))
+        if (leg > 0.02f) {
+            scope.translate(rearParallax.x, rearParallax.y) {
+                val rearPath = VesselContourBuilder.rearSilhouettePath(
+                    Offset(cx, cy + h * 0.015f),
+                    baseW * 1.06f,
+                    baseH * 1.04f,
+                    microBreathe = pulse * 0.3f,
+                    gen = scene.generated,
+                )
+                drawPath(path = rearPath, color = Color(0xFF0A1018).copy(alpha = (0.52f + scene.structuralMass * 0.22f) * leg))
+            }
         }
 
         SeedPainter.draw(
@@ -151,6 +170,24 @@ object VesselPainter {
             pulse = pulse,
         )
 
+        if (mode != VesselStageRenderMode.ADVANCED_FORMATION || leg < 0.9f) {
+            GerminationPainter.draw(
+                scope = scope,
+                center = Offset(cx, cy),
+                specimenWidth = baseW,
+                specimenHeight = baseH,
+                scene = scene,
+                palette = palette,
+                pulse = pulse,
+                visibility = when (mode) {
+                    VesselStageRenderMode.SEED_ONLY -> 0.95f
+                    VesselStageRenderMode.GERMINATING -> 0.75f
+                    VesselStageRenderMode.EARLY_BRANCHING -> 0.5f
+                    else -> 0.25f * (1f - leg)
+                },
+            )
+        }
+
         ChamberMassPainter.draw(
             scope = scope,
             center = Offset(cx, cy),
@@ -159,6 +196,7 @@ object VesselPainter {
             scene = scene,
             palette = palette,
             breath = breath,
+            visibilityMul = leg,
         )
 
         val focusCenter = sel?.let { type ->
@@ -172,6 +210,7 @@ object VesselPainter {
 
         scope.rotate(shiver + bodyJitter + scene.mobilitySway * 4f, pivot = Offset(cx, cy)) {
             scale(scaleX = 1f + parallax.x / w * 0.02f, scaleY = 1f + parallax.y / h * 0.015f, pivot = Offset(cx, cy)) {
+                val shellVis = if (mode == VesselStageRenderMode.SEED_ONLY) 0.18f else leg.coerceIn(0.12f, 1f)
                 VesselMembranePainter.drawShell(
                     scope = this,
                     center = Offset(cx, cy),
@@ -183,7 +222,21 @@ object VesselPainter {
                     tuning = tuning,
                     pulsePhase = pulse,
                     dimAlpha = if (sel != null && sel != OrganType.THERMAL_MEMBRANE) dim * 0.28f else 0f,
+                    visibilityMul = shellVis,
                 )
+
+                if (seedEmergence > 0.04f) {
+                    SeedGrowthPainter.draw(
+                        scope = this,
+                        center = Offset(cx, cy),
+                        width = baseW,
+                        height = baseH,
+                        scene = scene,
+                        palette = palette,
+                        phase = anim.seconds,
+                        pulse = pulse,
+                    )
+                }
 
                 if (!seedOnly) {
                     VesselPathwayPainter.draw(
@@ -199,11 +252,12 @@ object VesselPainter {
                         pulse = pulse,
                         selectedOrgan = sel,
                         focus = focus,
+                        visibilityMul = leg,
                     )
                 }
 
                 val musc = scene.organVisuals.firstOrNull { it.type == OrganType.VESTIBULAR_MUSCULATURE }
-                if (!seedOnly && musc != null) {
+                if (!seedOnly && musc != null && leg > 0.08f) {
                     VesselMembranePainter.drawStabilizerBands(
                         scope = this,
                         center = Offset(cx, cy),
@@ -213,7 +267,7 @@ object VesselPainter {
                         mobility = scene.mobilitySway,
                         pulse = pulse,
                         palette = palette,
-                        tendonVisibilityMul = scene.generated.tendonVisibilityMul,
+                        tendonVisibilityMul = scene.generated.tendonVisibilityMul * leg,
                     )
                 }
 
@@ -224,6 +278,7 @@ object VesselPainter {
                     height = baseH,
                     scene = scene,
                     phase = anim.seconds,
+                    visibilityMul = max(leg, seedEmergence * 0.45f),
                 )
 
                 if (!seedOnly) {
@@ -235,6 +290,7 @@ object VesselPainter {
                         scene = scene,
                         palette = palette,
                         phase = anim.seconds,
+                        visibilityMul = leg,
                     )
 
                     GrowthFrontPainter.draw(
@@ -245,6 +301,7 @@ object VesselPainter {
                         scene = scene,
                         palette = palette,
                         animSeconds = anim.seconds,
+                        visibilityMul = leg,
                     )
                 }
 
@@ -269,11 +326,11 @@ object VesselPainter {
                         tuning = tuning,
                         pulse = pulse,
                         breath = breath,
-                        dimAlpha = (peerDim + seedDim).coerceIn(0f, 0.92f),
-                        highlightMul = hl * (1f - seedOrganVeil * 0.35f + if (isSel) seedOrganVeil * 0.25f else 0f),
+                        dimAlpha = ((peerDim + seedDim + (1f - leg) * 0.55f)).coerceIn(0f, 0.92f),
+                        highlightMul = hl * (1f - seedOrganVeil * 0.35f + if (isSel) seedOrganVeil * 0.25f else 0f) * leg,
                         isSelected = isSel,
                         selectionPhase = pulse * 1.08f + focus * 2f,
-                        materialOrganHalo = material.organHaloIntensity,
+                        materialOrganHalo = material.organHaloIntensity * leg,
                         gelEnvelopeMul = scene.generated.gelEnvelopeMul,
                         archiveLamellaMul = scene.generated.archiveLamellaDensityMul,
                     )
@@ -291,6 +348,7 @@ object VesselPainter {
                         anim = anim,
                         tuning = tuning,
                         membraneDim = if (sel == OrganType.THERMAL_MEMBRANE) 0f else if (sel != null) dim * 0.22f else 0f,
+                        visibilityMul = max(0.15f, leg),
                     )
                 }
                 if (sel == OrganType.THERMAL_MEMBRANE && focus > 0.05f) {
@@ -300,7 +358,7 @@ object VesselPainter {
                         baseRadius = maxOf(baseW, baseH) * 0.36f,
                         accent = palette.thermalHot,
                         phase = pulse,
-                        strength = focus * tuning.selectionGlowStrength * material.selectionFocusBoost,
+                        strength = focus * tuning.selectionGlowStrength * material.selectionFocusBoost * leg,
                     )
                 }
             }

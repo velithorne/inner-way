@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.5.0-temporal-growth-ui"
+        versionCode = 17
+        versionName = "1.6.0-seed-first-renderer"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

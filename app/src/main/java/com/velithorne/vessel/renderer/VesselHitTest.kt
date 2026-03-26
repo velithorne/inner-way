@@ -27,12 +27,14 @@ object VesselHitTest {
     ): BodyBasis {
         val w = viewportW
         val h = viewportH
-        val cx = w * layout.bodyCenterX + parallax.x * 0.15f
-        val cy = h * layout.bodyCenterY + parallax.y * 0.12f
+        val sp = scene.seedPlacement
+        val cx = w * (if (scene.seedFirstFramingActive) sp.anchorXNormalized else layout.bodyCenterX) + parallax.x * 0.15f
+        val cy = h * (if (scene.seedFirstFramingActive) sp.anchorYNormalized else layout.bodyCenterY) + parallax.y * 0.12f
         val pulseApprox = 1f
         val breathApprox = 1f
-        val baseW = w * layout.bodyWidth * scene.bodyScale * pulseApprox * breathApprox
-        val baseH = h * layout.bodyHeight * scene.bodyScale * breathApprox * (0.98f + pulseApprox * 0.02f)
+        val scale = if (scene.seedFirstFramingActive) sp.seedViewportScale else 1f
+        val baseW = w * layout.bodyWidth * scene.bodyScale * scale * pulseApprox * breathApprox
+        val baseH = h * layout.bodyHeight * scene.bodyScale * scale * breathApprox * (0.98f + pulseApprox * 0.02f)
         return BodyBasis(cx, cy, baseW, baseH)
     }
 

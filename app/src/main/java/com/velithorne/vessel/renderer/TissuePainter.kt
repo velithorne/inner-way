@@ -16,12 +16,15 @@ object TissuePainter {
         height: Float,
         scene: VesselSceneState,
         phase: Float,
+        visibilityMul: Float = 1f,
     ) {
+        val vm = visibilityMul.coerceIn(0f, 1f)
+        if (vm < 0.02f) return
         val gv = scene.growthVisuals
         val activity = (
             scene.generated.visibleGrowthActivity * 0.5f + gv.activeAccretionPulse * 0.35f +
                 gv.growthFrontEdgeIntensity * 0.15f
-            ).coerceIn(0f, 1f)
+            ).coerceIn(0f, 1f) * vm
         if (activity < 0.03f) return
         val a = activity.coerceIn(0f, 1f)
         val shim = sin(phase * 2.2f) * 0.5f + 0.5f

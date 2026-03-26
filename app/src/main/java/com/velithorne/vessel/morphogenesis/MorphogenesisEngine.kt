@@ -109,7 +109,7 @@ class MorphogenesisEngine(
             germinationStage = germinationStage,
             gv = growthVisuals,
         )
-        val statusLabel = GrowthExplainer.activityLabel(accumulator, visible, growthVisuals, tuning)
+        val statusLabel = GrowthExplainer.activityLabel(accumulator, visible, growthVisuals, tuning, germinationStage)
         val statusLine = GrowthExplainer.statusLine(accumulator, germinationStage, growthFront, chamberMass!!, growthVisuals, tuning)
 
         return MorphogenesisSnapshot(

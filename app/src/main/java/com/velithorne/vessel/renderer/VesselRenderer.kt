@@ -109,6 +109,26 @@ class VesselRenderer(
         val generated = MorphogenesisMapper.toGeneratedParams(morphogenesis)
         val growthVisuals: GrowthVisualCues = morphogenesis.growthVisuals
 
+        val blendForMode = generated.seedFormBlend
+        val stageMode = VesselStageRenderMode.fromGermination(morphogenesis.germinationStage, blendForMode)
+        val seedPlacement = SeedPlacement.Default
+        val seedFirstFraming = stageMode != VesselStageRenderMode.ADVANCED_FORMATION
+        val legacyVis = when (stageMode) {
+            VesselStageRenderMode.SEED_ONLY -> 0f
+            VesselStageRenderMode.GERMINATING -> 0.06f
+            VesselStageRenderMode.EARLY_BRANCHING -> 0.22f
+            VesselStageRenderMode.MID_FORMATION -> 0.62f
+            VesselStageRenderMode.ADVANCED_FORMATION -> 1f
+        }
+        val seedLocal = when (stageMode) {
+            VesselStageRenderMode.SEED_ONLY -> 0.12f
+            VesselStageRenderMode.GERMINATING -> 0.35f
+            VesselStageRenderMode.EARLY_BRANCHING -> 0.58f
+            VesselStageRenderMode.MID_FORMATION -> 0.78f
+            VesselStageRenderMode.ADVANCED_FORMATION -> 1f
+        }
+        val seedCanvas = stageMode.seedDominant || legacyVis < 0.85f
+
         return VesselSceneState(
             timestampMillis = snapshot.timestampMillis,
             bodyScale = bodyScale,
@@ -147,6 +167,12 @@ class VesselRenderer(
             growthStageVisual = growthStageVisual,
             growthVisuals = growthVisuals,
             seedPresentationActive = false,
+            stageRenderMode = stageMode,
+            seedPlacement = seedPlacement,
+            seedFirstFramingActive = seedFirstFraming,
+            legacyScaffoldVisibility = legacyVis,
+            seedLocalEmergence = seedLocal,
+            seedFirstCanvasActive = seedCanvas,
         )
     }
 

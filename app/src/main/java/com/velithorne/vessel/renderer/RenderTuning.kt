@@ -65,6 +65,8 @@ data class RenderTuning(
 
     /** Draw core centroid, fit rect, chamber center (development). */
     val showFramingDebug: Boolean = false,
+    /** Seed-first validation: chamber bounds, fixed seed anchor, framing centroid (toggle off for release). */
+    val showSeedFirstDebug: Boolean = false,
 
     // Phase 5 — shell / membrane / pathways / atmosphere
     val shellFillOpacityBase: Float = 0.1f,

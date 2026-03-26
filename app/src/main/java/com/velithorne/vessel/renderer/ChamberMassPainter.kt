@@ -21,11 +21,14 @@ object ChamberMassPainter {
         scene: VesselSceneState,
         palette: VesselPaletteState,
         breath: Float,
+        visibilityMul: Float = 1f,
     ) {
+        val vm = visibilityMul.coerceIn(0f, 1f)
+        if (vm < 0.01f) return
         val gen = scene.generated
         val gv = scene.growthVisuals
-        val fill = gen.tissueBodyFillMul.coerceIn(0f, 1f)
-        val interior = gen.chamberInteriorMul.coerceIn(0f, 1f)
+        val fill = gen.tissueBodyFillMul.coerceIn(0f, 1f) * vm
+        val interior = gen.chamberInteriorMul.coerceIn(0f, 1f) * vm
         if (fill < 0.06f) return
 
         val shellPath = VesselContourBuilder.bodyShellPath(center, width, height, gen)

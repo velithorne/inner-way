@@ -34,11 +34,32 @@ object VesselFraming {
         scene: VesselSceneState,
         parallax: Offset,
     ): CoreSpecimenBounds {
-        val morphGraph: StructuralGraph? = scene.structuralGraph
         val w = viewportW
         val h = viewportH
-        val cx = w * layout.bodyCenterX + parallax.x * 0.15f
-        val cy = h * layout.bodyCenterY + parallax.y * 0.12f
+        val sp = scene.seedPlacement
+        val cx = w * sp.anchorXNormalized + parallax.x * 0.15f
+        val cy = h * sp.anchorYNormalized + parallax.y * 0.12f
+
+        // Seed-first: fixed anchor + compact bounds — never pull framing from graph/contour mass.
+        if (scene.seedFirstFramingActive) {
+            val pulseApprox = 1f
+            val breathApprox = 1f
+            val baseW = w * layout.bodyWidth * scene.bodyScale * sp.seedViewportScale * pulseApprox * breathApprox
+            val baseH = h * layout.bodyHeight * scene.bodyScale * sp.seedViewportScale * breathApprox * (0.98f + pulseApprox * 0.02f)
+            val mode = scene.stageRenderMode
+            val tight = when (mode) {
+                VesselStageRenderMode.SEED_ONLY -> 0.22f
+                VesselStageRenderMode.GERMINATING -> 0.28f
+                VesselStageRenderMode.EARLY_BRANCHING -> 0.42f
+                VesselStageRenderMode.MID_FORMATION -> 0.62f
+                VesselStageRenderMode.ADVANCED_FORMATION -> 0.85f
+            }
+            val halfW = baseW * max(0.2f, tight)
+            val halfH = baseH * max(0.22f, tight * 0.95f)
+            return CoreSpecimenBounds(centroid = Offset(cx, cy), halfWidth = halfW, halfHeight = halfH)
+        }
+
+        val morphGraph: StructuralGraph? = scene.structuralGraph
         val pulseApprox = 1f
         val breathApprox = 1f
         val baseW = w * layout.bodyWidth * scene.bodyScale * pulseApprox * breathApprox
@@ -139,10 +160,12 @@ object VesselFraming {
     ): FxEnvelopeBounds {
         val w = viewportW
         val h = viewportH
-        val cx = w * layout.bodyCenterX + parallax.x * 0.15f
-        val cy = h * layout.bodyCenterY + parallax.y * 0.12f
-        val baseW = w * layout.bodyWidth * scene.bodyScale
-        val baseH = h * layout.bodyHeight * scene.bodyScale
+        val sp = scene.seedPlacement
+        val cx = w * (if (scene.seedFirstFramingActive) sp.anchorXNormalized else layout.bodyCenterX) + parallax.x * 0.15f
+        val cy = h * (if (scene.seedFirstFramingActive) sp.anchorYNormalized else layout.bodyCenterY) + parallax.y * 0.12f
+        val scale = if (scene.seedFirstFramingActive) sp.seedViewportScale else 1f
+        val baseW = w * layout.bodyWidth * scene.bodyScale * scale
+        val baseH = h * layout.bodyHeight * scene.bodyScale * scale
         val r = maxOf(baseW, baseH) * 0.72f * (1f + scene.feverIntensity * 0.15f)
         return FxEnvelopeBounds(Offset(cx, cy), r)
     }
@@ -167,7 +190,11 @@ object VesselFraming {
             min(tuning.maxZoom, tuning.defaultFitZoomCap),
         )
 
-        val targetY = h * tuning.defaultVisualCentroidTargetY
+        val targetY = h * if (scene.seedFirstFramingActive) {
+            scene.seedPlacement.anchorYNormalized
+        } else {
+            tuning.defaultVisualCentroidTargetY
+        }
         val invZ = 1f / max(fitZoom, 1e-3f)
         val basePanX = vc.x - core.centroid.x
         val basePanY = (vc.y - core.centroid.y) + (targetY - vc.y) * invZ

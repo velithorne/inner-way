@@ -27,7 +27,10 @@ object VesselPathwayPainter {
         pulse: Float,
         selectedOrgan: OrganType?,
         focus: Float,
+        visibilityMul: Float = 1f,
     ) {
+        val vm = visibilityMul.coerceIn(0f, 1f)
+        if (vm < 0.02f) return
         fun xy(ov: OrganVisualModel) = Offset(
             w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f),
             h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f),
@@ -53,8 +56,8 @@ object VesselPathwayPainter {
             ).coerceIn(0.28f, 1f)
         val pulseSpeed = tuning.pathwayPulseSpeed * material.pathwayPulseSpeedMul * scene.vascularPulse.coerceIn(0.2f, 1f)
         val travel = anim.seconds * pulseSpeed * 1.8f
-        val baseMet = material.pathwayBaseAlpha * (0.85f + scene.vitalityGlow * 0.15f).coerceIn(0.5f, 1.2f) * seedPathwayPresence
-        val baseNeu = baseMet * (0.75f + scene.neuralDrive * 0.35f) * seedPathwayPresence
+        val baseMet = material.pathwayBaseAlpha * (0.85f + scene.vitalityGlow * 0.15f).coerceIn(0.5f, 1.2f) * seedPathwayPresence * vm
+        val baseNeu = baseMet * (0.75f + scene.neuralDrive * 0.35f) * seedPathwayPresence * vm
 
         fun metabolicBoostConnects(toType: OrganType?): Float {
             if (toType == null || focus < 0.05f) return 0f

@@ -20,11 +20,14 @@ object GrowthFrontPainter {
         scene: VesselSceneState,
         palette: VesselPaletteState,
         animSeconds: Float,
+        visibilityMul: Float = 1f,
     ) {
+        val vm = visibilityMul.coerceIn(0f, 1f)
+        if (vm < 0.02f) return
         val gen = scene.generated
         val g = scene.growthStageVisual
         val gv = scene.growthVisuals
-        val a = (gen.growthFrontMul * 0.45f + gv.growthFrontEdgeIntensity * 0.55f) * (0.35f + g.growthFrontIntensity * 0.65f)
+        val a = (gen.growthFrontMul * 0.45f + gv.growthFrontEdgeIntensity * 0.55f) * (0.35f + g.growthFrontIntensity * 0.65f) * vm
         if (a < 0.03f) return
 
         val shellPath = VesselContourBuilder.bodyShellPath(center, width, height, scene.generated)

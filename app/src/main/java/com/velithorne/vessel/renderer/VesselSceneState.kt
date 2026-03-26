@@ -60,4 +60,18 @@ data class VesselSceneState(
      * Legacy flag — kept false so growth layers + organs render; seed read comes from vesica + visualizer.
      */
     val seedPresentationActive: Boolean,
+    /** Explicit developmental render mode — drives what is actually drawn vs UI copy. */
+    val stageRenderMode: VesselStageRenderMode,
+    /** Fixed seed anchor (normalized) — not inferred from contour centroid. */
+    val seedPlacement: SeedPlacement,
+    /**
+     * When true, base camera framing uses [seedPlacement] only (no contour/graph centroid).
+     */
+    val seedFirstFramingActive: Boolean,
+    /** 0 = hide legacy scaffold; 1 = full legacy body stack. */
+    val legacyScaffoldVisibility: Float,
+    /** Local emergence scale around seed for early-stage growth (0..1). */
+    val seedLocalEmergence: Float,
+    /** True when canvas should emphasize seed + seed-local growth only. */
+    val seedFirstCanvasActive: Boolean,
 )
