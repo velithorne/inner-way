@@ -20,7 +20,8 @@ object SeedPainter {
     ) {
         val sv = scene.seedVisual
         val gen = scene.generated
-        val r = specimenWidth * sv.coreRadiusNorm * (0.85f + gen.tissueBodyFillMul * 0.2f)
+        // Prominent crystalline core — primary “seed” read when organs are hidden.
+        val r = specimenWidth * sv.coreRadiusNorm.coerceIn(0.07f, 0.14f) * (0.95f + gen.tissueBodyFillMul * 0.12f)
         val stress = sv.latticeStress.coerceIn(0f, 1f)
         val lum = sv.reserveLuminance.coerceIn(0.1f, 1f)
         val pulseWobble = sin(pulse * 1.15f) * 0.04f * stress

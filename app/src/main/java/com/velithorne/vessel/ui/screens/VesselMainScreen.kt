@@ -15,7 +15,9 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -33,6 +35,13 @@ fun VesselMainScreen(
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    /** Bump when user **returns** to Vessel from another tab (fresh gesture state + canvas). */
+    var vesselSession by rememberSaveable { mutableIntStateOf(0) }
+    var prevTab by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(tab) {
+        if (tab == 0 && prevTab != 0) vesselSession++
+        prevTab = tab
+    }
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -77,7 +86,8 @@ fun VesselMainScreen(
                 .padding(top = 4.dp),
         ) {
             when (tab) {
-                0 -> VesselScreen(viewModel = viewModel)
+                // Fresh chamber + camera each time user returns to Vessel (clear stray zoom/pan/tilt).
+                0 -> key(vesselSession) { VesselScreen(viewModel = viewModel) }
                 1 -> TelemetryDebugScreen(viewModel = viewModel)
                 2 -> PhysiologyDebugScreen(viewModel = viewModel)
             }

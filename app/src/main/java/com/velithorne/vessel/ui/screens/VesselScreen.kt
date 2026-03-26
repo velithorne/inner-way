@@ -65,7 +65,7 @@ fun VesselScreen(
     ) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Observation chamber",
+            text = "Silicon seed chamber",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
@@ -77,7 +77,7 @@ fun VesselScreen(
         ) {
             // Full-width title row — never share a Row with chips (narrow width → per-char wrap).
             Text(
-                text = "Specimen 01 · seed-stage morphogenesis · pinch · pan · tilt",
+                text = "Specimen 01 · vesica seed · pinch · pan · tilt · tap body for thermal readout",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
                 modifier = Modifier.fillMaxWidth(),

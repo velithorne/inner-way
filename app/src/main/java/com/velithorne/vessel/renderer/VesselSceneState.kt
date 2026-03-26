@@ -53,4 +53,9 @@ data class VesselSceneState(
     /** Seed nucleus + germination (visual bridge). */
     val seedVisual: SeedVisualState,
     val growthStageVisual: GrowthStageVisualState,
+    /**
+     * When true, draw a **seed specimen** only: vesica shell + tissue + nucleus — no organ blobs or conduit lines
+     * (avoids the “graph creature” read). Anatomy remains available via the sheet / data when needed.
+     */
+    val seedPresentationActive: Boolean,
 )

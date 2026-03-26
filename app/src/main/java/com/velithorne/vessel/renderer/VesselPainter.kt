@@ -126,7 +126,8 @@ object VesselPainter {
         val dim = if (sel != null) tuning.selectionDimAlpha * material.selectionPeerDim else 0f
         val focus = selection.focusProgress.coerceIn(0f, 1f)
         val seedBlend = scene.generated.seedFormBlend.coerceIn(0f, 1f)
-        val seedOrganVeil = ((seedBlend - 0.5f) / 0.5f).coerceIn(0f, 1f)
+        val seedOnly = scene.seedPresentationActive
+        val seedOrganVeil = if (seedOnly) 1f else ((seedBlend - 0.5f) / 0.5f).coerceIn(0f, 1f)
 
         val rearParallax = Offset(parallax.x * tuning.rearParallaxMul, parallax.y * tuning.rearParallaxMul)
         scope.translate(rearParallax.x, rearParallax.y) {
@@ -150,15 +151,17 @@ object VesselPainter {
             pulse = pulse,
         )
 
-        ChamberMassPainter.draw(
-            scope = scope,
-            center = Offset(cx, cy),
-            width = baseW,
-            height = baseH,
-            scene = scene,
-            palette = palette,
-            breath = breath,
-        )
+        if (!scene.seedPresentationActive) {
+            ChamberMassPainter.draw(
+                scope = scope,
+                center = Offset(cx, cy),
+                width = baseW,
+                height = baseH,
+                scene = scene,
+                palette = palette,
+                breath = breath,
+            )
+        }
 
         val focusCenter = sel?.let { type ->
             when (type) {
@@ -184,23 +187,25 @@ object VesselPainter {
                     dimAlpha = if (sel != null && sel != OrganType.THERMAL_MEMBRANE) dim * 0.28f else 0f,
                 )
 
-                VesselPathwayPainter.draw(
-                    scope = this,
-                    scene = scene,
-                    palette = palette,
-                    material = material,
-                    anim = anim,
-                    tuning = tuning,
-                    w = w,
-                    h = h,
-                    parallax = parallax,
-                    pulse = pulse,
-                    selectedOrgan = sel,
-                    focus = focus,
-                )
+                if (!seedOnly) {
+                    VesselPathwayPainter.draw(
+                        scope = this,
+                        scene = scene,
+                        palette = palette,
+                        material = material,
+                        anim = anim,
+                        tuning = tuning,
+                        w = w,
+                        h = h,
+                        parallax = parallax,
+                        pulse = pulse,
+                        selectedOrgan = sel,
+                        focus = focus,
+                    )
+                }
 
                 val musc = scene.organVisuals.firstOrNull { it.type == OrganType.VESTIBULAR_MUSCULATURE }
-                if (musc != null) {
+                if (!seedOnly && musc != null) {
                     VesselMembranePainter.drawStabilizerBands(
                         scope = this,
                         center = Offset(cx, cy),
@@ -223,31 +228,33 @@ object VesselPainter {
                     phase = anim.seconds,
                 )
 
-                BuddingPainter.draw(
-                    scope = this,
-                    center = Offset(cx, cy),
-                    width = baseW,
-                    height = baseH,
-                    scene = scene,
-                    palette = palette,
-                    phase = anim.seconds,
-                )
+                if (!seedOnly) {
+                    BuddingPainter.draw(
+                        scope = this,
+                        center = Offset(cx, cy),
+                        width = baseW,
+                        height = baseH,
+                        scene = scene,
+                        palette = palette,
+                        phase = anim.seconds,
+                    )
 
-                GrowthFrontPainter.draw(
-                    scope = this,
-                    center = Offset(cx, cy),
-                    width = baseW,
-                    height = baseH,
-                    scene = scene,
-                    palette = palette,
-                    animSeconds = anim.seconds,
-                )
+                    GrowthFrontPainter.draw(
+                        scope = this,
+                        center = Offset(cx, cy),
+                        width = baseW,
+                        height = baseH,
+                        scene = scene,
+                        palette = palette,
+                        animSeconds = anim.seconds,
+                    )
+                }
 
                 if (focusCenter != null && focus > 0.02f) {
                     OrganHighlightPainter.drawFocusVignette(this, focusCenter, focus * (0.72f + material.selectionFocusBoost * 0.08f))
                 }
 
-                val innerOrgans = scene.organVisuals.filter { it.type != OrganType.THERMAL_MEMBRANE }
+                val innerOrgans = if (seedOnly) emptyList() else scene.organVisuals.filter { it.type != OrganType.THERMAL_MEMBRANE }
                 for (ov in innerOrgans) {
                     val oCenter = organCenter(w, h, parallax, ov)
                     val isSel = sel == ov.type

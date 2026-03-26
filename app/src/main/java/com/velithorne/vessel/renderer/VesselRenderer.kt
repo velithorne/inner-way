@@ -143,6 +143,7 @@ class VesselRenderer(
             structuralGraph = structuralGraph,
             seedVisual = seedVisual,
             growthStageVisual = growthStageVisual,
+            seedPresentationActive = true,
         )
     }
 

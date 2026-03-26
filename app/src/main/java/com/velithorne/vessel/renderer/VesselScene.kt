@@ -204,18 +204,18 @@ fun VesselScene(
 
         val sleepVignette = scene.sleepDimming.coerceIn(0f, 1f)
         if (sleepVignette > 0.05f) {
-            val vc = Offset(size.width / 2f, size.height / 2f - size.height * 0.05f)
-            drawCircle(
-                brush = Brush.radialGradient(
+            val a = sleepVignette * 0.45f
+            drawRect(
+                brush = Brush.verticalGradient(
                     colors = listOf(
                         Color.Black.copy(alpha = 0f),
-                        Color.Black.copy(alpha = sleepVignette * 0.5f),
+                        Color.Black.copy(alpha = a * 0.85f),
                     ),
-                    center = vc,
-                    radius = size.maxDimension * 0.75f,
+                    startY = 0f,
+                    endY = size.height,
                 ),
-                radius = size.maxDimension * 0.9f,
-                center = vc,
+                topLeft = Offset.Zero,
+                size = size,
             )
         }
     }

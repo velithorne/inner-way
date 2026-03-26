@@ -11,8 +11,8 @@ object MorphogenesisMapper {
                 m.accumulated.neural * 0.18f +
                 m.genome.shellThickness * 0.22f
             ).coerceIn(0f, 1f)
-        // Higher = compact seed vesica; keep baseline seed-like longer (adult only under sustained growth load).
-        val seedBlend = (0.94f - growthLoad * 0.42f).coerceIn(0.52f, 0.96f)
+        // Higher = compact seed vesica — **default product read is always seed** until growth load is extreme.
+        val seedBlend = (0.97f - growthLoad * 0.35f).coerceIn(0.72f, 0.98f)
         val embed = (
             m.organEmbedding.metabolicHeart + m.organEmbedding.cortexCluster + m.organEmbedding.neuralGel +
                 m.organEmbedding.archiveVault + m.organEmbedding.signalLungs + m.organEmbedding.vestibularMusc
