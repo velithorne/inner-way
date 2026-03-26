@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.0-phase4"
+        versionCode = 5
+        versionName = "1.0.1-camera-framing"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
