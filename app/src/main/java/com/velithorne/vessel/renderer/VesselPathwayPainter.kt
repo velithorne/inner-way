@@ -44,10 +44,13 @@ object VesselPathwayPainter {
         val lungR = lungs.maxByOrNull { it.anchorX }?.let(::xy)
 
         val g = scene.generated
+        // Seed-stage vesica: soften graph-like conduits so the read is embryo/seed, not wiring diagram.
+        val seedBlend = g.seedFormBlend.coerceIn(0f, 1f)
+        val seedPathwayPresence = (0.22f + (1f - seedBlend) * 0.78f).coerceIn(0.18f, 1f)
         val pulseSpeed = tuning.pathwayPulseSpeed * material.pathwayPulseSpeedMul * scene.vascularPulse.coerceIn(0.2f, 1f)
         val travel = anim.seconds * pulseSpeed * 1.8f
-        val baseMet = material.pathwayBaseAlpha * (0.85f + scene.vitalityGlow * 0.15f).coerceIn(0.5f, 1.2f)
-        val baseNeu = baseMet * (0.75f + scene.neuralDrive * 0.35f)
+        val baseMet = material.pathwayBaseAlpha * (0.85f + scene.vitalityGlow * 0.15f).coerceIn(0.5f, 1.2f) * seedPathwayPresence
+        val baseNeu = baseMet * (0.75f + scene.neuralDrive * 0.35f) * seedPathwayPresence
 
         fun metabolicBoostConnects(toType: OrganType?): Float {
             if (toType == null || focus < 0.05f) return 0f

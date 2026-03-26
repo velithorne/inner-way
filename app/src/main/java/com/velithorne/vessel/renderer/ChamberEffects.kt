@@ -17,6 +17,7 @@ object ChamberEffects {
         val h = scope.size.height
         val cx = w / 2f
         val cy = h / 2f
+        val center = Offset(cx, cy)
         val r = kotlin.math.max(w, h) * 0.85f
         scope.drawCircle(
             brush = Brush.radialGradient(
@@ -25,17 +26,17 @@ object ChamberEffects {
                     Color(0xFF070A0F),
                     Color(0xFF030508),
                 ),
-                center = Offset(cx, cy * 0.9f),
+                center = center,
                 radius = r,
             ),
             radius = r,
-            center = Offset(cx, cy),
+            center = center,
         )
         val fogA = (0.05f + fog * 0.18f + thermal * 0.08f).coerceIn(0.04f, 0.35f)
         scope.drawCircle(
             color = Color(0xFF6B8AA0).copy(alpha = fogA * 0.35f),
             radius = r * 0.92f,
-            center = Offset(cx, cy * 0.92f),
+            center = center,
         )
     }
 

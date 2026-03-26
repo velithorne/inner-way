@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.2.0-germination-tissue"
+        versionCode = 13
+        versionName = "1.2.1-chamber-gradient-seed-ui"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

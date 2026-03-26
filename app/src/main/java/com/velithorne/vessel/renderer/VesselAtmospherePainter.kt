@@ -20,7 +20,9 @@ object VesselAtmospherePainter {
         val h = scope.size.height
         val cx = w / 2f + parallax.x * tuning.rearParallaxMul * 0.35f
         val cy = h / 2f + parallax.y * tuning.rearParallaxMul * 0.25f
+        val center = Offset(cx, cy)
         val r = kotlin.math.max(w, h) * 0.88f
+        // Gradient center MUST match drawCircle center — offset center caused a dark arc band at the top.
         scope.drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -28,18 +30,18 @@ object VesselAtmospherePainter {
                     Color(0xFF080C14),
                     Color(0xFF020408),
                 ),
-                center = Offset(cx, cy * 0.92f),
+                center = center,
                 radius = r,
             ),
             radius = r,
-            center = Offset(cx, cy),
+            center = center,
         )
         val fogA = (0.045f + scene.fogDensity * tuning.fogDensityScale * 0.16f + scene.feverIntensity * 0.07f)
             .coerceIn(0.04f, 0.32f)
         scope.drawCircle(
             color = palette.chamberMist.copy(alpha = fogA * palette.chamberMist.alpha),
             radius = r * 0.91f,
-            center = Offset(cx, cy * 0.93f),
+            center = center,
         )
     }
 

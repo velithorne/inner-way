@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -74,18 +75,25 @@ fun VesselScreen(
                 .fillMaxWidth()
                 .padding(top = 3.dp, bottom = 6.dp),
         ) {
-            Row(
+            // Full-width title row — never share a Row with chips (narrow width → per-char wrap).
+            Text(
+                text = "Specimen 01 · seed-stage morphogenesis · pinch · pan · tilt",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Specimen 01 · seed-stage morphogenesis · pinch · pan · tilt",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-                    modifier = Modifier.weight(1f),
+                Spacer(modifier = Modifier.weight(1f))
+                VesselStageChip(
+                    label = growth.germinationStageLabel,
+                    modifier = Modifier.widthIn(max = 200.dp),
                 )
-                VesselStageChip(label = growth.germinationStageLabel)
                 GrowthStatusChip(
                     label = growth.statusLabel,
                     subtitle = null,

@@ -16,7 +16,8 @@ object VesselContourBuilder {
         gen: GeneratedAnatomyParams = GeneratedAnatomyParams.identity,
     ): Path {
         val t = gen.seedFormBlend.coerceIn(0f, 1f)
-        return if (t > 0.35f) {
+        // Prefer compact vesica while [t] stays above mid (mapper keeps default seed-like longer).
+        return if (t > 0.42f) {
             seedVesicaPath(center, width, height, gen, t)
         } else {
             adultSpindlePath(center, width, height, gen)

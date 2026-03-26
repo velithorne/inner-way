@@ -48,7 +48,7 @@ data class GeneratedAnatomyParams(
             gelEnvelopeMul = 1f,
             archiveLamellaDensityMul = 0.5f,
             coolingVeilMul = 0.4f,
-            seedFormBlend = 0.82f,
+            seedFormBlend = 0.9f,
             tissueBodyFillMul = 0.45f,
             chamberInteriorMul = 0.5f,
             growthFrontMul = 0.35f,

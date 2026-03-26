@@ -125,6 +125,8 @@ object VesselPainter {
         val sel = selection.selectedOrgan
         val dim = if (sel != null) tuning.selectionDimAlpha * material.selectionPeerDim else 0f
         val focus = selection.focusProgress.coerceIn(0f, 1f)
+        val seedBlend = scene.generated.seedFormBlend.coerceIn(0f, 1f)
+        val seedOrganVeil = ((seedBlend - 0.5f) / 0.5f).coerceIn(0f, 1f)
 
         val rearParallax = Offset(parallax.x * tuning.rearParallaxMul, parallax.y * tuning.rearParallaxMul)
         scope.translate(rearParallax.x, rearParallax.y) {
@@ -250,6 +252,7 @@ object VesselPainter {
                     val oCenter = organCenter(w, h, parallax, ov)
                     val isSel = sel == ov.type
                     val peerDim = if (sel != null && !isSel) dim * (0.55f + focus * 0.28f) else 0f
+                    val seedDim = seedOrganVeil * 0.38f * (if (isSel) 0.35f else 1f)
                     val hl = if (isSel) tuning.selectionGlowStrength * material.selectionFocusBoost * (0.82f + focus * 0.45f) else 1f
                     OrganShapeBuilder.drawOrgan(
                         scope = this,
@@ -261,8 +264,8 @@ object VesselPainter {
                         tuning = tuning,
                         pulse = pulse,
                         breath = breath,
-                        dimAlpha = peerDim,
-                        highlightMul = hl,
+                        dimAlpha = (peerDim + seedDim).coerceIn(0f, 0.92f),
+                        highlightMul = hl * (1f - seedOrganVeil * 0.35f + if (isSel) seedOrganVeil * 0.25f else 0f),
                         isSelected = isSel,
                         selectionPhase = pulse * 1.08f + focus * 2f,
                         materialOrganHalo = material.organHaloIntensity,
