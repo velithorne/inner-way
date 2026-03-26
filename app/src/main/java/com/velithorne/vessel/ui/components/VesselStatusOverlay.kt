@@ -26,6 +26,8 @@ fun VesselStatusOverlay(
     hungerLabel: String,
     selectedOrganName: String?,
     statusLine: String,
+    /** Morphogenesis explainer line when expanded. */
+    growthHint: String? = null,
     expanded: Boolean,
     onToggleInfo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -85,6 +87,14 @@ fun VesselStatusOverlay(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                 )
+                growthHint?.let { hint ->
+                    Text(
+                        text = hint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }

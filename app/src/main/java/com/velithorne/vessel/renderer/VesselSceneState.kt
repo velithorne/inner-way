@@ -3,6 +3,7 @@ package com.velithorne.vessel.renderer
 import androidx.compose.ui.graphics.Color
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.morphogenesis.StructuralGraph
 
 /**
  * Renderer-ready frame derived from [com.velithorne.vessel.physiology.PhysiologySnapshot].
@@ -43,4 +44,8 @@ data class VesselSceneState(
     /** Phase 5 physiology-driven palette + material presentation. */
     val palette: VesselPaletteState,
     val material: VesselMaterialState,
+    /** Morphogenesis: procedural contour + tissue + pathway weights. */
+    val generated: GeneratedAnatomyParams,
+    /** Live structural graph for framing / future hit refinement. */
+    val structuralGraph: StructuralGraph,
 )

@@ -29,6 +29,8 @@ object OrganShapeBuilder {
         isSelected: Boolean,
         selectionPhase: Float,
         materialOrganHalo: Float,
+        gelEnvelopeMul: Float = 1f,
+        archiveLamellaMul: Float = 1f,
     ) {
         val r = w * ov.baseRadius * (0.85f + ov.reserveLevel * 0.22f +
             sin(pulse * ov.pulseCoupling * 1.05f) * 0.055f)
@@ -53,8 +55,8 @@ object OrganShapeBuilder {
         when (ov.type) {
             OrganType.METABOLIC_HEART -> drawMetabolicHeart(scope, center, r, pulse, organPalette, fillA, intensity)
             OrganType.CORTEX_CLUSTER -> drawCortexCluster(scope, center, r, pulse, breath, flick, organPalette, fillA, tuning)
-            OrganType.NEURAL_GEL -> drawNeuralGel(scope, center, r, pulse, ov, palette, fillA, intensity)
-            OrganType.ARCHIVE_VAULT -> drawArchiveVault(scope, center, r, pulse, ov, palette, fillA)
+            OrganType.NEURAL_GEL -> drawNeuralGel(scope, center, r, pulse, ov, palette, fillA, intensity, gelEnvelopeMul)
+            OrganType.ARCHIVE_VAULT -> drawArchiveVault(scope, center, r, pulse, ov, palette, fillA, archiveLamellaMul)
             OrganType.SIGNAL_LUNGS -> drawSignalLungs(scope, center, r, breath, organPalette, fillA, scope.size.width)
             OrganType.VESTIBULAR_MUSCULATURE -> { /* drawn as pathways + membrane bands */ }
             OrganType.THERMAL_MEMBRANE -> { }
@@ -202,7 +204,9 @@ object OrganShapeBuilder {
         palette: VesselPaletteState,
         fillA: (Float) -> Float,
         intensity: Float,
+        gelEnvelopeMul: Float,
     ) {
+        val ge = gelEnvelopeMul.coerceIn(0.65f, 1.35f)
         scope.drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -211,9 +215,9 @@ object OrganShapeBuilder {
                     palette.innerChamberShadow.copy(alpha = fillA(0.04f)),
                 ),
                 center = center,
-                radius = r * 1.15f,
+                radius = r * 1.15f * ge,
             ),
-            radius = r * 1.08f,
+            radius = r * 1.08f * ge,
             center = center,
         )
         val grains = (6 + ov.densityLines * 10f).toInt().coerceIn(6, 18)
@@ -244,8 +248,9 @@ object OrganShapeBuilder {
         ov: OrganVisualModel,
         palette: VesselPaletteState,
         fillA: (Float) -> Float,
+        lamellaMul: Float,
     ) {
-        val layers = (4 + ov.densityLines * 7f).toInt().coerceIn(4, 12)
+        val layers = ((4 + ov.densityLines * 7f) * lamellaMul.coerceIn(0.7f, 1.35f)).toInt().coerceIn(4, 14)
         for (i in 0 until layers) {
             val rr = r * (0.32f + i * 0.085f)
             val skew = sin(pulse * 0.8f + i * 0.35f) * r * 0.04f * ov.densityLines

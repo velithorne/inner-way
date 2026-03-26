@@ -2,8 +2,11 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.velithorne.vessel.model.GrowthVisualState
 import com.velithorne.vessel.model.OrganInspectionState
 import com.velithorne.vessel.model.VesselVisualState
+import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
+import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -27,6 +30,7 @@ class TelemetryViewModel(
     private val repository: TelemetryRepository,
     private val physiologyEngine: PhysiologyEngine,
     private val vesselRenderer: VesselRenderer,
+    private val morphogenesisEngine: MorphogenesisEngine,
 ) : ViewModel() {
 
     val telemetry: StateFlow<TelemetrySnapshot> = repository.snapshot
@@ -46,15 +50,48 @@ class TelemetryViewModel(
             initialValue = initialPhysiology,
         )
 
-    private val initialScene = vesselRenderer.map(initialPhysiology)
+    private val initialMorph = morphogenesisEngine.update(initialPhysiology)
+    private val initialScene = vesselRenderer.map(initialPhysiology, initialMorph)
 
-    val vesselScene: StateFlow<VesselSceneState> = physiology
-        .map { vesselRenderer.map(it) }
+    val morphogenesis: StateFlow<MorphogenesisSnapshot> = physiology
+        .map { morphogenesisEngine.update(it) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = initialScene,
+            initialValue = initialMorph,
         )
+
+    val vesselScene: StateFlow<VesselSceneState> = combine(
+        physiology,
+        morphogenesis,
+    ) { phys, morph ->
+        vesselRenderer.map(phys, morph)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = initialScene,
+    )
+
+    val growthVisual: StateFlow<GrowthVisualState> = combine(
+        morphogenesis,
+        vesselScene,
+    ) { morph, scene ->
+        GrowthVisualState(
+            snapshot = morph,
+            statusLabel = morph.growthStatusLabel,
+            statusLine = morph.growthStatusLine,
+            visibleActivity = morph.visibleGrowthActivity,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = GrowthVisualState(
+            snapshot = initialMorph,
+            statusLabel = initialMorph.growthStatusLabel,
+            statusLine = initialMorph.growthStatusLine,
+            visibleActivity = initialMorph.visibleGrowthActivity,
+        ),
+    )
 
     val vesselVisual: StateFlow<VesselVisualState> = vesselScene
         .map { VesselVisualState(scene = it) }
@@ -72,14 +109,16 @@ class TelemetryViewModel(
 
     val organInspection: StateFlow<OrganInspectionState?> = combine(
         physiology,
+        morphogenesis,
         _selectedVesselOrgan,
-    ) { snap, organ ->
-        if (organ == null) null else OrganInspectionState.build(organ, snap.organs)
+    ) { snap, morph, organ ->
+        if (organ == null) null else OrganInspectionState.build(organ, snap.organs, morph)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = null,
     )
+
 
     fun selectVesselOrgan(type: OrganType?) {
         _selectedVesselOrgan.value = type

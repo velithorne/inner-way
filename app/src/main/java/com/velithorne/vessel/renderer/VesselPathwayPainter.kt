@@ -43,6 +43,7 @@ object VesselPathwayPainter {
         val lungL = lungs.minByOrNull { it.anchorX }?.let(::xy)
         val lungR = lungs.maxByOrNull { it.anchorX }?.let(::xy)
 
+        val g = scene.generated
         val pulseSpeed = tuning.pathwayPulseSpeed * material.pathwayPulseSpeedMul * scene.vascularPulse.coerceIn(0.2f, 1f)
         val travel = anim.seconds * pulseSpeed * 1.8f
         val baseMet = material.pathwayBaseAlpha * (0.85f + scene.vitalityGlow * 0.15f).coerceIn(0.5f, 1.2f)
@@ -63,30 +64,30 @@ object VesselPathwayPainter {
         }
 
         cortex?.let { c ->
-            drawPathway(scope, heart, c, palette.metabolicPathway, baseMet * (0.55f + scene.vascularPulse * 0.35f), tuning.pathwayWidthMetabolic, pulse, travel, metabolicBoostConnects(OrganType.CORTEX_CLUSTER))
+            drawPathway(scope, heart, c, palette.metabolicPathway, baseMet * (0.55f + scene.vascularPulse * 0.35f), tuning.pathwayWidthMetabolic * g.metabolicPathwayMul, pulse, travel, metabolicBoostConnects(OrganType.CORTEX_CLUSTER))
         }
         vault?.let { v ->
-            drawPathway(scope, heart, v, palette.metabolicPathway, baseMet * (0.5f + scene.structuralMass * 0.2f), tuning.pathwayWidthMetabolic, pulse + 0.4f, travel + 0.3f, metabolicBoostConnects(OrganType.ARCHIVE_VAULT))
+            drawPathway(scope, heart, v, palette.metabolicPathway, baseMet * (0.5f + scene.structuralMass * 0.2f), tuning.pathwayWidthMetabolic * g.metabolicPathwayMul, pulse + 0.4f, travel + 0.3f, metabolicBoostConnects(OrganType.ARCHIVE_VAULT))
         }
         lungL?.let { l ->
-            drawPathway(scope, heart, l, palette.metabolicPathway, baseMet * 0.48f, tuning.pathwayWidthMetabolic, pulse + 0.8f, travel + 1.1f, metabolicBoostConnects(OrganType.SIGNAL_LUNGS))
+            drawPathway(scope, heart, l, palette.metabolicPathway, baseMet * 0.48f, tuning.pathwayWidthMetabolic * g.metabolicPathwayMul, pulse + 0.8f, travel + 1.1f, metabolicBoostConnects(OrganType.SIGNAL_LUNGS))
         }
         lungR?.let { r ->
-            drawPathway(scope, heart, r, palette.metabolicPathway, baseMet * 0.48f, tuning.pathwayWidthMetabolic, pulse + 1.1f, travel + 1.4f, metabolicBoostConnects(OrganType.SIGNAL_LUNGS))
+            drawPathway(scope, heart, r, palette.metabolicPathway, baseMet * 0.48f, tuning.pathwayWidthMetabolic * g.metabolicPathwayMul, pulse + 1.1f, travel + 1.4f, metabolicBoostConnects(OrganType.SIGNAL_LUNGS))
         }
 
         if (cortex != null) {
-            gel?.let { g ->
-                drawPathway(scope, cortex, g, palette.neuralPathway, baseNeu * 0.55f, tuning.pathwayWidthNeural, pulse * 1.2f, travel, neuralBoost(OrganType.NEURAL_GEL))
+            gel?.let { gp ->
+                drawPathway(scope, cortex, gp, palette.neuralPathway, baseNeu * 0.55f, tuning.pathwayWidthNeural * g.neuralPathwayMul, pulse * 1.2f, travel, neuralBoost(OrganType.NEURAL_GEL))
             }
             vault?.let { v ->
-                drawPathway(scope, cortex, v, palette.neuralPathway, baseNeu * 0.42f, tuning.pathwayWidthNeural, pulse * 1.05f, travel + 0.5f, neuralBoost(OrganType.ARCHIVE_VAULT))
+                drawPathway(scope, cortex, v, palette.neuralPathway, baseNeu * 0.42f, tuning.pathwayWidthNeural * g.neuralPathwayMul, pulse * 1.05f, travel + 0.5f, neuralBoost(OrganType.ARCHIVE_VAULT))
             }
             lungL?.let { l ->
-                drawPathway(scope, cortex, l, palette.neuralPathway, baseNeu * (0.48f + scene.signalBrightness * 0.12f), tuning.pathwayWidthNeural, pulse * 1.3f, travel + 0.8f, neuralBoost(OrganType.SIGNAL_LUNGS))
+                drawPathway(scope, cortex, l, palette.neuralPathway, baseNeu * (0.48f + scene.signalBrightness * 0.12f), tuning.pathwayWidthNeural * g.neuralPathwayMul, pulse * 1.3f, travel + 0.8f, neuralBoost(OrganType.SIGNAL_LUNGS))
             }
             lungR?.let { r ->
-                drawPathway(scope, cortex, r, palette.neuralPathway, baseNeu * (0.48f + scene.signalBrightness * 0.12f), tuning.pathwayWidthNeural, pulse * 1.35f, travel + 1f, neuralBoost(OrganType.SIGNAL_LUNGS))
+                drawPathway(scope, cortex, r, palette.neuralPathway, baseNeu * (0.48f + scene.signalBrightness * 0.12f), tuning.pathwayWidthNeural * g.neuralPathwayMul, pulse * 1.35f, travel + 1f, neuralBoost(OrganType.SIGNAL_LUNGS))
             }
         }
     }

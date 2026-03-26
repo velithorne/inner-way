@@ -75,6 +75,30 @@ fun VesselOrganSheet(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Growth driver",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f),
+            )
+            Text(
+                text = inspection.growthDriver,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                text = "Formation logic",
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f),
+                modifier = Modifier.padding(top = 10.dp),
+            )
+            Text(
+                text = inspection.formationLogic,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                modifier = Modifier.padding(top = 4.dp),
+            )
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

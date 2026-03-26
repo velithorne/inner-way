@@ -9,27 +9,35 @@ import kotlin.math.sin
  */
 object VesselContourBuilder {
 
-    fun bodyShellPath(center: Offset, width: Float, height: Float): Path {
-        val c = center
-        val hw = width * 0.5f
-        val h = height
+    fun bodyShellPath(
+        center: Offset,
+        width: Float,
+        height: Float,
+        gen: GeneratedAnatomyParams = GeneratedAnatomyParams.identity,
+    ): Path {
+        val hw = width * 0.5f * gen.thoraxWidthMul * (1f + gen.crownWidthMul * 0.15f - 0.15f)
+        val h = height * gen.tailLengthMul
+        val ax = gen.asymmetryX * width * 0.08f
+        val cShift = Offset(center.x + ax, center.y - gen.thermalBulge * height * 0.02f)
         val path = Path()
+        val c = cShift
 
+        val crownW = hw * (0.92f + gen.crownWidthMul * 0.08f)
         val apex = Offset(c.x, c.y - h * 0.48f)
-        val shoulderR = Offset(c.x + hw * 0.48f, c.y - h * 0.1f)
+        val shoulderR = Offset(c.x + crownW * 0.48f, c.y - h * 0.1f)
         val flankR = Offset(c.x + hw * 0.52f, c.y + h * 0.06f)
         val hipR = Offset(c.x + hw * 0.34f, c.y + h * 0.36f)
         val tailR = Offset(c.x + hw * 0.12f, c.y + h * 0.5f)
         val tailL = Offset(c.x - hw * 0.12f, c.y + h * 0.5f)
         val hipL = Offset(c.x - hw * 0.34f, c.y + h * 0.36f)
         val flankL = Offset(c.x - hw * 0.52f, c.y + h * 0.06f)
-        val shoulderL = Offset(c.x - hw * 0.48f, c.y - h * 0.1f)
+        val shoulderL = Offset(c.x - crownW * 0.48f, c.y - h * 0.1f)
 
         path.moveTo(apex.x, apex.y)
         // Crown facet → right shoulder (engineered widening)
         path.cubicTo(
-            c.x + hw * 0.26f, c.y - h * 0.38f,
-            c.x + hw * 0.4f, c.y - h * 0.22f,
+            c.x + crownW * 0.26f, c.y - h * 0.38f,
+            c.x + crownW * 0.4f, c.y - h * 0.22f,
             shoulderR.x, shoulderR.y,
         )
         path.cubicTo(
@@ -46,16 +54,22 @@ object VesselContourBuilder {
             shoulderL.x, shoulderL.y,
         )
         path.cubicTo(
-            c.x - hw * 0.4f, c.y - h * 0.22f,
-            c.x - hw * 0.26f, c.y - h * 0.38f,
+            c.x - crownW * 0.4f, c.y - h * 0.22f,
+            c.x - crownW * 0.26f, c.y - h * 0.38f,
             apex.x, apex.y,
         )
         path.close()
         return path
     }
 
-    fun rearSilhouettePath(center: Offset, width: Float, height: Float, microBreathe: Float): Path {
+    fun rearSilhouettePath(
+        center: Offset,
+        width: Float,
+        height: Float,
+        microBreathe: Float,
+        gen: GeneratedAnatomyParams = GeneratedAnatomyParams.identity,
+    ): Path {
         val k = 1f + sin(microBreathe) * 0.012f
-        return bodyShellPath(center, width * k * 0.96f, height * k * 0.97f)
+        return bodyShellPath(center, width * k * 0.96f, height * k * 0.97f, gen)
     }
 }

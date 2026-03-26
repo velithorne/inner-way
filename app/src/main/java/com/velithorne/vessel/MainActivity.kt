@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
             repository = container.telemetryRepository,
             physiologyEngine = container.physiologyEngine,
             vesselRenderer = container.vesselRenderer,
+            morphogenesisEngine = container.morphogenesisEngine,
         )
         setContent {
             VelithorneVesselTheme {

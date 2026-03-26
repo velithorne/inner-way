@@ -3,6 +3,8 @@ package com.velithorne.vessel.renderer
 import androidx.compose.ui.graphics.Color
 import com.velithorne.vessel.model.VesselMaterialState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
+import com.velithorne.vessel.morphogenesis.StructuralGraph
 import com.velithorne.vessel.physiology.OrganState
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -10,19 +12,18 @@ import com.velithorne.vessel.physiology.SpeciesState
 import com.velithorne.vessel.telemetry.NetworkTransport
 
 /**
- * Physiology → [VesselSceneState]. Separates simulation mapping from Canvas code.
- *
- * Future: evolution traits adjust [VesselLayout] and palette; Room stores keyframe traces.
+ * Physiology + morphogenesis → [VesselSceneState].
  */
 class VesselRenderer(
     private val layout: VesselLayout = VesselLayout(),
     private val tuning: RenderTuning = RenderTuning(),
 ) {
 
-    fun map(snapshot: PhysiologySnapshot): VesselSceneState {
+    fun map(snapshot: PhysiologySnapshot, morphogenesis: MorphogenesisSnapshot): VesselSceneState {
         val s = snapshot.species
         val telem = snapshot.telemetry
         val organs = snapshot.organs.associateBy { it.organType }
+        val structuralGraph: StructuralGraph = morphogenesis.graph
 
         val vitalityGlow = (s.vitality * tuning.vitalityGlowScale).coerceIn(0f, 1.4f)
         val stressTint = s.stress.coerceIn(0f, 1f)
@@ -40,7 +41,8 @@ class VesselRenderer(
 
         val breath = tuning.breathAmplitudeRespirationScale * (0.45f + s.respiration * 0.9f)
 
-        val bodyScale = (0.96f + s.vitality * 0.06f + s.recovery * 0.02f) * tuning.bodyProfileScale
+        val shellMul = 0.98f + morphogenesis.genome.shellThickness * 0.04f
+        val bodyScale = (0.96f + s.vitality * 0.06f + s.recovery * 0.02f) * tuning.bodyProfileScale * shellMul
 
         val neuralDrive = s.neuralActivity.coerceIn(0f, 1f)
         val vascularPulse = (s.vitality * 0.35f + neuralDrive * 0.45f + s.signalArousal * 0.35f)
@@ -67,20 +69,7 @@ class VesselRenderer(
         val hungerDim = s.hunger.coerceIn(0f, 1f)
         val stressShiver = (s.stress * tuning.stressShiverDegrees / 8f).coerceIn(0f, 1f)
 
-        val organVisuals = OrganType.values().flatMap { type ->
-            when (type) {
-                OrganType.SIGNAL_LUNGS -> {
-                    val left = layout.anchors[OrganType.SIGNAL_LUNGS]
-                        ?: VesselLayout.OrganAnchor(0.35f, 0.48f, 0.065f)
-                    val rightAnchor = left.copy(x = 1f - left.x)
-                    listOf(
-                        mapOrganAt(type, organs[type], s, feverIntensity, left),
-                        mapOrganAt(type, organs[type], s, feverIntensity, rightAnchor),
-                    )
-                }
-                else -> listOf(mapOrganAt(type, organs[type], s, feverIntensity, layout.anchors[type]))
-            }
-        }
+        val organVisuals = buildOrganVisuals(organs, s, feverIntensity, structuralGraph)
 
         val thermalTint = lerpColor(
             Color(0xFF1A2A28),
@@ -94,6 +83,7 @@ class VesselRenderer(
         )
         val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, tuning)
         val material: VesselMaterialState = VesselMaterialSystem.derive(s, tuning)
+        val generated = MorphogenesisMapper.toGeneratedParams(morphogenesis)
 
         return VesselSceneState(
             timestampMillis = snapshot.timestampMillis,
@@ -127,7 +117,51 @@ class VesselRenderer(
             thermalTint = thermalTint,
             palette = palette,
             material = material,
+            generated = generated,
+            structuralGraph = structuralGraph,
         )
+    }
+
+    private fun buildOrganVisuals(
+        organs: Map<OrganType, com.velithorne.vessel.physiology.OrganState>,
+        species: SpeciesState,
+        globalFever: Float,
+        graph: com.velithorne.vessel.morphogenesis.StructuralGraph,
+    ): List<OrganVisualModel> {
+        return OrganType.values().flatMap { type ->
+            val anchors = anchorsForType(type, graph)
+            anchors.map { anchor ->
+                mapOrganAt(type, organs[type], species, globalFever, anchor)
+            }
+        }
+    }
+
+    private fun anchorsForType(type: OrganType, graph: com.velithorne.vessel.morphogenesis.StructuralGraph): List<VesselLayout.OrganAnchor> {
+        val nodes = graph.nodes.filter { it.organType == type && it.kind == com.velithorne.vessel.morphogenesis.StructuralNodeKind.ORGAN }
+            .sortedBy { it.id }
+        if (nodes.isNotEmpty()) {
+            return nodes.map { n ->
+                VesselLayout.OrganAnchor(n.nx, n.ny, n.influenceRadius.coerceIn(0.03f, 0.55f))
+            }
+        }
+        return when (type) {
+            OrganType.SIGNAL_LUNGS -> {
+                val left = layout.anchors[OrganType.SIGNAL_LUNGS]
+                    ?: VesselLayout.OrganAnchor(0.35f, 0.48f, 0.065f)
+                listOf(left, left.copy(x = 1f - left.x))
+            }
+            else -> listOfNotNull(layout.anchors[type] ?: fallbackAnchor(type))
+        }
+    }
+
+    private fun fallbackAnchor(type: OrganType) = when (type) {
+        OrganType.METABOLIC_HEART -> VesselLayout.OrganAnchor(0.5f, 0.62f, 0.07f)
+        OrganType.CORTEX_CLUSTER -> VesselLayout.OrganAnchor(0.5f, 0.32f, 0.09f)
+        OrganType.NEURAL_GEL -> VesselLayout.OrganAnchor(0.5f, 0.38f, 0.12f)
+        OrganType.ARCHIVE_VAULT -> VesselLayout.OrganAnchor(0.5f, 0.76f, 0.11f)
+        OrganType.SIGNAL_LUNGS -> VesselLayout.OrganAnchor(0.35f, 0.48f, 0.065f)
+        OrganType.VESTIBULAR_MUSCULATURE -> VesselLayout.OrganAnchor(0.5f, 0.52f, 0.14f)
+        OrganType.THERMAL_MEMBRANE -> VesselLayout.OrganAnchor(0.5f, 0.5f, 0.5f)
     }
 
     private fun mapOrganAt(

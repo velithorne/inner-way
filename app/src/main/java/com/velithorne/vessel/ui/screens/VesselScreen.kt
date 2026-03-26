@@ -30,6 +30,7 @@ import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.renderer.RenderTuning
 import com.velithorne.vessel.renderer.VesselGestureController
 import com.velithorne.vessel.renderer.VesselScene
+import com.velithorne.vessel.ui.components.GrowthStatusChip
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
@@ -47,6 +48,7 @@ fun VesselScreen(
     val selected by viewModel.selectedVesselOrgan.collectAsState()
     val inspection by viewModel.organInspection.collectAsState()
     val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
+    val growth by viewModel.growthVisual.collectAsState()
     var overlayExpanded by rememberSaveable { mutableStateOf(false) }
 
     val tuning = remember { RenderTuning() }
@@ -65,12 +67,24 @@ fun VesselScreen(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Text(
-            text = "Specimen 01 · contained silicon species · pinch · pan · tilt",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-            modifier = Modifier.padding(top = 3.dp, bottom = 6.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 3.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = "Specimen 01 · morphogenesis active · pinch · pan · tilt",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                modifier = Modifier.weight(1f),
+            )
+            GrowthStatusChip(
+                label = growth.statusLabel,
+                subtitle = growth.statusLine,
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -128,6 +142,7 @@ fun VesselScreen(
             hungerLabel = scene.hungerLabel,
             selectedOrganName = selected?.let { organDisplayName(it) },
             statusLine = scene.statusLine,
+            growthHint = growth.snapshot.explainerLines.firstOrNull(),
             expanded = overlayExpanded,
             onToggleInfo = { overlayExpanded = !overlayExpanded },
         )

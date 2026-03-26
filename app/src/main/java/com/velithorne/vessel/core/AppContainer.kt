@@ -1,6 +1,7 @@
 package com.velithorne.vessel.core
 
 import android.app.Application
+import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.renderer.VesselRenderer
 import com.velithorne.vessel.telemetry.TelemetryRepository
@@ -24,4 +25,6 @@ class AppContainer(app: Application) {
 
     /** Telemetry → scene mapping (stateless); animation state lives in composables. */
     val vesselRenderer: VesselRenderer = VesselRenderer()
+
+    val morphogenesisEngine: MorphogenesisEngine = MorphogenesisEngine()
 }

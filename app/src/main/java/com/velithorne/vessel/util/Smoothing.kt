@@ -1,6 +1,8 @@
 package com.velithorne.vessel.util
 
 object Smoothing {
+    fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t.coerceIn(0f, 1f)
+
     fun exponentialMovingAverage(
         previous: Float?,
         next: Float?,

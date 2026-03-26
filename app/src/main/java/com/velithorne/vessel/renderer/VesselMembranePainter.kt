@@ -25,8 +25,9 @@ object VesselMembranePainter {
         pulsePhase: Float,
         dimAlpha: Float,
     ) {
-        val path = VesselContourBuilder.bodyShellPath(center, width, height)
-        val fillAlpha = material.shellFillOpacity * (1f - scene.sleepDimming * 0.5f) * (1f - scene.hungerDim * 0.28f) * (1f - dimAlpha)
+        val gen = scene.generated
+        val path = VesselContourBuilder.bodyShellPath(center, width, height, gen)
+        val fillAlpha = material.shellFillOpacity * gen.shellOpacityMul * (1f - scene.sleepDimming * 0.5f) * (1f - scene.hungerDim * 0.28f) * (1f - dimAlpha)
         val recovery = scene.recoveryGlow * material.recoverySheenAlpha
         scope.drawPath(
             path = path,
@@ -87,8 +88,9 @@ object VesselMembranePainter {
         membraneDim: Float,
     ) {
         if (scene.feverIntensity < 0.035f && scene.stressTint < 0.5f && material.heatTintStrength < 0.08f) return
-        val path = VesselContourBuilder.bodyShellPath(center, width, height)
-        val shim = sin(anim.pulsePhase(0.32f)) * scene.feverIntensity * tuning.feverShimmerScale * material.thermalShimmerStrength
+        val gen = scene.generated
+        val path = VesselContourBuilder.bodyShellPath(center, width, height, gen)
+        val shim = sin(anim.pulsePhase(0.32f)) * scene.feverIntensity * tuning.feverShimmerScale * material.thermalShimmerStrength * gen.coolingVeilMul
         val d = (1f - membraneDim).coerceIn(0.55f, 1f)
         val edge = material.thermalEdgeBleed * d
         scope.drawPath(
@@ -119,8 +121,9 @@ object VesselMembranePainter {
         mobility: Float,
         pulse: Float,
         palette: VesselPaletteState,
+        tendonVisibilityMul: Float,
     ) {
-        val tension = (musc.strain * 0.55f + mobility * 0.45f).coerceIn(0f, 1f)
+        val tension = (musc.strain * 0.55f + mobility * 0.45f).coerceIn(0f, 1f) * tendonVisibilityMul.coerceIn(0.35f, 1.4f)
         val yFactorsH = listOf(-0.22f, 0f, 0.22f)
         for ((i, yf) in yFactorsH.withIndex()) {
             val yOff = baseH * yf + sin(pulse + i * 0.7f) * mobility * baseH * 0.035f
@@ -135,7 +138,7 @@ object VesselMembranePainter {
             }
             scope.drawPath(
                 band,
-                color = palette.musculatureTension.copy(alpha = 0.06f + tension * 0.16f),
+                color = palette.musculatureTension.copy(alpha = (0.06f + tension * 0.16f) * tendonVisibilityMul.coerceIn(0.4f, 1.2f)),
                 style = Stroke(width = 1.4f + tension * 1.8f),
             )
         }

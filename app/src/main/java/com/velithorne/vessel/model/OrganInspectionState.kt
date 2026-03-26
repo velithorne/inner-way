@@ -1,5 +1,6 @@
 package com.velithorne.vessel.model
 
+import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.physiology.OrganState
 import com.velithorne.vessel.physiology.OrganType
 
@@ -9,17 +10,42 @@ data class OrganInspectionState(
     val organState: OrganState?,
     val conditionSummary: String,
     val reactionNote: String,
+    val growthDriver: String,
+    val formationLogic: String,
 ) {
     companion object {
-        fun build(organ: OrganType, organs: List<com.velithorne.vessel.physiology.OrganState>): OrganInspectionState {
+        fun build(
+            organ: OrganType,
+            organs: List<com.velithorne.vessel.physiology.OrganState>,
+            morph: MorphogenesisSnapshot,
+        ): OrganInspectionState {
             val info = OrganInfo.forType(organ)
             val o = organs.firstOrNull { it.organType == organ }
+            val (driver, logic) = growthLines(organ, morph)
             return OrganInspectionState(
                 info = info,
                 organState = o,
                 conditionSummary = deterministicCondition(o),
                 reactionNote = deterministicReaction(organ, o),
+                growthDriver = driver,
+                formationLogic = logic,
             )
+        }
+
+        private fun growthLines(organ: OrganType, m: MorphogenesisSnapshot): Pair<String, String> {
+            val acc = m.accumulated
+            val driver = when (organ) {
+                OrganType.METABOLIC_HEART -> "reserve strain ${"%.2f".format(acc.reserve)} · hunger ${"%.2f".format(acc.hunger)}"
+                OrganType.CORTEX_CLUSTER -> "neural pressure ${"%.2f".format(acc.neural)} · cortical field ${"%.2f".format(m.field.cortical)}"
+                OrganType.NEURAL_GEL -> "neural ${"%.2f".format(acc.neural)} · central chamber ${"%.2f".format(m.field.centralChamber)}"
+                OrganType.ARCHIVE_VAULT -> "archive pressure ${"%.2f".format(acc.archive)} · lamellae bias ${"%.2f".format(m.genome.archiveLamellaBias)}"
+                OrganType.SIGNAL_LUNGS -> "signal ${"%.2f".format(acc.signal)} · lateral field ${"%.2f".format(m.field.lateralSignal)}"
+                OrganType.VESTIBULAR_MUSCULATURE -> "motion ${"%.2f".format(acc.motion)} · tendon field ${"%.2f".format(m.field.supportTendon)}"
+                OrganType.THERMAL_MEMBRANE -> "thermal ${"%.2f".format(acc.thermal)} · shell field ${"%.2f".format(m.field.perimeterShell)}"
+            }
+            val logic = m.explainerLines.firstOrNull()
+                ?: "Structural graph stable under current pressure envelope."
+            return driver to logic
         }
 
         private fun deterministicCondition(o: OrganState?): String {

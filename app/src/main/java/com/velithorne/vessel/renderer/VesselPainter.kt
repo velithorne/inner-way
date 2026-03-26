@@ -133,6 +133,7 @@ object VesselPainter {
                 baseW * 1.06f,
                 baseH * 1.04f,
                 microBreathe = pulse * 0.3f,
+                gen = scene.generated,
             )
             drawPath(path = rearPath, color = Color(0xFF0A1018).copy(alpha = 0.52f + scene.structuralMass * 0.22f))
         }
@@ -187,8 +188,18 @@ object VesselPainter {
                         mobility = scene.mobilitySway,
                         pulse = pulse,
                         palette = palette,
+                        tendonVisibilityMul = scene.generated.tendonVisibilityMul,
                     )
                 }
+
+                TissuePainter.drawGrowthShimmer(
+                    scope = this,
+                    center = Offset(cx, cy),
+                    width = baseW,
+                    height = baseH,
+                    activity = scene.generated.visibleGrowthActivity,
+                    phase = anim.seconds,
+                )
 
                 if (focusCenter != null && focus > 0.02f) {
                     OrganHighlightPainter.drawFocusVignette(this, focusCenter, focus * (0.72f + material.selectionFocusBoost * 0.08f))
@@ -215,6 +226,8 @@ object VesselPainter {
                         isSelected = isSel,
                         selectionPhase = pulse * 1.08f + focus * 2f,
                         materialOrganHalo = material.organHaloIntensity,
+                        gelEnvelopeMul = scene.generated.gelEnvelopeMul,
+                        archiveLamellaMul = scene.generated.archiveLamellaDensityMul,
                     )
                 }
 

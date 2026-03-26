@@ -2,6 +2,8 @@ package com.velithorne.vessel.renderer
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import com.velithorne.vessel.morphogenesis.StructuralGraph
+import com.velithorne.vessel.morphogenesis.StructuralNodeKind
 import com.velithorne.vessel.physiology.OrganType
 import kotlin.math.abs
 import kotlin.math.max
@@ -32,6 +34,7 @@ object VesselFraming {
         scene: VesselSceneState,
         parallax: Offset,
     ): CoreSpecimenBounds {
+        val morphGraph: StructuralGraph? = scene.structuralGraph
         val w = viewportW
         val h = viewportH
         val cx = w * layout.bodyCenterX + parallax.x * 0.15f
@@ -50,15 +53,26 @@ object VesselFraming {
 
         val organPoints = mutableListOf<Offset>()
         val seenLungs = mutableSetOf<String>()
-        for (ov in scene.organVisuals) {
-            if (ov.type == OrganType.THERMAL_MEMBRANE) continue
-            if (ov.type == OrganType.SIGNAL_LUNGS) {
-                val key = "${"%.4f".format(ov.anchorX)}_${"%.4f".format(ov.anchorY)}"
-                if (!seenLungs.add(key)) continue
+        if (morphGraph != null) {
+            for (n in morphGraph.nodes) {
+                if (n.kind != StructuralNodeKind.ORGAN || n.organType == OrganType.THERMAL_MEMBRANE) continue
+                if (n.organType == OrganType.SIGNAL_LUNGS) {
+                    val key = "${"%.4f".format(n.nx)}_${"%.4f".format(n.ny)}"
+                    if (!seenLungs.add(key)) continue
+                }
+                organPoints += Offset(w * n.nx + parallax.x * 0.12f, h * n.ny + parallax.y * 0.1f)
             }
-            val ox = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
-            val oy = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
-            organPoints += Offset(ox, oy)
+        } else {
+            for (ov in scene.organVisuals) {
+                if (ov.type == OrganType.THERMAL_MEMBRANE) continue
+                if (ov.type == OrganType.SIGNAL_LUNGS) {
+                    val key = "${"%.4f".format(ov.anchorX)}_${"%.4f".format(ov.anchorY)}"
+                    if (!seenLungs.add(key)) continue
+                }
+                val ox = w * ov.anchorX + parallax.x * 0.12f * (0.6f + ov.baseRadius * 3f)
+                val oy = h * ov.anchorY + parallax.y * 0.1f * (0.6f + ov.baseRadius * 3f)
+                organPoints += Offset(ox, oy)
+            }
         }
 
         val allPts = silhouetteSamples + organPoints
