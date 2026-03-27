@@ -4,6 +4,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.velithorne.vessel.model.SeedBudVisualState
@@ -12,6 +14,7 @@ import com.velithorne.vessel.model.SeedPodLayerState
 import com.velithorne.vessel.model.SeedPodLightingState
 import com.velithorne.vessel.model.VesselPaletteState
 import kotlin.math.max
+import kotlin.random.Random
 
 /** Crown / lateral / reserve with depth offsets and local shadow. */
 object SeedPodBudPainter {
@@ -80,39 +83,22 @@ object SeedPodBudPainter {
         if (max(latL, latR) > 0.02f) {
             val mul = tuning.lateralBudSizeCurve * depth.budDepthMul
             val y = pod.y + layers.budsLateral.y + w * 0.015f
-            val span = max(radii.shellRx, radii.bandMidRx) * 1.05f
-            for (side in listOf(-1f, 1f)) {
-                val strength = if (side < 0) latL else latR
-                if (strength < 0.02f) continue
-                val bx = pod.x + layers.budsLateral.x + side * (span + w * 0.02f * strength * mul)
-                scope.drawOval(
-                    color = Color(0xFF000000).copy(alpha = 0.1f * strength),
-                    topLeft = Offset(bx - w * 0.04f, y + w * 0.02f),
-                    size = Size(w * 0.08f * strength, w * 0.03f),
-                )
-                val rw = w * (0.022f + strength * 0.038f) * mul
-                val rh = w * (0.045f + strength * 0.06f) * mul
-                scope.drawRoundRect(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            palette.accentSignal.copy(alpha = strength * 0.35f * (0.9f + lighting.lateralSheen * 0.1f)),
-                            palette.shellBase.copy(alpha = strength * 0.22f),
-                        ),
-                        start = Offset(bx - rw, y - rh * 0.5f),
-                        end = Offset(bx + rw, y + rh * 0.5f),
-                    ),
-                    topLeft = Offset(bx - rw, y - rh * 0.5f),
-                    size = Size(rw * 2f, rh),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(rw * 0.6f, rw * 0.6f),
-                )
-                scope.drawRoundRect(
-                    color = palette.accentSignal.copy(alpha = strength * 0.35f),
-                    topLeft = Offset(bx - rw, y - rh * 0.5f),
-                    size = Size(rw * 2f, rh),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(rw * 0.6f, rw * 0.6f),
-                    style = Stroke(1f),
-                )
-            }
+            val shellR = max(radii.shellRx, radii.bandMidRx)
+            val specimenSeed = pod.x.toBits().toLong() xor (pod.y.toBits().toLong() shl 32)
+            drawSignalLungFronds(
+                scope = scope,
+                pod = pod,
+                layersOffset = layers.budsLateral,
+                shellRx = shellR,
+                minDim = w,
+                baseY = y,
+                latL = latL,
+                latR = latR,
+                mul = mul,
+                lighting = lighting,
+                palette = palette,
+                specimenSeed = specimenSeed,
+            )
         }
 
         val res = buds.reserve
@@ -143,6 +129,108 @@ object SeedPodBudPainter {
                 start = Offset(pod.x + layers.budsReserve.x - dropR * 0.5f, by - dropR * 0.35f),
                 end = Offset(pod.x + layers.budsReserve.x + dropR * 0.45f, by - dropR * 0.42f),
                 strokeWidth = 1.2f,
+            )
+        }
+    }
+
+    /**
+     * Lateral signal “lungs”: curved fronds emerging from the shell — not flat green tabs.
+     * Shape is deterministic per specimen anchor; growth follows [latL]/[latR] over time.
+     */
+    private fun drawSignalLungFronds(
+        scope: DrawScope,
+        pod: Offset,
+        layersOffset: Offset,
+        shellRx: Float,
+        minDim: Float,
+        baseY: Float,
+        latL: Float,
+        latR: Float,
+        mul: Float,
+        lighting: SeedPodLightingState,
+        palette: VesselPaletteState,
+        specimenSeed: Long,
+    ) {
+        val cx = pod.x + layersOffset.x
+        val attachY = baseY
+        val span = shellRx * 1.02f
+        val sheen = lighting.lateralSheen.coerceIn(0f, 1f)
+
+        for (side in listOf(-1f, 1f)) {
+            val strength = (if (side < 0) latL else latR).coerceIn(0f, 1.2f)
+            if (strength < 0.02f) continue
+
+            val rnd = Random(specimenSeed xor (if (side < 0) 0x4C1L else 0x4C2L))
+            val angleJitter = (rnd.nextFloat() - 0.5f) * 0.14f
+            val lengthJitter = 0.92f + rnd.nextFloat() * 0.16f
+            val bulgeJitter = 0.94f + rnd.nextFloat() * 0.12f
+
+            val reach = minDim * (0.04f + strength * 0.11f) * mul * lengthJitter
+            val rootX = cx + side * (span + minDim * 0.008f * strength)
+            val midX = rootX + side * reach * 0.48f * bulgeJitter
+            val tipX = rootX + side * reach * 1.05f
+            val midY = attachY - reach * (0.22f + strength * 0.08f + angleJitter)
+            val tipY = attachY - reach * (0.05f * rnd.nextFloat())
+
+            val path = Path().apply {
+                moveTo(rootX, attachY)
+                quadraticTo(midX, midY, tipX, tipY)
+            }
+            val strokeMain = 1.4f + strength * 2.8f
+            val core = palette.lungFrond.copy(alpha = strength * 0.42f * (0.85f + sheen * 0.15f))
+            val rim = palette.accentSignal.copy(alpha = strength * 0.28f * (0.9f + sheen * 0.1f))
+
+            scope.drawPath(
+                path = path,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        palette.shellBase.copy(alpha = strength * 0.2f),
+                        core,
+                        rim,
+                    ),
+                    start = Offset(rootX, attachY),
+                    end = Offset(tipX, tipY),
+                ),
+                style = Stroke(width = strokeMain, cap = StrokeCap.Round),
+            )
+            scope.drawPath(
+                path = path,
+                color = palette.neuralPathway.copy(alpha = strength * 0.22f),
+                style = Stroke(width = (strokeMain * 0.45f).coerceAtLeast(0.6f), cap = StrokeCap.Round),
+            )
+
+            // Secondary branch (only when strong — reads like lobes growing)
+            if (strength > 0.35f) {
+                val brLen = reach * (0.45f + rnd.nextFloat() * 0.15f)
+                val bx = rootX + side * brLen * 0.55f
+                val by = attachY - brLen * (0.35f + rnd.nextFloat() * 0.12f)
+                val b2 = Path().apply {
+                    moveTo(rootX + side * shellRx * 0.04f, attachY - shellRx * 0.02f)
+                    quadraticTo(
+                        bx + side * brLen * 0.2f,
+                        by - brLen * 0.2f,
+                        bx + side * brLen * 0.85f,
+                        by,
+                    )
+                }
+                scope.drawPath(
+                    path = b2,
+                    color = palette.lungFrond.copy(alpha = strength * 0.25f),
+                    style = Stroke(width = 1f + strength * 1.2f, cap = StrokeCap.Round),
+                )
+            }
+
+            scope.drawOval(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF000000).copy(alpha = 0.12f * strength),
+                        Color(0xFF000000).copy(alpha = 0f),
+                    ),
+                    center = Offset(tipX, tipY + minDim * 0.01f),
+                    radius = reach * 0.35f,
+                ),
+                topLeft = Offset(tipX - reach * 0.25f, tipY),
+                size = Size(reach * 0.5f, reach * 0.22f),
             )
         }
     }

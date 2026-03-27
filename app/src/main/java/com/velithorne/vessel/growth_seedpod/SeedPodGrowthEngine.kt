@@ -91,7 +91,7 @@ object SeedPodGrowthEngine {
             activity < 0.35f -> SeedPodGrowthStage.ACTIVATING_POD
             activity < 0.55f -> SeedPodGrowthStage.GERMINATING_POD
             d.tissueHaze < 0.42f -> SeedPodGrowthStage.EARLY_BUDDING
-            maturityScore(d) < 0.82f -> SeedPodGrowthStage.EARLY_CHAMBERING
+            maturityScore(d) < 0.78f -> SeedPodGrowthStage.EARLY_CHAMBERING
             else -> SeedPodGrowthStage.CHAMBER_MATURED
         }
     }
