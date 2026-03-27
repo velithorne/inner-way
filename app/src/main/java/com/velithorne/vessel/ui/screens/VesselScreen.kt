@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.renderer_seedpod.SeedPodGestureController
@@ -45,14 +43,12 @@ import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
 /**
- * Vessel tab: **only** [SeedPodScene].
+ * Vessel tab: [SeedPodScene] only.
  *
- * **Critical:** The seed pod chamber sits **immediately under** [GrowthProgressCard] with a
- * **fixed height** — it never uses [weight] below a tall stats block (that squeezed the chamber
- * to ~0px and forced scroll to “find” the organism).
- *
- * Reset / overlay / chips live in a **scrollable** region **below** the chamber so they cannot
- * steal the organism’s vertical space.
+ * **Layout:** Header + progress (wrap) → **chamber [weight(1f)]** fills the **entire middle** of the
+ * tab (organism sits **under** progress in the **upper-mid** of that region via [SeedPodLayout]) →
+ * controls + overlay + chips **wrap height at bottom** — no [weight] on the bottom block, so no
+ * huge empty band between progress and the organism.
  */
 @Composable
 fun VesselScreen(
@@ -78,12 +74,6 @@ fun VesselScreen(
     val gestureController = remember(tuning) { SeedPodGestureController(tuning) }
 
     var chamberOffset by remember { mutableStateOf(Offset.Zero) }
-    val bottomScroll = rememberScrollState()
-    val configuration = LocalConfiguration.current
-    val chamberHeight = remember(configuration.screenHeightDp) {
-        // Always reserve real pixels for the pod — never collapse to empty black.
-        (configuration.screenHeightDp * 0.40f).dp.coerceIn(210.dp, 300.dp)
-    }
 
     Column(
         modifier = modifier
@@ -99,7 +89,7 @@ fun VesselScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 3.dp, bottom = 6.dp),
+                .padding(top = 3.dp, bottom = 4.dp),
         ) {
             Text(
                 text = "Specimen 01 · seed pod · pinch · pan · tilt · tap pod for readout",
@@ -136,11 +126,11 @@ fun VesselScreen(
             )
         }
 
-        // Seed pod — fixed height directly under progress (always visible; no scroll hunt).
+        // Fills **all space** between progress and bottom chrome — organism is the main viewport (upper-mid in canvas).
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(chamberHeight),
+                .weight(1f, fill = true),
             contentAlignment = Alignment.TopCenter,
         ) {
             Box(
@@ -162,17 +152,12 @@ fun VesselScreen(
             }
         }
 
-        // Stats / controls — scroll if needed; never steal height from the chamber above.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true)
-                .verticalScroll(bottomScroll),
-        ) {
+        // Wrap height only — does **not** expand to create a dead gap above the organism.
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 6.dp),
+                    .padding(top = 4.dp, bottom = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -203,7 +188,7 @@ fun VesselScreen(
                 expanded = overlayExpanded,
                 onToggleInfo = { overlayExpanded = !overlayExpanded },
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -223,7 +208,7 @@ fun VesselScreen(
                     VesselLegendChip(label = "$short · ${Formatters.formatUnitInterval(o.health)}")
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 
