@@ -213,6 +213,7 @@ class LineageRepository(
                 lastVisibleGrowthMs = if (important) batch.newLastVisibleGrowthMs else (previousEntity?.lastVisibleGrowthMs ?: now),
                 lastStageTransitionMs = if (important) batch.newLastStageTransitionMs else (previousEntity?.lastStageTransitionMs ?: 0L),
                 lastAdaptationUpdateMs = if (important) batch.newLastAdaptationUpdateMs else (previousEntity?.lastAdaptationUpdateMs ?: 0L),
+                lastVisualExpressionMagnitude = if (important) batch.newLastVisualExpressionMagnitude else (previousEntity?.lastVisualExpressionMagnitude ?: 0f),
             )
             seedDao.upsert(entity)
             cachedSeedEntity = entity
@@ -405,6 +406,7 @@ class LineageRepository(
             branchSummaryLine = branchBlock,
             branchReasonLine = branchReason,
             branchAffinityPercentsLine = affLine,
+            visibleTraitsFormingLine = "Visible traits forming: ${BranchExplainer.visibleTraitsSummary(lead)}",
         )
     }
 

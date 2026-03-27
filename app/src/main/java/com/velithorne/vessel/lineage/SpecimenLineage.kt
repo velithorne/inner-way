@@ -23,4 +23,6 @@ data class SpecimenLineage(
     val branchReasonLine: String,
     /** Compact affinity snapshot for UI, e.g. "Thermal 24% · Signal 21% · Crown 18%". */
     val branchAffinityPercentsLine: String,
+    /** Short visible morphology summary for leading family. */
+    val visibleTraitsFormingLine: String,
 )

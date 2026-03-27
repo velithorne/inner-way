@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.model.SeedPodDepthState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.VesselPaletteState
@@ -22,8 +23,11 @@ object SeedPodInnerVolumePainter {
         appearance: SeedPodVisualState,
         depth: SeedPodDepthState,
         tuning: SeedPodTuning,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ) {
         val c = pod + layerOffset
+        val focus = branch.innerVolumeFocusY.coerceIn(-0.55f, 0.55f)
+        val mag = branch.visualExpressionMagnitude.coerceIn(0f, 1f)
         val d = (appearance.innerHazeDensity * tuning.innerHazeMax * tuning.depth.innerVolumeFalloffMul * depth.innerVolumeExpand).coerceIn(0f, 1f)
         if (d < 0.04f) return
         // Rear inner haze (cooler, deeper)
@@ -34,7 +38,7 @@ object SeedPodInnerVolumePainter {
                     palette.gelMedium.copy(alpha = d * 0.18f),
                     Color(0xFF000000).copy(alpha = 0f),
                 ),
-                center = Offset(c.x, c.y + radii.innerChamberRy * 0.08f),
+                center = Offset(c.x, c.y + radii.innerChamberRy * (0.08f - focus * 0.12f * mag)),
                 radius = maxOf(radii.innerChamberRx, radii.innerChamberRy) * 1.25f,
             ),
             topLeft = Offset(
@@ -50,7 +54,7 @@ object SeedPodInnerVolumePainter {
                     palette.neuralPathway.copy(alpha = d * 0.08f),
                     Color(0xFF000000).copy(alpha = 0f),
                 ),
-                center = Offset(c.x, c.y - radii.shellRy * 0.15f),
+                center = Offset(c.x, c.y - radii.shellRy * (0.15f + focus * 0.22f * mag)),
                 radius = maxOf(radii.shellRx, radii.shellRy) * 0.55f,
             ),
             topLeft = Offset(c.x - radii.shellRx * 0.6f, c.y - radii.shellRy * 0.65f),

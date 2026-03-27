@@ -1,6 +1,7 @@
 package com.velithorne.vessel.renderer_seedpod
 
 import androidx.compose.ui.graphics.Color
+import com.velithorne.vessel.branching.LineageBranch
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.model.BranchVisualState
@@ -140,6 +141,31 @@ object SeedPodMaterialSystem {
             latL *= lv.lateralInflationMul.coerceIn(0.5f, 1.15f)
             latR *= lv.lateralInflationMul.coerceIn(0.5f, 1.15f)
             res *= lv.reserveDimMul.coerceIn(0.45f, 1.1f)
+        }
+        val expr = branch.visualExpressionMagnitude.coerceIn(0f, 1f)
+        val lead = branch.leadingBranch
+        when (lead) {
+            LineageBranch.CROWN_NEURAL -> crown *= 1f + 0.14f * expr
+            LineageBranch.SIGNAL_FROND -> {
+                latL *= 1f + 0.1f * expr
+                latR *= 1f + 0.1f * expr
+            }
+            LineageBranch.RESERVE_BASIN -> res *= 1f + 0.12f * expr
+            LineageBranch.THERMAL_SHELL -> {
+                crown *= 1f - 0.08f * expr
+                latL *= 1f - 0.05f * expr
+                latR *= 1f - 0.05f * expr
+            }
+            LineageBranch.ARCHIVE_CORE -> {
+                crown *= 1f - 0.06f * expr
+                latL *= 1f - 0.06f * expr
+                latR *= 1f - 0.06f * expr
+            }
+            LineageBranch.MOTION_BRACED -> {
+                crown *= 1f - 0.04f * expr
+                res *= 1f - 0.03f * expr
+            }
+            LineageBranch.BALANCED -> {}
         }
         return SeedBudVisualState(
             crown = crown.coerceIn(0f, 1.2f),

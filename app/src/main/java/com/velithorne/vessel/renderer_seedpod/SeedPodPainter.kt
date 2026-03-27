@@ -49,6 +49,7 @@ object SeedPodPainter {
             tuning = tuning,
             branchStretchX = bv.contourStretchXMul,
             branchStretchY = bv.contourStretchYMul,
+            shellThicknessMul = bv.shellThicknessMul,
         )
         val coreR = SeedPodContourBuilder.nucleusRadius(minDim, tuning) *
             (0.92f + appearance.nucleusBrightnessMul * 0.06f)
@@ -104,6 +105,7 @@ object SeedPodPainter {
                             appearance = appearance,
                             depth = depth,
                             tuning = tuning,
+                            branch = bv,
                         )
 
                         SeedPodNucleusPainter.draw(
@@ -199,6 +201,7 @@ object SeedPodPainter {
                             lighting = lighting,
                             palette = palette,
                             phaseSec = anim.seconds,
+                            thermalVeilEmphasisMul = bv.thermalVeilEmphasisMul,
                         )
 
                         val pScale = appearance.particleScale

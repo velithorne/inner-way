@@ -75,6 +75,31 @@ object BranchExplainer {
         }
     }
 
+    /** One line when visible morphology reinforcement crosses a delta (lineage history). */
+    fun visibleReinforceLine(lead: LineageBranch, expressionMag: Float): String {
+        val pct = (expressionMag * 100f).toInt().coerceIn(0, 100)
+        return when (lead) {
+            LineageBranch.THERMAL_SHELL -> "Perimeter shell bands and thermal veil are visibly strengthening ($pct% expression)."
+            LineageBranch.SIGNAL_FROND -> "Lateral fronds and conductive sheen are visibly extending ($pct% expression)."
+            LineageBranch.CROWN_NEURAL -> "Upper crown bloom and neural chamber lift are visibly deepening ($pct% expression)."
+            LineageBranch.RESERVE_BASIN -> "Lower reserve chamber mass is visibly swelling ($pct% expression)."
+            LineageBranch.ARCHIVE_CORE -> "Inner chamber density and stratified haze are visibly compacting ($pct% expression)."
+            LineageBranch.MOTION_BRACED -> "Structural bracing and taut silhouette are visibly tightening ($pct% expression)."
+            LineageBranch.BALANCED -> "Balanced morphology cues are gently clarifying ($pct% expression)."
+        }
+    }
+
+    /** Short bullet for Lineage “visible traits forming” summary. */
+    fun visibleTraitsSummary(lead: LineageBranch): String = when (lead) {
+        LineageBranch.THERMAL_SHELL -> "thicker shell rings, warmer perimeter veil"
+        LineageBranch.SIGNAL_FROND -> "extended lateral fronds, conductive side sheen"
+        LineageBranch.CROWN_NEURAL -> "lifted crown bloom, brighter upper chamber"
+        LineageBranch.RESERVE_BASIN -> "deeper lower reserve bulb, reservoir shading"
+        LineageBranch.ARCHIVE_CORE -> "denser inner haze, compact core mass"
+        LineageBranch.MOTION_BRACED -> "tension bracing lines, stabilized outline"
+        LineageBranch.BALANCED -> "subtle multi-channel hints, smooth silhouette"
+    }
+
     /** Short deterministic lines matching product copy (telemetry + history weighted). */
     fun vignetteLine(lead: LineageBranch, ecology: UsageEcologyProfile): String =
         when (lead) {

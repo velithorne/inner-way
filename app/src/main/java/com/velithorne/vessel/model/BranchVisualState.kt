@@ -36,6 +36,19 @@ data class BranchVisualState(
     val lateralAsymmetryBoost: Float,
     /** Bracing / tension stroke visibility (MOTION_BRACED). */
     val bracingLineAlpha: Float,
+    /** -1 lower chamber, +1 upper — inner volume painter vertical bias. */
+    val innerVolumeFocusY: Float,
+    /** Perimeter shell thickness vs geometry baseline. */
+    val shellThicknessMul: Float,
+    /** Thermal veil / edge warmth draw strength. */
+    val thermalVeilEmphasisMul: Float,
+    /** 0..1 warm rim tint from [com.velithorne.vessel.branching.BranchVisualRules]. */
+    val paletteWarmthBias: Float,
+    val paletteCoolSideBias: Float,
+    val paletteCrownTintBias: Float,
+    val paletteReserveTintBias: Float,
+    /** 0..1 — how strongly morphology reads on canvas (readiness × stage gate). */
+    val visualExpressionMagnitude: Float,
 ) {
     companion object {
         fun neutral() = BranchVisualState(
@@ -54,6 +67,14 @@ data class BranchVisualState(
             lateralReachMul = 1f,
             lateralAsymmetryBoost = 0f,
             bracingLineAlpha = 0f,
+            innerVolumeFocusY = 0f,
+            shellThicknessMul = 1f,
+            thermalVeilEmphasisMul = 1f,
+            paletteWarmthBias = 0f,
+            paletteCoolSideBias = 0f,
+            paletteCrownTintBias = 0f,
+            paletteReserveTintBias = 0f,
+            visualExpressionMagnitude = 0f,
         )
     }
 }

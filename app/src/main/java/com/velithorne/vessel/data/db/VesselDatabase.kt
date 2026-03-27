@@ -34,7 +34,7 @@ import com.velithorne.vessel.data.db.entity.SpecimenEntity
         AmbientEventEntity::class,
         AmbientEcologyMetaEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 abstract class VesselDatabase : RoomDatabase() {

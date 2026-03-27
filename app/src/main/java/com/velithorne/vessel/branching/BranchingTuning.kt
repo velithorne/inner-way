@@ -31,6 +31,17 @@ data class BranchingTuning(
     val branchReadinessEventThreshold: Float = 0.35f,
     /** Min affinity delta (0..1) to log [GrowthEventType.BRANCH_TENDENCY_STRENGTHENED]. */
     val branchAffinityStrengthenDelta: Float = 0.04f,
+    /**
+     * Scales [BranchVisualRules] blend — >1 in dev makes family differences visible sooner
+     * without changing affinity math.
+     */
+    val visualDifferentiationStrengthMul: Float = 1f,
+    /** First crossing: visual expression magnitude (readiness × stage gate). */
+    val branchVisualApparentThreshold: Float = 0.22f,
+    /** Delta to log reinforced visible traits. */
+    val branchVisualReinforceDelta: Float = 0.08f,
+    /** Minimum magnitude for reinforce event. */
+    val branchVisualReinforceMinMagnitude: Float = 0.35f,
 ) {
     /** 0..1 strength of branch-driven silhouette/material tweaks at this structural stage. */
     fun visualInfluenceAt(stage: com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage): Float {

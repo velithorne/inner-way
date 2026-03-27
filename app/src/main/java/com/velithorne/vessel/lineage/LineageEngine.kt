@@ -3,6 +3,8 @@ package com.velithorne.vessel.lineage
 import com.velithorne.vessel.branching.BranchAffinity
 import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.branching.LineageBranch
+import com.velithorne.vessel.branching.BranchExplainer
+import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
 import com.velithorne.vessel.data.db.entity.SeedPodStateEntity
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
@@ -27,6 +29,7 @@ object LineageEngine {
         val newLastVisibleGrowthMs: Long,
         val newLastStageTransitionMs: Long,
         val newLastAdaptationUpdateMs: Long,
+        val newLastVisualExpressionMagnitude: Float,
     )
 
     data class StageTransitionRecord(
@@ -171,6 +174,50 @@ object LineageEngine {
             }
         }
 
+        val prevVisMag = previousEntity?.lastVisualExpressionMagnitude ?: 0f
+        val nextVisMag = SeedPodBranchMapper.map(
+            next.structural.morphologyBranch,
+            next.structural.permanentStage,
+            branchingTuning,
+        ).visualExpressionMagnitude
+        var newVisMag = prevVisMag
+        val leadB = next.structural.morphologyBranch.leadingBranch()
+        if (previousEntity != null &&
+            next.structural.permanentStage.ordinal >= SeedPodGrowthStage.CHAMBER_MATURED.ordinal
+        ) {
+            if (prevVisMag < branchingTuning.branchVisualApparentThreshold &&
+                nextVisMag >= branchingTuning.branchVisualApparentThreshold
+            ) {
+                events += GrowthEventRecord(
+                    type = GrowthEventType.BRANCH_VISUAL_APPARENT,
+                    region = "vessel_morphology",
+                    magnitude = nextVisMag,
+                    driver = leadB.name,
+                    explanation = "${leadB.displayName} morphology is now visibly emerging on the vessel silhouette.",
+                    offline = offlineCatchUp,
+                )
+                lines += "${leadB.displayName} family traits are visibly forming."
+                newVisMag = nextVisMag
+            } else if (
+                nextVisMag >= branchingTuning.branchVisualReinforceMinMagnitude &&
+                nextVisMag > prevVisMag + branchingTuning.branchVisualReinforceDelta
+            ) {
+                events += GrowthEventRecord(
+                    type = GrowthEventType.BRANCH_VISUAL_TRAIT_REINFORCED,
+                    region = "vessel_morphology",
+                    magnitude = nextVisMag - prevVisMag,
+                    driver = leadB.name,
+                    explanation = BranchExplainer.visibleReinforceLine(leadB, nextVisMag),
+                    offline = offlineCatchUp,
+                )
+                newVisMag = nextVisMag
+            } else {
+                newVisMag = nextVisMag
+            }
+        } else {
+            newVisMag = nextVisMag
+        }
+
         // Threshold crossings (first time above threshold)
         if (prevDisplay != null) {
             if (prevDisplay.crownNub < CROWN_THRESH && d.crownNub >= CROWN_THRESH) {
@@ -283,6 +330,7 @@ object LineageEngine {
             newLastVisibleGrowthMs = lastVis,
             newLastStageTransitionMs = lastStage,
             newLastAdaptationUpdateMs = lastAdapt,
+            newLastVisualExpressionMagnitude = newVisMag,
         )
     }
 

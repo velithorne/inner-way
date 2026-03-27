@@ -48,6 +48,10 @@ object DevSimulationProfile {
             commitmentResistance = 0.08f,
             branchReadinessEventThreshold = 0.22f,
             branchAffinityStrengthenDelta = 0.022f,
+            visualDifferentiationStrengthMul = 1.45f,
+            branchVisualApparentThreshold = 0.16f,
+            branchVisualReinforceDelta = 0.06f,
+            branchVisualReinforceMinMagnitude = 0.28f,
         )
         val bg = BackgroundTuning(
             periodicWorkIntervalMs = TimeUnit.MINUTES.toMillis(15),

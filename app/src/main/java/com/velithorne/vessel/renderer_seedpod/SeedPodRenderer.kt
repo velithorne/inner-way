@@ -25,7 +25,8 @@ class SeedPodRenderer(
             telem.networkConnected == false -> 0.55f
             else -> 0.12f
         }
-        val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, com.velithorne.vessel.renderer.RenderTuning())
+        val paletteBase: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, com.velithorne.vessel.renderer.RenderTuning())
+        val palette = BranchPaletteTint.apply(paletteBase, branchVisual)
         val seedPodPalette = SeedPodPalette(base = palette)
 
         val live = LiveExpressionMapper.map(physiology)

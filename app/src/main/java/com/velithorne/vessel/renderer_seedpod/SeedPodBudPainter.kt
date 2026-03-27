@@ -36,9 +36,10 @@ object SeedPodBudPainter {
         val w = minDim
         val crown = buds.crown
         if (crown > 0.02f) {
-            val mul = tuning.crownBudSizeCurve * depth.budDepthMul
+            val mul = tuning.crownBudSizeCurve * depth.budDepthMul * branch.crownBloomMul
             val cBase = pod + layers.budsCrown
-            val cy = cBase.y - max(radii.shellRy, radii.shellRx) * (0.85f + crown * 0.12f * mul)
+            val crownLift = 1f + 0.06f * branch.visualExpressionMagnitude * branch.crownBloomMul
+            val cy = cBase.y - max(radii.shellRy, radii.shellRx) * (0.85f + crown * 0.12f * mul) * crownLift
             val cx = cBase.x
             val br = w * (0.04f + crown * 0.055f) * mul
             scope.drawOval(
@@ -96,7 +97,7 @@ object SeedPodBudPainter {
                 baseY = y,
                 latL = latL,
                 latR = latR,
-                mul = mul,
+                mul = mul * branch.lateralFrondMul,
                 lighting = lighting,
                 palette = palette,
                 specimenSeed = specimenSeed,
@@ -107,7 +108,7 @@ object SeedPodBudPainter {
 
         val res = buds.reserve
         if (res > 0.02f) {
-            val mul = tuning.reserveBudSizeCurve * depth.budDepthMul
+            val mul = tuning.reserveBudSizeCurve * depth.budDepthMul * branch.reserveBulbMul
             val by = pod.y + layers.budsReserve.y + max(radii.shellRy, radii.shellRx) * (0.92f + res * 0.06f)
             val dropR = w * (0.035f + res * 0.07f) * mul
             scope.drawOval(

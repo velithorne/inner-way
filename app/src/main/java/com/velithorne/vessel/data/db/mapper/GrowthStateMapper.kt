@@ -66,6 +66,7 @@ object GrowthStateMapper {
         lastVisibleGrowthMs: Long,
         lastStageTransitionMs: Long,
         lastAdaptationUpdateMs: Long,
+        lastVisualExpressionMagnitude: Float = 0f,
     ): SeedPodStateEntity {
         val aff = state.structural.morphologyBranch.affinities.asArray()
         return SeedPodStateEntity(
@@ -108,6 +109,7 @@ object GrowthStateMapper {
             branchReadiness = state.structural.morphologyBranch.branchReadiness,
             leadingBranchOrdinal = state.structural.morphologyBranch.leadingBranchOrdinal,
             branchCommitmentLevel = state.structural.morphologyBranch.commitmentLevel,
+            lastVisualExpressionMagnitude = lastVisualExpressionMagnitude,
         )
     }
 }

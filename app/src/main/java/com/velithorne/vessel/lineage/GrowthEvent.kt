@@ -18,6 +18,10 @@ enum class GrowthEventType {
     BRANCH_TENDENCY_STRENGTHENED,
     /** Background ecology snapshots nudged adaptation / lineage (offline accumulation). */
     AMBIENT_ECOLOGY_INFLUENCE,
+    /** Branch morphology became visibly distinct on the Vessel (readiness + stage gate). */
+    BRANCH_VISUAL_APPARENT,
+    /** Visible family traits strengthened (crown / lateral / shell / reserve emphasis). */
+    BRANCH_VISUAL_TRAIT_REINFORCED,
 }
 
 data class GrowthEvent(

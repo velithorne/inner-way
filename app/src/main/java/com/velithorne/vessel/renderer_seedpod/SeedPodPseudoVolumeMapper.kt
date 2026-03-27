@@ -50,7 +50,7 @@ object SeedPodPseudoVolumeMapper {
                 appearance.shellOpacityMul * 0.12f +
                 fever * 0.08f +
                 (1f - hunger) * 0.06f
-            ).coerceIn(0.25f, 1f) * branch.shellBandMul
+            ).coerceIn(0.25f, 1f) * branch.shellBandMul * branch.shellThicknessMul
 
         val rearDark = (
             td.rearDarkeningBase +

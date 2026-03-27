@@ -59,4 +59,6 @@ data class SeedPodStateEntity(
     val branchReadiness: Float = 0f,
     val leadingBranchOrdinal: Int = 6,
     val branchCommitmentLevel: Int = 0,
+    /** Last persisted branch visual expression 0..1 — for lineage event thresholds. */
+    val lastVisualExpressionMagnitude: Float = 0f,
 )

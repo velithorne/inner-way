@@ -195,7 +195,7 @@ class TelemetryViewModel(
     private val initialBranchVisual = SeedPodBranchMapper.map(
         initialPodGrowth.structural.morphologyBranch,
         initialPodGrowth.structural.permanentStage,
-        branchingTuning,
+        growthProfileProvider.profile.branching,
     )
     private val initialSeedPodScene = seedPodRenderer.map(
         initialPhysiology,
@@ -210,7 +210,7 @@ class TelemetryViewModel(
             val branchVisual = SeedPodBranchMapper.map(
                 growth.structural.morphologyBranch,
                 growth.structural.permanentStage,
-                branchingTuning,
+                growthProfileProvider.profile.branching,
             )
             seedPodRenderer.map(phys, display, branchVisual)
         }

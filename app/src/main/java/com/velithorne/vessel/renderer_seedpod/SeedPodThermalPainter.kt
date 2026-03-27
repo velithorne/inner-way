@@ -23,9 +23,10 @@ object SeedPodThermalPainter {
         lighting: SeedPodLightingState,
         palette: VesselPaletteState,
         phaseSec: Float,
+        thermalVeilEmphasisMul: Float = 1f,
     ) {
         val c = pod + layerOffset
-        val edge = thermal.edgeShimmer.coerceIn(0f, 1f)
+        val edge = (thermal.edgeShimmer * thermalVeilEmphasisMul.coerceIn(0.85f, 1.25f)).coerceIn(0f, 1f)
         if (edge < 0.04f && thermal.hotspotAlpha < 0.06f) return
 
         val rx = radii.shellRx * 1.02f
