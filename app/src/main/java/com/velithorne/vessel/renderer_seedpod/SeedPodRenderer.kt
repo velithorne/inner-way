@@ -1,5 +1,6 @@
 package com.velithorne.vessel.renderer_seedpod
 
+import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -13,7 +14,11 @@ class SeedPodRenderer(
     private val tuning: SeedPodTuning = SeedPodTuning(),
 ) {
 
-    fun map(physiology: PhysiologySnapshot, podDisplay: SeedPodDisplayState): SeedPodSceneState {
+    fun map(
+        physiology: PhysiologySnapshot,
+        podDisplay: SeedPodDisplayState,
+        branchVisual: BranchVisualState = BranchVisualState.neutral(),
+    ): SeedPodSceneState {
         val s = physiology.species
         val telem = physiology.telemetry
         val signalStrained = when {
@@ -24,10 +29,10 @@ class SeedPodRenderer(
         val seedPodPalette = SeedPodPalette(base = palette)
 
         val live = LiveExpressionMapper.map(physiology)
-        val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning, live)
-        val materialState = SeedPodMaterialSystem.deriveMaterialState(physiology, appearance)
-        val depthState = SeedPodPseudoVolumeMapper.map(physiology, podDisplay.stage, appearance, tuning)
-        val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance, live)
+        val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning, live, branchVisual)
+        val materialState = SeedPodMaterialSystem.deriveMaterialState(physiology, appearance, branchVisual)
+        val depthState = SeedPodPseudoVolumeMapper.map(physiology, podDisplay.stage, appearance, tuning, branchVisual)
+        val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance, live, branchVisual)
         val thermal = SeedPodMaterialSystem.deriveThermal(physiology, podDisplay, palette, tuning)
         val lightingState = SeedPodLightingModel.compute(physiology, appearance, thermal, tuning)
 
@@ -48,6 +53,7 @@ class SeedPodRenderer(
             lightingState = lightingState,
             buds = buds,
             thermal = thermal,
+            branchVisual = branchVisual,
             vitalityGlow = vitalityGlow,
             stressTint = s.stress.coerceIn(0f, 1f),
             feverIntensity = s.fever.coerceIn(0f, 1f),

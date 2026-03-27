@@ -32,9 +32,10 @@ object ProgressBarModelFactory {
             SeedPodGrowthStage.EARLY_CHAMBERING -> SeedPodGrowthStage.CHAMBER_MATURED
             SeedPodGrowthStage.CHAMBER_MATURED -> SeedPodGrowthStage.LINEAGE_DIFFERENTIATING
             SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> SeedPodGrowthStage.FIRST_BRANCH_FORMING
-            SeedPodGrowthStage.FIRST_BRANCH_FORMING -> SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT
-            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> SeedPodGrowthStage.SPECIALIZATION_READY
-            SeedPodGrowthStage.SPECIALIZATION_READY -> SeedPodGrowthStage.SPECIALIZATION_READY
+            SeedPodGrowthStage.FIRST_BRANCH_FORMING -> SeedPodGrowthStage.BRANCH_STABILIZING
+            SeedPodGrowthStage.BRANCH_STABILIZING -> SeedPodGrowthStage.SPECIALIZATION_EMERGING
+            SeedPodGrowthStage.SPECIALIZATION_EMERGING -> SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED
+            SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED -> SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED
         }
         val nextLabel = SeedPodExplainer.stageLabel(next)
         val cap = "Permanent growth toward $nextLabel · readiness ${(nextAccum * 100f).toInt()}%"

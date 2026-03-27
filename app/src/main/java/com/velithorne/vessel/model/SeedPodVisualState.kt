@@ -1,5 +1,7 @@
 package com.velithorne.vessel.model
 
+import com.velithorne.vessel.branching.LineageBranch
+
 /**
  * Derived appearance scalars for the seed pod canvas (material + stage + physiology).
  */
@@ -28,4 +30,6 @@ data class SeedPodVisualState(
     val stageBudScale: Float,
     /** Tight “closed” look for dormant (reduces shell separation visual). */
     val shellClosedness: Float,
+    /** Leading morphology branch for subtle silhouette bias (optional). */
+    val branchHint: LineageBranch = LineageBranch.BALANCED,
 )

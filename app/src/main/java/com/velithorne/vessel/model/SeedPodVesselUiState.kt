@@ -20,4 +20,7 @@ data class SeedPodVesselUiState(
     val recentAwayLine: String,
     val returnSummary: GrowthSessionSummary?,
     val seedPodReturnSummary: SeedPodReturnSummary?,
+    /** Shown after lineage differentiation — morphology family leaning. */
+    val branchStatusLine: String,
+    val branchReasonLine: String,
 )

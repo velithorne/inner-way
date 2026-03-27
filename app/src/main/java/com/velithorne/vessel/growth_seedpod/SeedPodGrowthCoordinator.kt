@@ -1,6 +1,9 @@
 package com.velithorne.vessel.growth_seedpod
 
 import android.content.Context
+import com.velithorne.vessel.branching.BranchInfluenceModel
+import com.velithorne.vessel.branching.BranchSelectionEngine
+import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.lineage.SeedPodReturnSummary
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -26,6 +29,7 @@ class SeedPodGrowthCoordinator(
     private lateinit var specimenId: String
 
     private val progressionTuning = ProgressionTuning()
+    private val branchingTuning = BranchingTuning()
 
     /** Wall time when app went to background — for resume catch-up. */
     private var backgroundAtMs: Long = 0L
@@ -110,10 +114,22 @@ class SeedPodGrowthCoordinator(
             nowMs = now,
             tuning = progressionTuning,
         )
-        val perm = dev.structural.permanentStage
+        val markers = lineageRepository.getAdaptationMarkersSync(specimenId)
+        val (device, ecology) = BranchInfluenceModel.fromTelemetryForStep(phys.telemetry, markers)
+        val targetAff = BranchInfluenceModel.targetAffinity(device, ecology, branchingTuning)
+        val branchNext = BranchSelectionEngine.step(
+            prev = dev.structural.morphologyBranch,
+            target = targetAff,
+            stage = dev.structural.permanentStage,
+            maturityHigh = dev.structural.confirmedMaturityHigh,
+            dtSec = dtSec,
+            tuning = branchingTuning,
+        )
+        val structuralWithBranch = dev.structural.copy(morphologyBranch = branchNext)
+        val perm = structuralWithBranch.permanentStage
         return afterLive.copy(
             display = afterLive.display.copy(stage = perm),
-            structural = dev.structural,
+            structural = structuralWithBranch,
         )
     }
 

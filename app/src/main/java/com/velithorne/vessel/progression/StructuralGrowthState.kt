@@ -1,5 +1,6 @@
 package com.velithorne.vessel.progression
 
+import com.velithorne.vessel.branching.MorphologyBranchState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 
 /**
@@ -22,6 +23,8 @@ data class StructuralGrowthState(
     val leanReserve: Float,
     /** Smoothed progress bar 0..1 (monotonic display). */
     val smoothedStructuralProgress: Float,
+    /** Lineage morphology branching — affinities, leading branch, readiness. */
+    val morphologyBranch: MorphologyBranchState,
 ) {
     companion object {
         fun initial(nowMs: Long) = StructuralGrowthState(
@@ -35,6 +38,7 @@ data class StructuralGrowthState(
             leanSignal = 0.25f,
             leanReserve = 0.25f,
             smoothedStructuralProgress = 0f,
+            morphologyBranch = MorphologyBranchState.initial(),
         )
     }
 }

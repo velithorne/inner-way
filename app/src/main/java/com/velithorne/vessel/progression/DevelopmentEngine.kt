@@ -92,9 +92,10 @@ object DevelopmentEngine {
                 SeedPodGrowthStage.EARLY_CHAMBERING -> highMaturity >= tuning.chamberMaturedMaturity + hy
                 SeedPodGrowthStage.CHAMBER_MATURED -> accum >= tuning.lineageDiffAccum
                 SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> accum >= tuning.firstBranchAccum
-                SeedPodGrowthStage.FIRST_BRANCH_FORMING -> accum >= tuning.adaptiveShellAccum
-                SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> accum >= tuning.specializationAccum
-                SeedPodGrowthStage.SPECIALIZATION_READY -> false
+                SeedPodGrowthStage.FIRST_BRANCH_FORMING -> accum >= tuning.branchStabilizingAccum
+                SeedPodGrowthStage.BRANCH_STABILIZING -> accum >= tuning.specializationEmergingAccum
+                SeedPodGrowthStage.SPECIALIZATION_EMERGING -> accum >= tuning.specializationEstablishedAccum
+                SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED -> false
             }
             if (!ok) return false
             stage = next
@@ -103,23 +104,21 @@ object DevelopmentEngine {
             when (next) {
                 SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> unlock(DevelopmentMilestone.LINEAGE_DIFFERENTIATION)
                 SeedPodGrowthStage.FIRST_BRANCH_FORMING -> unlock(DevelopmentMilestone.FIRST_BRANCH_FORM)
-                SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> unlock(DevelopmentMilestone.ADAPTIVE_SHELL)
-                SeedPodGrowthStage.SPECIALIZATION_READY -> unlock(DevelopmentMilestone.SPECIALIZATION_READY)
+                SeedPodGrowthStage.BRANCH_STABILIZING -> unlock(DevelopmentMilestone.ADAPTIVE_SHELL)
+                SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED -> unlock(DevelopmentMilestone.SPECIALIZATION_READY)
                 else -> {}
             }
             return true
         }
 
-        // Accumulate post-mature readiness
         if (stage.ordinal >= SeedPodGrowthStage.CHAMBER_MATURED.ordinal &&
-            stage.ordinal < SeedPodGrowthStage.SPECIALIZATION_READY.ordinal
+            stage.ordinal < SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED.ordinal
         ) {
             val bias = (ln * 0.04f + ls * 0.04f + lt * 0.03f + (1f - lr) * 0.02f)
             val rate = tuning.baseAccumPerSec * slowdown * (1f + bias)
             accum = min(1f, accum + rate * dtSec)
         }
 
-        // Catch up multiple maturity gates in one frame (offline / long dt)
         var guard = 0
         while (guard < 16 && tryAdvanceOnce()) {
             guard++
@@ -148,6 +147,7 @@ object DevelopmentEngine {
             leanSignal = ls,
             leanReserve = lr,
             smoothedStructuralProgress = smoothed,
+            morphologyBranch = prev.morphologyBranch,
         )
         return StepResult(out, newMilestones)
     }

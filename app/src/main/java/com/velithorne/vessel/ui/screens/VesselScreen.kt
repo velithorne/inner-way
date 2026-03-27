@@ -153,6 +153,22 @@ fun VesselScreen(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            if (podUi.branchStatusLine.isNotEmpty()) {
+                Text(
+                    text = podUi.branchStatusLine,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (podUi.branchReasonLine.isNotEmpty()) {
+                Text(
+                    text = podUi.branchReasonLine,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
         GrowthProgressCard(
             progress = podUi.growthProgressFraction,

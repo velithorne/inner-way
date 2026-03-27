@@ -14,4 +14,9 @@ data class SpecimenLineage(
     val lastMajorChangeLabel: String,
     val lastStageTransitionMillis: Long?,
     val lastGrowthEventMillis: Long?,
+    /** Lineage morphology branching — persisted affinities / lead. */
+    val branchReadinessPercent: Int,
+    val leadingBranchLabel: String,
+    val branchSummaryLine: String,
+    val branchReasonLine: String,
 )

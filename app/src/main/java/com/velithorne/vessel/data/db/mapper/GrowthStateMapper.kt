@@ -5,6 +5,8 @@ import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthBudget
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthState
+import com.velithorne.vessel.branching.BranchAffinity
+import com.velithorne.vessel.branching.MorphologyBranchState
 import com.velithorne.vessel.progression.StructuralGrowthState
 
 object GrowthStateMapper {
@@ -31,6 +33,17 @@ object GrowthStateMapper {
             thermal = e.budgetThermal,
             coherence = e.budgetCoherence,
         )
+        val branch = MorphologyBranchState(
+            affinities = BranchAffinity.fromArray(
+                floatArrayOf(
+                    e.affinity0, e.affinity1, e.affinity2, e.affinity3,
+                    e.affinity4, e.affinity5, e.affinity6,
+                ),
+            ),
+            branchReadiness = e.branchReadiness,
+            leadingBranchOrdinal = e.leadingBranchOrdinal,
+            commitmentLevel = e.branchCommitmentLevel,
+        )
         val sg = StructuralGrowthState(
             permanentStage = st,
             milestoneFlags = e.milestoneFlags,
@@ -42,6 +55,7 @@ object GrowthStateMapper {
             leanSignal = e.leanSignal,
             leanReserve = e.leanReserve,
             smoothedStructuralProgress = e.smoothedStructuralProgress,
+            morphologyBranch = branch,
         )
         return SeedPodGrowthState(display = d, budget = b, structural = sg)
     }
@@ -52,8 +66,9 @@ object GrowthStateMapper {
         lastVisibleGrowthMs: Long,
         lastStageTransitionMs: Long,
         lastAdaptationUpdateMs: Long,
-    ): SeedPodStateEntity =
-        SeedPodStateEntity(
+    ): SeedPodStateEntity {
+        val aff = state.structural.morphologyBranch.affinities.asArray()
+        return SeedPodStateEntity(
             specimenId = specimenId,
             stageOrdinal = state.structural.permanentStage.ordinal,
             crownNub = state.display.crownNub,
@@ -83,5 +98,16 @@ object GrowthStateMapper {
             leanReserve = state.structural.leanReserve,
             smoothedStructuralProgress = state.structural.smoothedStructuralProgress,
             structuralStageEnteredAtMs = state.structural.stageEnteredAtMs,
+            affinity0 = aff[0],
+            affinity1 = aff[1],
+            affinity2 = aff[2],
+            affinity3 = aff[3],
+            affinity4 = aff[4],
+            affinity5 = aff[5],
+            affinity6 = aff[6],
+            branchReadiness = state.structural.morphologyBranch.branchReadiness,
+            leadingBranchOrdinal = state.structural.morphologyBranch.leadingBranchOrdinal,
+            branchCommitmentLevel = state.structural.morphologyBranch.commitmentLevel,
         )
+    }
 }

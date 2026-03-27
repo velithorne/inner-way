@@ -1,5 +1,6 @@
 package com.velithorne.vessel.lineage
 
+import com.velithorne.vessel.branching.LineageBranch
 import com.velithorne.vessel.data.db.entity.SeedPodStateEntity
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
@@ -93,6 +94,25 @@ object LineageEngine {
             stageRec = StageTransitionRecord(prevStructuralStage, nextStructural, ch, expl)
             lastStage = nowMs
             lines += expl
+        }
+
+        val prevLeadOrd = previousEntity?.leadingBranchOrdinal
+        val nextLeadOrd = next.structural.morphologyBranch.leadingBranchOrdinal
+        if (previousEntity != null && prevLeadOrd != null &&
+            prevLeadOrd != nextLeadOrd &&
+            next.structural.permanentStage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.FIRST_BRANCH_FORMING.ordinal
+        ) {
+            val fromB = LineageBranch.entries.getOrNull(prevLeadOrd) ?: LineageBranch.BALANCED
+            val toB = LineageBranch.entries.getOrNull(nextLeadOrd) ?: LineageBranch.BALANCED
+            events += GrowthEventRecord(
+                type = GrowthEventType.BRANCH_LEAD_CHANGED,
+                region = "morphology_branch",
+                magnitude = next.structural.morphologyBranch.affinities[toB],
+                driver = "lineage_affinity",
+                explanation = "Leading morphology tendency shifted from ${fromB.displayName} toward ${toB.displayName}.",
+                offline = offlineCatchUp,
+            )
+            lines += "Morphology family lead updated toward ${toB.displayName}."
         }
 
         // Threshold crossings (first time above threshold)

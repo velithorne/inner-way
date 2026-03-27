@@ -48,4 +48,15 @@ data class SeedPodStateEntity(
     val leanReserve: Float = 0.25f,
     val smoothedStructuralProgress: Float = 0f,
     val structuralStageEnteredAtMs: Long = 0L,
+    /** [com.velithorne.vessel.branching.BranchAffinity] as seven floats. */
+    val affinity0: Float = 1f / 7f,
+    val affinity1: Float = 1f / 7f,
+    val affinity2: Float = 1f / 7f,
+    val affinity3: Float = 1f / 7f,
+    val affinity4: Float = 1f / 7f,
+    val affinity5: Float = 1f / 7f,
+    val affinity6: Float = 1f / 7f,
+    val branchReadiness: Float = 0f,
+    val leadingBranchOrdinal: Int = 6,
+    val branchCommitmentLevel: Int = 0,
 )

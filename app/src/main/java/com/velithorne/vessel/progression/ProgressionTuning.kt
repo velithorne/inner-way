@@ -15,8 +15,9 @@ data class ProgressionTuning(
         180_000L, // CHAMBER_MATURED
         240_000L, // LINEAGE_DIFFERENTIATING
         300_000L, // FIRST_BRANCH_FORMING
-        360_000L, // ADAPTIVE_SHELL_VARIANT
-        420_000L, // SPECIALIZATION_READY
+        360_000L, // BRANCH_STABILIZING
+        400_000L, // SPECIALIZATION_EMERGING
+        420_000L, // SPECIALIZATION_ESTABLISHED
     ),
     /** Accumulation 0..1 per second toward next stage under good conditions. */
     val baseAccumPerSec: Float = 0.00012f,
@@ -31,8 +32,9 @@ data class ProgressionTuning(
     /** Readiness for post-mature stages scales with nextStageAccum crossing. */
     val lineageDiffAccum: Float = 0.85f,
     val firstBranchAccum: Float = 0.88f,
-    val adaptiveShellAccum: Float = 0.9f,
-    val specializationAccum: Float = 0.92f,
+    val branchStabilizingAccum: Float = 0.9f,
+    val specializationEmergingAccum: Float = 0.91f,
+    val specializationEstablishedAccum: Float = 0.93f,
     /** EMA for lineage tendency from physiology. */
     val tendencyLerp: Float = 0.02f,
     /** Progress bar smoothing toward target (higher = smoother, slower). */

@@ -13,8 +13,9 @@ object StageExplainer {
         SeedPodGrowthStage.CHAMBER_MATURED -> "Chamber matured"
         SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> "Lineage differentiating"
         SeedPodGrowthStage.FIRST_BRANCH_FORMING -> "First branch forming"
-        SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> "Adaptive shell variant"
-        SeedPodGrowthStage.SPECIALIZATION_READY -> "Specialization ready"
+        SeedPodGrowthStage.BRANCH_STABILIZING -> "Branch stabilizing"
+        SeedPodGrowthStage.SPECIALIZATION_EMERGING -> "Specialization emerging"
+        SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED -> "Specialization established"
     }
 
     fun structuralNote(
@@ -30,6 +31,6 @@ object StageExplainer {
 
     private fun nextStage(s: SeedPodGrowthStage): SeedPodGrowthStage {
         val o = s.ordinal + 1
-        return SeedPodGrowthStage.entries.getOrNull(o) ?: SeedPodGrowthStage.SPECIALIZATION_READY
+        return SeedPodGrowthStage.entries.getOrNull(o) ?: SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED
     }
 }

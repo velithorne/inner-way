@@ -2,6 +2,7 @@ package com.velithorne.vessel.renderer_seedpod
 
 import androidx.compose.ui.geometry.Offset
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
+import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.model.SeedPodDepthState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -17,6 +18,7 @@ object SeedPodPseudoVolumeMapper {
         stage: SeedPodGrowthStage,
         appearance: SeedPodVisualState,
         tuning: SeedPodTuning,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ): SeedPodDepthState {
         val s = physiology.species
         val vitality = s.vitality.coerceIn(0f, 1f)
@@ -36,8 +38,9 @@ object SeedPodPseudoVolumeMapper {
             SeedPodGrowthStage.CHAMBER_MATURED -> 1f
             SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
             SeedPodGrowthStage.FIRST_BRANCH_FORMING,
-            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
-            SeedPodGrowthStage.SPECIALIZATION_READY,
+            SeedPodGrowthStage.BRANCH_STABILIZING,
+            SeedPodGrowthStage.SPECIALIZATION_EMERGING,
+            SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED,
             -> 1f
         }
 
@@ -47,7 +50,7 @@ object SeedPodPseudoVolumeMapper {
                 appearance.shellOpacityMul * 0.12f +
                 fever * 0.08f +
                 (1f - hunger) * 0.06f
-            ).coerceIn(0.25f, 1f)
+            ).coerceIn(0.25f, 1f) * branch.shellBandMul
 
         val rearDark = (
             td.rearDarkeningBase +
@@ -58,11 +61,11 @@ object SeedPodPseudoVolumeMapper {
 
         val innerVol = (
             appearance.innerHazeDensity * 0.4f + stageSep * 0.35f + neural * 0.15f
-            ).coerceIn(0.2f, 1f)
+            ).coerceIn(0.2f, 1f) * branch.innerMassMul
 
         val budDepth = (
             td.budDepthMulBase + signal * 0.12f + stageSep * 0.15f
-            ).coerceIn(0.45f, 1.15f)
+            ).coerceIn(0.45f, 1.15f) * (0.92f + branch.lateralFrondMul * 0.08f)
 
         val stageNucleusBias = when (stage) {
             SeedPodGrowthStage.DORMANT_POD -> -0.08f
@@ -73,8 +76,9 @@ object SeedPodPseudoVolumeMapper {
             SeedPodGrowthStage.CHAMBER_MATURED -> 0.14f
             SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
             SeedPodGrowthStage.FIRST_BRANCH_FORMING,
-            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
-            SeedPodGrowthStage.SPECIALIZATION_READY,
+            SeedPodGrowthStage.BRANCH_STABILIZING,
+            SeedPodGrowthStage.SPECIALIZATION_EMERGING,
+            SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED,
             -> 0.16f
         }
         val burial = (
@@ -82,18 +86,18 @@ object SeedPodPseudoVolumeMapper {
                 stageNucleusBias +
                 (1f - vitality) * 0.12f +
                 hunger * 0.1f
-            ).coerceIn(0.72f, 0.98f)
+            ).coerceIn(0.72f, 0.98f) * (1f - (branch.crownBloomMul - 1f) * 0.25f)
 
         val recessY = td.nucleusDepthOffsetPx * (1.1f - burial)
 
         return SeedPodDepthState(
-            nucleusRecessOffset = Offset(0f, recessY),
-            shellThicknessVisual = shellThick,
+            nucleusRecessOffset = Offset(0f, recessY * branch.bracingMul),
+            shellThicknessVisual = shellThick.coerceIn(0.2f, 1.15f),
             rearDarkening = rearDark,
-            innerVolumeExpand = innerVol,
-            budDepthMul = budDepth,
+            innerVolumeExpand = innerVol.coerceIn(0.15f, 1.05f),
+            budDepthMul = budDepth.coerceIn(0.4f, 1.2f),
             stageDepthSeparation = stageSep,
-            nucleusBurialScale = burial,
+            nucleusBurialScale = burial.coerceIn(0.65f, 0.99f),
         )
     }
 }

@@ -9,6 +9,8 @@ enum class GrowthEventType {
     CHAMBER_ENVELOPE,
     COHERENCE_IMPROVED,
     STAGE_ADVANCED,
+    /** Leading morphology family changed (persisted affinity / selection). */
+    BRANCH_LEAD_CHANGED,
     CUSTOM,
 }
 

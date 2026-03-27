@@ -21,8 +21,9 @@ object SeedPodExplainer {
         SeedPodGrowthStage.CHAMBER_MATURED -> "Chamber matured"
         SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> "Lineage differentiating"
         SeedPodGrowthStage.FIRST_BRANCH_FORMING -> "First branch forming"
-        SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> "Adaptive shell variant"
-        SeedPodGrowthStage.SPECIALIZATION_READY -> "Specialization ready"
+        SeedPodGrowthStage.BRANCH_STABILIZING -> "Branch stabilizing"
+        SeedPodGrowthStage.SPECIALIZATION_EMERGING -> "Specialization emerging"
+        SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED -> "Specialization established"
     }
 
     fun statusLine(phys: PhysiologySnapshot, state: SeedPodGrowthState): String {

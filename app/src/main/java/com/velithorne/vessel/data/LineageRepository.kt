@@ -18,9 +18,15 @@ import com.velithorne.vessel.growth_seedpod.SeedPodGrowthBudget
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthEngine
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthState
+import com.velithorne.vessel.branching.BranchAffinity
+import com.velithorne.vessel.branching.BranchExplainer
+import com.velithorne.vessel.branching.DeviceProfile
+import com.velithorne.vessel.branching.LineageBranch
+import com.velithorne.vessel.branching.UsageEcologyProfileBuilder
 import com.velithorne.vessel.progression.DevelopmentMilestone
 import com.velithorne.vessel.progression.MilestoneBits
 import com.velithorne.vessel.progression.ProgressBarModelFactory
+import com.velithorne.vessel.lineage.AdaptationKind
 import com.velithorne.vessel.lineage.AdaptationMarker
 import com.velithorne.vessel.lineage.GrowthHistory
 import com.velithorne.vessel.lineage.LineageEngine
@@ -239,6 +245,20 @@ class LineageRepository(
         return GrowthHistory(stageTransitions = st, growthEvents = ev)
     }
 
+    /** For synchronous growth step (UI thread) — lightweight read. */
+    fun getAdaptationMarkersSync(specimenId: String): List<AdaptationMarker> =
+        runBlocking(Dispatchers.IO) {
+            adaptDao.getAllForSpecimen(specimenId).map { e ->
+                AdaptationMarker(
+                    kind = AdaptationKind.entries[e.kindOrdinal],
+                    accumulatedIntensity = e.accumulatedIntensity,
+                    lastTriggeredAtMillis = e.lastTriggeredAtMillis,
+                    visibleBiasApplied = e.visibleBiasApplied,
+                    explanationLabel = e.explanationLabel,
+                )
+            }
+        }
+
     suspend fun getAdaptationMarkers(specimenId: String): List<AdaptationMarker> =
         adaptDao.getAllForSpecimen(specimenId).map { e ->
             com.velithorne.vessel.lineage.AdaptationMarker(
@@ -309,6 +329,32 @@ class LineageRepository(
         val lastEvent = hist.growthEvents.firstOrNull()?.explanation
             ?: hist.stageTransitions.firstOrNull()?.explanation
             ?: "—"
+        val markers = getAdaptationMarkersSync(specimenId)
+        val ecology = UsageEcologyProfileBuilder.fromMarkers(markers)
+        val lead = LineageBranch.entries.getOrNull(seed.leadingBranchOrdinal) ?: LineageBranch.BALANCED
+        val branchSummary = BranchExplainer.leadingLine(lead, seed.branchReadiness, st)
+        val branchReason = BranchExplainer.reasonLine(DeviceProfile.neutral(), ecology, lead)
+        val aff = BranchAffinity.fromArray(
+            floatArrayOf(
+                seed.affinity0, seed.affinity1, seed.affinity2, seed.affinity3,
+                seed.affinity4, seed.affinity5, seed.affinity6,
+            ),
+        )
+        val secondary = BranchExplainer.secondaryLine(aff, lead)
+        val peakBranch = LineageBranch.entries.maxByOrNull { aff[it] } ?: LineageBranch.BALANCED
+        val branchBlock = buildString {
+            if (branchSummary.isNotEmpty()) append(branchSummary)
+            secondary?.let {
+                if (isNotEmpty()) append("\n")
+                append(it)
+            }
+            if (isEmpty()) {
+                append(
+                    "Strongest affinity: ${peakBranch.displayName} (${(aff[peakBranch] * 100f).toInt()}%) · " +
+                        "lead ${lead.displayName} (${(aff[lead] * 100f).toInt()}%)",
+                )
+            }
+        }
         return SpecimenLineage(
             identity = id,
             age = formatAge(id.creationTimestampMillis),
@@ -320,6 +366,10 @@ class LineageRepository(
             lastMajorChangeLabel = lastEvent,
             lastStageTransitionMillis = seed.lastStageTransitionMs.takeIf { it > 0 },
             lastGrowthEventMillis = hist.growthEvents.firstOrNull()?.timestampMillis,
+            branchReadinessPercent = (seed.branchReadiness * 100f).toInt().coerceIn(0, 100),
+            leadingBranchLabel = lead.displayName,
+            branchSummaryLine = branchBlock,
+            branchReasonLine = branchReason,
         )
     }
 

@@ -2,6 +2,10 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.velithorne.vessel.branching.BranchExplainer
+import com.velithorne.vessel.branching.BranchInfluenceModel
+import com.velithorne.vessel.branching.BranchingTuning
+import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.growth_seedpod.SeedPodExplainer
@@ -126,17 +130,30 @@ class TelemetryViewModel(
 
     val growthReturnSummary = growthTimeCoordinator.returnSummary
 
+    private val branchingTuning = BranchingTuning()
+
     private val initialPodGrowth = seedPodGrowthCoordinator.process(initialPhysiology)
+    private val initialBranchVisual = SeedPodBranchMapper.map(
+        initialPodGrowth.structural.morphologyBranch,
+        initialPodGrowth.structural.permanentStage,
+        branchingTuning,
+    )
     private val initialSeedPodScene = seedPodRenderer.map(
         initialPhysiology,
         initialPodGrowth.display.copy(stage = initialPodGrowth.structural.permanentStage),
+        initialBranchVisual,
     )
 
     val seedPodScene: StateFlow<SeedPodSceneState> = physiology
         .map { phys ->
             val growth = seedPodGrowthCoordinator.process(phys)
             val display = growth.display.copy(stage = growth.structural.permanentStage)
-            seedPodRenderer.map(phys, display)
+            val branchVisual = SeedPodBranchMapper.map(
+                growth.structural.morphologyBranch,
+                growth.structural.permanentStage,
+                branchingTuning,
+            )
+            seedPodRenderer.map(phys, display, branchVisual)
         }
         .stateIn(
             scope = viewModelScope,
@@ -171,6 +188,19 @@ class TelemetryViewModel(
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = ret,
             seedPodReturnSummary = seedRet,
+            branchStatusLine = run {
+                val lead = gs.structural.morphologyBranch.leadingBranch()
+                BranchExplainer.leadingLine(lead, gs.structural.morphologyBranch.branchReadiness, gs.structural.permanentStage).ifEmpty {
+                    if (gs.structural.permanentStage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.LINEAGE_DIFFERENTIATING.ordinal) {
+                        "Branch readiness ${(gs.structural.morphologyBranch.branchReadiness * 100f).toInt()}% · lead ${lead.displayName}"
+                    } else ""
+                }
+            },
+            branchReasonLine = run {
+                val markers = lineageRepository.getAdaptationMarkersSync(seedPodGrowthCoordinator.specimenId())
+                val (dev, eco) = BranchInfluenceModel.fromTelemetryForStep(scene.physiology.telemetry, markers)
+                BranchExplainer.reasonLine(dev, eco, gs.structural.morphologyBranch.leadingBranch())
+            },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -198,6 +228,19 @@ class TelemetryViewModel(
                 recentAwayLine = growthTimeCoordinator.recentAwayLine(),
                 returnSummary = growthTimeCoordinator.returnSummary.value,
                 seedPodReturnSummary = null,
+                branchStatusLine = run {
+                    val lead = gs.structural.morphologyBranch.leadingBranch()
+                    BranchExplainer.leadingLine(lead, gs.structural.morphologyBranch.branchReadiness, gs.structural.permanentStage).ifEmpty {
+                        if (gs.structural.permanentStage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.LINEAGE_DIFFERENTIATING.ordinal) {
+                            "Branch readiness ${(gs.structural.morphologyBranch.branchReadiness * 100f).toInt()}% · lead ${lead.displayName}"
+                        } else ""
+                    }
+                },
+                branchReasonLine = run {
+                    val markers = lineageRepository.getAdaptationMarkersSync(seedPodGrowthCoordinator.specimenId())
+                    val (dev, eco) = BranchInfluenceModel.fromTelemetryForStep(initialPhysiology.telemetry, markers)
+                    BranchExplainer.reasonLine(dev, eco, gs.structural.morphologyBranch.leadingBranch())
+                },
             )
         },
     )

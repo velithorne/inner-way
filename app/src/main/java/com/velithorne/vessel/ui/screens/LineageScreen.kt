@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.velithorne.vessel.ui.components.BranchAffinityCard
 import com.velithorne.vessel.ui.components.AdaptationChip
 import com.velithorne.vessel.ui.components.GrowthEventRow
 import com.velithorne.vessel.ui.components.LineageCard
@@ -54,7 +55,10 @@ fun LineageScreen(
                 )
             }
         }
-        state.lineage?.let { SpecimenIdentityCard(lineage = it) }
+        state.lineage?.let { l ->
+            SpecimenIdentityCard(lineage = l)
+            BranchAffinityCard(lineage = l)
+        }
         Text(
             text = "Adaptation shaping",
             style = MaterialTheme.typography.labelSmall,

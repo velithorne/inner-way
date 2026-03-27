@@ -3,6 +3,7 @@ package com.velithorne.vessel.renderer_seedpod
 import androidx.compose.ui.graphics.Color
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
+import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.model.SeedBudVisualState
 import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
@@ -21,6 +22,7 @@ object SeedPodMaterialSystem {
         palette: VesselPaletteState,
         tuning: SeedPodTuning,
         live: LiveExpressionState? = null,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ): SeedPodVisualState {
         val s = physiology.species
         val stage = podDisplay.stage
@@ -70,19 +72,21 @@ object SeedPodMaterialSystem {
 
         val particleScale = (0.75f + physiology.species.respiration * 0.15f + fever * 0.1f).coerceIn(0.6f, 1.25f)
 
+        val bb = branch.balancedBlend.coerceIn(0.75f, 1.05f)
         var out = SeedPodVisualState(
-            shellOpacityMul = shellOpacityMul,
-            shellEdgeBright = shellEdgeBright,
-            innerHazeDensity = innerHaze,
-            nucleusBrightnessMul = nucleusBright,
-            nucleusBloomMul = nucleusBloom,
-            facetLineAlpha = facetAlpha,
-            growthFrontAlpha = growthFront,
-            spotlightStrength = spotlight,
+            shellOpacityMul = (shellOpacityMul * branch.shellBandMul * bb).coerceIn(0.25f, 1.25f),
+            shellEdgeBright = (shellEdgeBright * (0.92f + branch.shellBandMul * 0.08f)).coerceIn(0.3f, 1.3f),
+            innerHazeDensity = (innerHaze * branch.innerMassMul).coerceIn(0f, 1f),
+            nucleusBrightnessMul = (nucleusBright * branch.crownBloomMul).coerceIn(0.2f, 1.45f),
+            nucleusBloomMul = (nucleusBloom * branch.crownBloomMul).coerceIn(0.15f, 1.3f),
+            facetLineAlpha = (facetAlpha * (0.9f + branch.innerMassMul * 0.1f)).coerceIn(0.05f, 0.6f),
+            growthFrontAlpha = (growthFront * branch.shellBandMul).coerceIn(0f, 1f),
+            spotlightStrength = (spotlight * bb).coerceIn(0.2f, 1f),
             glassReflectionAlpha = glass,
             particleScale = particleScale,
             stageBudScale = sm.budScale,
-            shellClosedness = sm.closedness,
+            shellClosedness = (sm.closedness * branch.bracingMul).coerceIn(0.08f, 0.98f),
+            branchHint = branch.leadingBranch,
         )
         live?.let { lv ->
             out = out.copy(
@@ -101,11 +105,12 @@ object SeedPodMaterialSystem {
     fun deriveMaterialState(
         physiology: PhysiologySnapshot,
         appearance: SeedPodVisualState,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ): SeedPodMaterialState {
         val s = physiology.species
         return SeedPodMaterialState(
             shellTranslucency = appearance.shellOpacityMul.coerceIn(0.3f, 1.2f),
-            shellThicknessNorm = (0.35f + s.fever * 0.15f + s.structuralLoad * 0.1f).coerceIn(0.2f, 1f),
+            shellThicknessNorm = ((0.35f + s.fever * 0.15f + s.structuralLoad * 0.1f) * branch.shellBandMul).coerceIn(0.2f, 1f),
             edgeBrightness = appearance.shellEdgeBright,
             innerHaze = appearance.innerHazeDensity,
             thermalHaze = s.fever.coerceIn(0f, 1f),
@@ -119,16 +124,17 @@ object SeedPodMaterialSystem {
         tuning: SeedPodTuning,
         stageVisual: SeedPodVisualState,
         live: LiveExpressionState? = null,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ): SeedBudVisualState {
         fun gate(raw: Float, threshold: Float): Float {
             if (raw < threshold) return 0f
             val over = (raw - threshold) / (1f - threshold + 1e-4f)
             return (over * stageVisual.stageBudScale).coerceIn(0f, 1.2f)
         }
-        var crown = gate(podDisplay.crownNub, tuning.budVisibilityThresholdCrown)
-        var latL = gate(podDisplay.lateralBudLeft, tuning.budVisibilityThresholdLateral)
-        var latR = gate(podDisplay.lateralBudRight, tuning.budVisibilityThresholdLateral)
-        var res = gate(podDisplay.reserveBulb, tuning.budVisibilityThresholdReserve)
+        var crown = gate(podDisplay.crownNub, tuning.budVisibilityThresholdCrown) * branch.crownBloomMul * branch.balancedBlend
+        var latL = gate(podDisplay.lateralBudLeft, tuning.budVisibilityThresholdLateral) * branch.lateralFrondMul
+        var latR = gate(podDisplay.lateralBudRight, tuning.budVisibilityThresholdLateral) * branch.lateralFrondMul
+        var res = gate(podDisplay.reserveBulb, tuning.budVisibilityThresholdReserve) * branch.reserveBulbMul
         live?.let { lv ->
             crown *= lv.crownGlowMul.coerceIn(0.5f, 1.15f)
             latL *= lv.lateralInflationMul.coerceIn(0.5f, 1.15f)
@@ -246,8 +252,9 @@ object SeedPodMaterialSystem {
             )
             SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
             SeedPodGrowthStage.FIRST_BRANCH_FORMING,
-            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
-            SeedPodGrowthStage.SPECIALIZATION_READY,
+            SeedPodGrowthStage.BRANCH_STABILIZING,
+            SeedPodGrowthStage.SPECIALIZATION_EMERGING,
+            SeedPodGrowthStage.SPECIALIZATION_ESTABLISHED,
             -> StageMul(
                 shellDim = g.chamberingShellDim * 1.04f,
                 edgeBoost = g.chamberingEdge * 1.08f,
