@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,8 +48,9 @@ import com.velithorne.vessel.viewmodel.TelemetryViewModel
  * Vessel tab: **only** [SeedPodScene] / [com.velithorne.vessel.renderer_seedpod.SeedPodRenderer].
  * Legacy [com.velithorne.vessel.renderer.VesselScene] is not used here.
  *
- * Layout: chamber sits **directly under** the progress card with a **fixed vertical share** of the
- * tab (not [weight(1f)] above bottom chrome), so the specimen stays upper/middle — not at the screen bottom.
+ * **Layout rule:** The seed pod chamber is a **fixed-height** strip **immediately below**
+ * [GrowthProgressCard] — not a [weight]-expanded region (which left a huge empty band and made the
+ * pod read as “sitting at the bottom” of the screen).
  */
 @Composable
 fun VesselScreen(
@@ -75,6 +77,10 @@ fun VesselScreen(
 
     var chamberOffset by remember { mutableStateOf(Offset.Zero) }
     val bottomScroll = rememberScrollState()
+    val configuration = LocalConfiguration.current
+    val chamberHeight = remember(configuration.screenHeightDp) {
+        (configuration.screenHeightDp * 0.36f).dp.coerceIn(220.dp, 300.dp)
+    }
 
     Column(
         modifier = modifier
@@ -127,11 +133,11 @@ fun VesselScreen(
             )
         }
 
-        // Chamber: fixed share of tab height so it stays upper/middle — not pushed down by bottom UI.
+        // Chamber: **fixed height** directly under progress — avoids a tall empty [weight] region.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(VesselScreenLayout.chamberWeight, fill = true),
+                .height(chamberHeight),
             contentAlignment = Alignment.TopCenter,
         ) {
             Box(
@@ -153,11 +159,11 @@ fun VesselScreen(
             }
         }
 
-        // Controls + readouts scroll below the chamber on small screens.
+        // Controls + readouts: fill remainder and scroll (starts right below chamber, not screen bottom).
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(VesselScreenLayout.bottomPanelWeight, fill = true)
+                .weight(1f, fill = true)
                 .verticalScroll(bottomScroll),
         ) {
             Row(
@@ -233,12 +239,6 @@ fun VesselScreen(
             viewModel.dismissReturnGrowthSummary()
         },
     )
-}
-
-/** Vertical split: chamber vs bottom panel (must sum to 1f). */
-private object VesselScreenLayout {
-    const val chamberWeight: Float = 0.58f
-    const val bottomPanelWeight: Float = 0.42f
 }
 
 private fun feverWord(f: Float): String = when {
