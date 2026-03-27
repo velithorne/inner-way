@@ -62,14 +62,15 @@ object SeedPodGrowthEngine {
 
     fun initialDisplay(): SeedPodDisplayState = SeedPodDisplayState(
         stage = SeedPodGrowthStage.DORMANT_POD,
-        crownNub = 0.04f,
+        // Keep activity = crown + lateralL + lateralR + reserve + haze < 0.18 so first frame stays DORMANT.
+        crownNub = 0.03f,
         lateralBudLeft = 0.03f,
         lateralBudRight = 0.03f,
-        reserveBulb = 0.06f,
-        shellThickening = 0.12f,
-        thermalVeil = 0.08f,
-        tissueHaze = 0.05f,
-        podCoherence = 0.55f,
+        reserveBulb = 0.04f,
+        shellThickening = 0.14f,
+        thermalVeil = 0.06f,
+        tissueHaze = 0.03f,
+        podCoherence = 0.5f,
         lastWallClockMs = System.currentTimeMillis(),
     )
 

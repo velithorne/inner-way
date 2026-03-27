@@ -20,6 +20,12 @@ class SeedPodRenderer(
             else -> 0.12f
         }
         val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, com.velithorne.vessel.renderer.RenderTuning())
+        val seedPodPalette = SeedPodPalette(base = palette)
+
+        val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning)
+        val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance)
+        val thermal = SeedPodMaterialSystem.deriveThermal(physiology, podDisplay, palette, tuning)
+
         val vitalityGlow = (s.vitality * 1.15f).coerceIn(0f, 1.4f)
         val stressShiver = (s.stress * tuning.stressShiverDegrees / 8f).coerceIn(0f, 1f)
         val particleDensity = (
@@ -30,6 +36,10 @@ class SeedPodRenderer(
             physiology = physiology,
             podDisplay = podDisplay,
             palette = palette,
+            seedPodPalette = seedPodPalette,
+            appearance = appearance,
+            buds = buds,
+            thermal = thermal,
             vitalityGlow = vitalityGlow,
             stressTint = s.stress.coerceIn(0f, 1f),
             feverIntensity = s.fever.coerceIn(0f, 1f),

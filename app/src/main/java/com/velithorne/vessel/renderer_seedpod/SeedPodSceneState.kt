@@ -1,8 +1,10 @@
 package com.velithorne.vessel.renderer_seedpod
 
-import androidx.compose.ui.graphics.Color
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
+import com.velithorne.vessel.model.SeedBudVisualState
+import com.velithorne.vessel.model.SeedPodVisualState
+import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 
@@ -13,6 +15,10 @@ data class SeedPodSceneState(
     val physiology: PhysiologySnapshot,
     val podDisplay: SeedPodDisplayState,
     val palette: VesselPaletteState,
+    val seedPodPalette: SeedPodPalette,
+    val appearance: SeedPodVisualState,
+    val buds: SeedBudVisualState,
+    val thermal: SeedThermalVisualState,
     val vitalityGlow: Float,
     val stressTint: Float,
     val feverIntensity: Float,

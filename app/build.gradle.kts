@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.7.9-chamber-mist-no-seam"
+        versionCode = 28
+        versionName = "1.8.0-seed-pod-visual-identity"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
