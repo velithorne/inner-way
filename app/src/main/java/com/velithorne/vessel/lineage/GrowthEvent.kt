@@ -12,6 +12,10 @@ enum class GrowthEventType {
     /** Leading morphology family changed (persisted affinity / selection). */
     BRANCH_LEAD_CHANGED,
     CUSTOM,
+    /** Branch readiness crossed the visibility threshold (post–chamber mature). Append-only for Room ordinals. */
+    BRANCH_READINESS_UNLOCKED,
+    /** A morphology family’s affinity rose meaningfully vs last persist. */
+    BRANCH_TENDENCY_STRENGTHENED,
 }
 
 data class GrowthEvent(

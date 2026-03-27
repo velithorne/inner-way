@@ -1,5 +1,7 @@
 package com.velithorne.vessel.lineage
 
+import com.velithorne.vessel.branching.BranchAffinity
+import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.branching.LineageBranch
 import com.velithorne.vessel.data.db.entity.SeedPodStateEntity
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
@@ -113,6 +115,59 @@ object LineageEngine {
                 offline = offlineCatchUp,
             )
             lines += "Morphology family lead updated toward ${toB.displayName}."
+        }
+
+        val bt = BranchingTuning()
+        if (previousEntity != null) {
+            val prevR = previousEntity.branchReadiness
+            val nextR = next.structural.morphologyBranch.branchReadiness
+            val matureEnough =
+                next.structural.permanentStage.ordinal >= SeedPodGrowthStage.CHAMBER_MATURED.ordinal
+            if (matureEnough && prevR < bt.branchReadinessEventThreshold && nextR >= bt.branchReadinessEventThreshold) {
+                events += GrowthEventRecord(
+                    type = GrowthEventType.BRANCH_READINESS_UNLOCKED,
+                    region = "branch_readiness",
+                    magnitude = nextR,
+                    driver = "structural_maturity",
+                    explanation = "Lineage morphology branching unlocked — affinities now accumulate toward a family.",
+                    offline = offlineCatchUp,
+                )
+                lines += "Branch readiness unlocked — morphology families can diverge."
+            }
+            val prevAff = BranchAffinity.fromArray(
+                floatArrayOf(
+                    previousEntity.affinity0,
+                    previousEntity.affinity1,
+                    previousEntity.affinity2,
+                    previousEntity.affinity3,
+                    previousEntity.affinity4,
+                    previousEntity.affinity5,
+                    previousEntity.affinity6,
+                ),
+            )
+            val nextAff = next.structural.morphologyBranch.affinities
+            var bestBranch: LineageBranch? = null
+            var bestDelta = 0f
+            for (b in LineageBranch.entries) {
+                if (b == LineageBranch.BALANCED) continue
+                val d = nextAff[b] - prevAff[b]
+                if (d > bestDelta && d >= bt.branchAffinityStrengthenDelta) {
+                    bestDelta = d
+                    bestBranch = b
+                }
+            }
+            if (bestBranch != null &&
+                next.structural.permanentStage.ordinal >= SeedPodGrowthStage.LINEAGE_DIFFERENTIATING.ordinal
+            ) {
+                events += GrowthEventRecord(
+                    type = GrowthEventType.BRANCH_TENDENCY_STRENGTHENED,
+                    region = "affinity",
+                    magnitude = bestDelta,
+                    driver = bestBranch.name,
+                    explanation = "${bestBranch.displayName} tendency strengthened (${(bestDelta * 100f).toInt()}% shift).",
+                    offline = offlineCatchUp,
+                )
+            }
         }
 
         // Threshold crossings (first time above threshold)

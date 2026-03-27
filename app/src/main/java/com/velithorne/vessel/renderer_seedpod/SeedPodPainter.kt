@@ -41,11 +41,14 @@ object SeedPodPainter {
         val layers = SeedPodParallaxModel.compute(parallax, depth, tuning)
 
         val pod = SeedPodFraming.podCenterPx(w, h, parallax)
+        val bv = scene.branchVisual
         val radii = SeedPodContourBuilder.radii(
             minDim = minDim,
             shellThickening = d.shellThickening,
             closedness = appearance.shellClosedness,
             tuning = tuning,
+            branchStretchX = bv.contourStretchXMul,
+            branchStretchY = bv.contourStretchYMul,
         )
         val coreR = SeedPodContourBuilder.nucleusRadius(minDim, tuning) *
             (0.92f + appearance.nucleusBrightnessMul * 0.06f)
@@ -138,6 +141,16 @@ object SeedPodPainter {
                             lighting = lighting,
                             palette = palette,
                             tuning = tuning,
+                            branch = bv,
+                        )
+
+                        SeedPodBracingPainter.draw(
+                            scope = podScope,
+                            pod = pod,
+                            radii = radii,
+                            palette = palette,
+                            branch = bv,
+                            phaseSec = anim.seconds,
                         )
 
                         SeedPodShellPainter.drawFront(

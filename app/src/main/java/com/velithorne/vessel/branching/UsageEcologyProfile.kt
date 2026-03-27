@@ -17,6 +17,8 @@ fun blendEcology(a: UsageEcologyProfile, b: UsageEcologyProfile, t: Float): Usag
         reserveStressHistory = m(a.reserveStressHistory, b.reserveStressHistory),
         archiveBurdenHistory = m(a.archiveBurdenHistory, b.archiveBurdenHistory),
         recoveryStability = m(a.recoveryStability, b.recoveryStability),
+        frequentChargerAttachment = m(a.frequentChargerAttachment, b.frequentChargerAttachment),
+        erraticStressRhythm = m(a.erraticStressRhythm, b.erraticStressRhythm),
     )
 }
 
@@ -29,6 +31,10 @@ data class UsageEcologyProfile(
     val reserveStressHistory: Float,
     val archiveBurdenHistory: Float,
     val recoveryStability: Float,
+    /** From adaptation: charging/recovery vs reserve stress. */
+    val frequentChargerAttachment: Float,
+    /** Variance proxy across marker intensities — higher = more mixed ecology. */
+    val erraticStressRhythm: Float,
 )
 
 object UsageEcologyProfileBuilder {
@@ -41,6 +47,11 @@ object UsageEcologyProfileBuilder {
         val archive = k(AdaptationKind.ARCHIVE)
         val recovery = k(AdaptationKind.RECOVERY)
         val sum = (thermal + signal + neural + reserve + archive + recovery).coerceAtLeast(0.01f)
+        val vec = listOf(thermal, signal, neural, reserve, archive, recovery)
+        val mean = vec.sum() / vec.size
+        val varRaw = vec.sumOf { (it - mean).toDouble().let { d -> d * d } }.toFloat() / vec.size
+        val erratic = (varRaw / (0.25f + mean * mean)).coerceIn(0f, 1f)
+        val charger = (recovery / (recovery + reserve + 1e-3f)).coerceIn(0f, 1f)
         return UsageEcologyProfile(
             mobileDataHeavy = (signal * 0.6f).coerceIn(0f, 1f),
             wifiHeavy = ((1f - signal * 0.3f) * 0.4f).coerceIn(0f, 1f),
@@ -50,6 +61,8 @@ object UsageEcologyProfileBuilder {
             reserveStressHistory = (reserve / sum).coerceIn(0f, 1f),
             archiveBurdenHistory = (archive / sum).coerceIn(0f, 1f),
             recoveryStability = (recovery / sum).coerceIn(0f, 1f),
+            frequentChargerAttachment = charger,
+            erraticStressRhythm = erratic,
         )
     }
 }

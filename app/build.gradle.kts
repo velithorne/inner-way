@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "2.2.0-lineage-morphology-branching"
+        versionCode = 35
+        versionName = "2.2.1-lineage-branching-morphology-polish"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

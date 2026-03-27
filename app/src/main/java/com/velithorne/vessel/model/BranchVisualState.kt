@@ -26,6 +26,16 @@ data class BranchVisualState(
     val bracingMul: Float,
     /** Overall blend toward moderate form (balanced). */
     val balancedBlend: Float,
+    /** Vesica horizontal stretch for shell silhouette (thermal / signal families). */
+    val contourStretchXMul: Float,
+    /** Vesica vertical stretch (reserve / crown bias). */
+    val contourStretchYMul: Float,
+    /** Extra lateral frond length vs base bud strength (SIGNAL_FROND). */
+    val lateralReachMul: Float,
+    /** 0..~0.12 — extra angle/length jitter for signal-path asymmetry. */
+    val lateralAsymmetryBoost: Float,
+    /** Bracing / tension stroke visibility (MOTION_BRACED). */
+    val bracingLineAlpha: Float,
 ) {
     companion object {
         fun neutral() = BranchVisualState(
@@ -39,6 +49,11 @@ data class BranchVisualState(
             innerMassMul = 1f,
             bracingMul = 1f,
             balancedBlend = 1f,
+            contourStretchXMul = 1f,
+            contourStretchYMul = 1f,
+            lateralReachMul = 1f,
+            lateralAsymmetryBoost = 0f,
+            bracingLineAlpha = 0f,
         )
     }
 }

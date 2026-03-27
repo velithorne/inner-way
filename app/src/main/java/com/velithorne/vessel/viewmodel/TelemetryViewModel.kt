@@ -199,7 +199,12 @@ class TelemetryViewModel(
             branchReasonLine = run {
                 val markers = lineageRepository.getAdaptationMarkersSync(seedPodGrowthCoordinator.specimenId())
                 val (dev, eco) = BranchInfluenceModel.fromTelemetryForStep(scene.physiology.telemetry, markers)
-                BranchExplainer.reasonLine(dev, eco, gs.structural.morphologyBranch.leadingBranch())
+                val lead = gs.structural.morphologyBranch.leadingBranch()
+                buildString {
+                    append(BranchExplainer.reasonLine(dev, eco, lead))
+                    append("\n")
+                    append(BranchExplainer.vignetteLine(lead, eco))
+                }
             },
         )
     }.stateIn(
@@ -239,7 +244,12 @@ class TelemetryViewModel(
                 branchReasonLine = run {
                     val markers = lineageRepository.getAdaptationMarkersSync(seedPodGrowthCoordinator.specimenId())
                     val (dev, eco) = BranchInfluenceModel.fromTelemetryForStep(initialPhysiology.telemetry, markers)
-                    BranchExplainer.reasonLine(dev, eco, gs.structural.morphologyBranch.leadingBranch())
+                    val lead = gs.structural.morphologyBranch.leadingBranch()
+                    buildString {
+                        append(BranchExplainer.reasonLine(dev, eco, lead))
+                        append("\n")
+                        append(BranchExplainer.vignetteLine(lead, eco))
+                    }
                 },
             )
         },

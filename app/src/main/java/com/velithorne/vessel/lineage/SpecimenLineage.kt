@@ -17,6 +17,10 @@ data class SpecimenLineage(
     /** Lineage morphology branching — persisted affinities / lead. */
     val branchReadinessPercent: Int,
     val leadingBranchLabel: String,
+    /** Short morphology family line from [com.velithorne.vessel.branching.LineageBranch]. */
+    val branchFamilyBlurb: String,
     val branchSummaryLine: String,
     val branchReasonLine: String,
+    /** Compact affinity snapshot for UI, e.g. "Thermal 24% · Signal 21% · Crown 18%". */
+    val branchAffinityPercentsLine: String,
 )

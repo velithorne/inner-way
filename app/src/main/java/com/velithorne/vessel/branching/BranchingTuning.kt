@@ -27,6 +27,10 @@ data class BranchingTuning(
     val deviceVsAdaptationWeight: Float = 0.35f,
     /** Max visual influence strength 0..1 at full specialization. */
     val maxVisualInfluence: Float = 0.55f,
+    /** Emit [com.velithorne.vessel.lineage.GrowthEventType.BRANCH_READINESS_UNLOCKED] once above this. */
+    val branchReadinessEventThreshold: Float = 0.35f,
+    /** Min affinity delta (0..1) to log [GrowthEventType.BRANCH_TENDENCY_STRENGTHENED]. */
+    val branchAffinityStrengthenDelta: Float = 0.04f,
 ) {
     /** 0..1 strength of branch-driven silhouette/material tweaks at this structural stage. */
     fun visualInfluenceAt(stage: com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage): Float {

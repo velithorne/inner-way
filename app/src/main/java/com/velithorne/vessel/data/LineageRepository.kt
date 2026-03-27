@@ -333,7 +333,11 @@ class LineageRepository(
         val ecology = UsageEcologyProfileBuilder.fromMarkers(markers)
         val lead = LineageBranch.entries.getOrNull(seed.leadingBranchOrdinal) ?: LineageBranch.BALANCED
         val branchSummary = BranchExplainer.leadingLine(lead, seed.branchReadiness, st)
-        val branchReason = BranchExplainer.reasonLine(DeviceProfile.neutral(), ecology, lead)
+        val branchReason = buildString {
+            append(BranchExplainer.reasonLine(DeviceProfile.neutral(), ecology, lead))
+            append("\n")
+            append(BranchExplainer.vignetteLine(lead, ecology))
+        }
         val aff = BranchAffinity.fromArray(
             floatArrayOf(
                 seed.affinity0, seed.affinity1, seed.affinity2, seed.affinity3,
@@ -355,6 +359,11 @@ class LineageRepository(
                 )
             }
         }
+        val affLine = LineageBranch.entries
+            .filter { it != LineageBranch.BALANCED }
+            .sortedByDescending { aff[it] }
+            .take(4)
+            .joinToString(" · ") { b -> "${b.displayName} ${(aff[b] * 100f).toInt()}%" }
         return SpecimenLineage(
             identity = id,
             age = formatAge(id.creationTimestampMillis),
@@ -368,8 +377,10 @@ class LineageRepository(
             lastGrowthEventMillis = hist.growthEvents.firstOrNull()?.timestampMillis,
             branchReadinessPercent = (seed.branchReadiness * 100f).toInt().coerceIn(0, 100),
             leadingBranchLabel = lead.displayName,
+            branchFamilyBlurb = lead.briefDescription,
             branchSummaryLine = branchBlock,
             branchReasonLine = branchReason,
+            branchAffinityPercentsLine = affLine,
         )
     }
 

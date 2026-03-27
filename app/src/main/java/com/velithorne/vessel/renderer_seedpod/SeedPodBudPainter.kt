@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.model.SeedBudVisualState
 import com.velithorne.vessel.model.SeedPodDepthState
 import com.velithorne.vessel.model.SeedPodLayerState
@@ -30,6 +31,7 @@ object SeedPodBudPainter {
         lighting: SeedPodLightingState,
         palette: VesselPaletteState,
         tuning: SeedPodTuning,
+        branch: BranchVisualState = BranchVisualState.neutral(),
     ) {
         val w = minDim
         val crown = buds.crown
@@ -98,6 +100,8 @@ object SeedPodBudPainter {
                 lighting = lighting,
                 palette = palette,
                 specimenSeed = specimenSeed,
+                reachMul = branch.lateralReachMul,
+                asymBoost = branch.lateralAsymmetryBoost,
             )
         }
 
@@ -150,6 +154,8 @@ object SeedPodBudPainter {
         lighting: SeedPodLightingState,
         palette: VesselPaletteState,
         specimenSeed: Long,
+        reachMul: Float = 1f,
+        asymBoost: Float = 0f,
     ) {
         val cx = pod.x + layersOffset.x
         val attachY = baseY
@@ -161,11 +167,11 @@ object SeedPodBudPainter {
             if (strength < 0.02f) continue
 
             val rnd = Random(specimenSeed xor (if (side < 0) 0x4C1L else 0x4C2L))
-            val angleJitter = (rnd.nextFloat() - 0.5f) * 0.14f
+            val angleJitter = (rnd.nextFloat() - 0.5f) * (0.14f + asymBoost * 1.2f)
             val lengthJitter = 0.92f + rnd.nextFloat() * 0.16f
             val bulgeJitter = 0.94f + rnd.nextFloat() * 0.12f
 
-            val reach = minDim * (0.04f + strength * 0.11f) * mul * lengthJitter
+            val reach = minDim * (0.04f + strength * 0.11f) * mul * lengthJitter * reachMul.coerceIn(0.85f, 1.35f)
             val rootX = cx + side * (span + minDim * 0.008f * strength)
             val midX = rootX + side * reach * 0.48f * bulgeJitter
             val tipX = rootX + side * reach * 1.05f

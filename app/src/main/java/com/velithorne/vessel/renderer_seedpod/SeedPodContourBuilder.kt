@@ -25,13 +25,17 @@ object SeedPodContourBuilder {
         shellThickening: Float,
         closedness: Float,
         tuning: SeedPodTuning,
+        branchStretchX: Float = 1f,
+        branchStretchY: Float = 1f,
     ): PodRadii {
         val st = shellThickening.coerceIn(0f, 1f)
         val cl = closedness.coerceIn(0f, 1f)
+        val sx = branchStretchX.coerceIn(0.88f, 1.15f)
+        val sy = branchStretchY.coerceIn(0.88f, 1.15f)
         val baseR = minDim * tuning.podShellRadiusMul * (1f + st * 0.14f)
         val squeeze = 0.92f + cl * 0.08f
-        val shellRx = baseR * tuning.shellVesicaStretchX * squeeze
-        val shellRy = baseR * tuning.shellVesicaStretchY * (1f - cl * 0.06f)
+        val shellRx = baseR * tuning.shellVesicaStretchX * squeeze * sx
+        val shellRy = baseR * tuning.shellVesicaStretchY * (1f - cl * 0.06f) * sy
         val bandOuterRx = shellRx * tuning.shellBandOuterMul
         val bandOuterRy = shellRy * tuning.shellBandOuterMul
         val bandMidRx = shellRx * tuning.shellBandMidMul

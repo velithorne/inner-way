@@ -74,4 +74,27 @@ object BranchExplainer {
                 "No single pressure dominates — the specimen remains balanced across pathways."
         }
     }
+
+    /** Short deterministic lines matching product copy (telemetry + history weighted). */
+    fun vignetteLine(lead: LineageBranch, ecology: UsageEcologyProfile): String =
+        when (lead) {
+            LineageBranch.SIGNAL_FROND ->
+                "Sustained mobile connectivity is driving lateral signal specialization."
+            LineageBranch.THERMAL_SHELL ->
+                "Repeated thermal strain is thickening shell-oriented development."
+            LineageBranch.CROWN_NEURAL ->
+                "High neural load is favoring crown-dominant differentiation."
+            LineageBranch.RESERVE_BASIN ->
+                "Reserve deficit history is biasing lower-basin endurance growth."
+            LineageBranch.ARCHIVE_CORE ->
+                "Archive burden is densifying the inner chamber core."
+            LineageBranch.MOTION_BRACED ->
+                "Active handling rhythm is bracing the pod for stability."
+            LineageBranch.BALANCED ->
+                if (ecology.erraticStressRhythm > 0.45f) {
+                    "Mixed stress rhythm keeps morphology moderate across families."
+                } else {
+                    "Balanced ecology — no single pathway dominates yet."
+                }
+        }
 }
