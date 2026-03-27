@@ -95,6 +95,7 @@ fun SeedPodScene(
                             parallax = parallaxOff,
                             stressShiverDeg = scene.stressShiver * tuning.stressShiverDegrees,
                         )
+                        if (hit == null) anim.resetSelectionFocus()
                         onSelectTarget(hit)
                     },
                 )
