@@ -9,7 +9,7 @@ import androidx.work.WorkManager
 import com.velithorne.vessel.BuildConfig
 import java.util.concurrent.TimeUnit
 
-private const val UNIQUE_NAME = "velithorne_ecology_periodic"
+const val ECOLOGY_PERIODIC_WORK_NAME = "velithorne_ecology_periodic"
 
 object EcologyWorkScheduler {
 
@@ -25,7 +25,7 @@ object EcologyWorkScheduler {
             .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context.applicationContext).enqueueUniquePeriodicWork(
-            UNIQUE_NAME,
+            ECOLOGY_PERIODIC_WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             req,
         )

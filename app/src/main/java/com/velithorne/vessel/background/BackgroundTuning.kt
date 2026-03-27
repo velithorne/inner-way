@@ -29,4 +29,19 @@ data class BackgroundTuning(
     /** Thermal stress: battery temp above this (C) counts as warm. */
     val warmBatteryTempC: Float = 36f,
     val hotBatteryTempC: Float = 40f,
+    /** Motion below this (unitless) counts as "calm" for idle-stable heuristics. */
+    val idleMotionIntensityMax: Float = 0.08f,
+    val motionHighIntensityMin: Float = 0.22f,
+    /** Scales abstract readiness pressure into [StructuralGrowthState.nextStageAccum] nudge. */
+    val ambientStructuralReadinessScale: Float = 0.045f,
+    val maxAmbientStructuralReadinessPerApply: Float = 0.035f,
+    /** Scales abstract affinity pressure into [BranchAffinity] nudge. */
+    val ambientAffinityNudgeScale: Float = 0.028f,
+    val maxAmbientAffinityNudgePerApply: Float = 0.022f,
+    /** Max delta per kind when applying ambient adaptation upserts (keeps markers bounded). */
+    val maxAmbientAdaptDelta: Float = 0.06f,
+    /** Minimum structural readiness delta to mention in return copy. */
+    val returnSummaryReadinessMentionThreshold: Float = 0.008f,
+    /** Minimum affinity delta on a branch to mention. */
+    val returnSummaryAffinityMentionThreshold: Float = 0.006f,
 )

@@ -2,6 +2,7 @@ package com.velithorne.vessel.growth_seedpod
 
 import android.content.Context
 import com.velithorne.vessel.background.AmbientGrowthAccumulator
+import com.velithorne.vessel.background.AmbientProgressionApplicator
 import com.velithorne.vessel.background.AmbientReopenProcessor
 import com.velithorne.vessel.background.BackgroundTuning
 import com.velithorne.vessel.background.ReturnSummaryComposer
@@ -67,7 +68,8 @@ class SeedPodGrowthCoordinator(
             val unapplied = lineageRepository.unappliedEcologySnapshots(specimenId)
             if (unapplied.isNotEmpty() && elapsed >= ambientTuning.minAwayMsForAmbientProcess) {
                 val acc = AmbientGrowthAccumulator.accumulate(unapplied, ambientTuning)
-                var merged = AmbientReopenProcessor.mergeBudget(state, acc.budgetDelta)
+                val applied = AmbientProgressionApplicator.apply(state, acc, ambientTuning)
+                var merged = applied.state
                 val simSec = min(
                     ambientTuning.maxAmbientCatchUpSimulatedSec,
                     capped / 1000f,
@@ -82,7 +84,26 @@ class SeedPodGrowthCoordinator(
                 state = merged
                 val lastTs = unapplied.maxOfOrNull { it.timestampMillis } ?: System.currentTimeMillis()
                 lineageRepository.updateLastAppliedSnapshotMillis(specimenId, lastTs)
-                val ambientLines = ReturnSummaryComposer.compose(capped / 1000L, acc, ambientTuning)
+                val affMoved = applied.affinityDeltas.any { it > 1e-4f }
+                val readyMoved = applied.structuralReadinessDelta > 1e-5f
+                if (affMoved || readyMoved ||
+                    applied.adaptationNudges.let { n ->
+                        n.thermal + n.signal + n.neural + n.recovery + n.reserve + n.archive > 1e-4f
+                    }
+                ) {
+                    lineageRepository.persistAmbientFollowUp(
+                        specimenId = specimenId,
+                        nudges = applied.adaptationNudges,
+                        affinityMoved = affMoved,
+                        readinessMoved = readyMoved,
+                    )
+                }
+                val ambientLines = ReturnSummaryComposer.compose(
+                    capped / 1000L,
+                    acc,
+                    ambientTuning,
+                    applied,
+                )
                 if (ambientLines.isNotEmpty()) {
                     ambientSummary = SeedPodReturnSummary(awaySeconds = capped / 1000L, lines = ambientLines)
                 }
@@ -126,7 +147,8 @@ class SeedPodGrowthCoordinator(
             if (unapplied.isEmpty()) return@withContext null
             val prevEntity = lineageRepository.cachedSeedEntity
             val acc = AmbientGrowthAccumulator.accumulate(unapplied, ambientTuning)
-            var merged = AmbientReopenProcessor.mergeBudget(state, acc.budgetDelta)
+            val applied = AmbientProgressionApplicator.apply(state, acc, ambientTuning)
+            var merged = applied.state
             val (afterSim, _) = AmbientReopenProcessor.simulateGrowthSteps(
                 initial = merged,
                 phys = phys,
@@ -136,6 +158,20 @@ class SeedPodGrowthCoordinator(
             state = merged
             val lastTs = unapplied.maxOfOrNull { it.timestampMillis } ?: System.currentTimeMillis()
             lineageRepository.updateLastAppliedSnapshotMillis(specimenId, lastTs)
+            val affMoved = applied.affinityDeltas.any { it > 1e-4f }
+            val readyMoved = applied.structuralReadinessDelta > 1e-5f
+            if (affMoved || readyMoved ||
+                applied.adaptationNudges.let { n ->
+                    n.thermal + n.signal + n.neural + n.recovery + n.reserve + n.archive > 1e-4f
+                }
+            ) {
+                lineageRepository.persistAmbientFollowUp(
+                    specimenId = specimenId,
+                    nudges = applied.adaptationNudges,
+                    affinityMoved = affMoved,
+                    readinessMoved = readyMoved,
+                )
+            }
             lineageRepository.persistGrowthStep(
                 specimenId = specimenId,
                 previousEntity = prevEntity,
@@ -148,7 +184,7 @@ class SeedPodGrowthCoordinator(
                 val mn = unapplied.minOfOrNull { it.timestampMillis } ?: lastTs
                 ((lastTs - mn) / 1000L).coerceAtLeast(1L)
             }
-            val lines = ReturnSummaryComposer.compose(spanSec, acc, ambientTuning)
+            val lines = ReturnSummaryComposer.compose(spanSec, acc, ambientTuning, applied)
             if (lines.isEmpty()) return@withContext null
             SeedPodReturnSummary(awaySeconds = spanSec, lines = lines)
         }

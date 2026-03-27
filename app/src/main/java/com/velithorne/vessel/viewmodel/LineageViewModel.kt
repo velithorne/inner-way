@@ -1,5 +1,6 @@
 package com.velithorne.vessel.viewmodel
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.velithorne.vessel.background.AmbientEcologyPresentation
@@ -31,6 +32,7 @@ data class LineageUiState(
 )
 
 class LineageViewModel(
+    private val application: Application,
     private val lineageRepository: LineageRepository,
     private val ecologySnapshotStore: EcologySnapshotStore,
 ) : ViewModel() {
@@ -62,9 +64,16 @@ class LineageViewModel(
             val meta = withContext(Dispatchers.IO) {
                 lineageRepository.getAmbientEcologyMeta(id.specimenId)
             }
+            val lastEvt = withContext(Dispatchers.IO) {
+                lineageRepository.recentAmbientEvents(id.specimenId, 1).firstOrNull()
+            }
+            val workOk = AmbientEcologyPresentation.workScheduled(application)
             val ambient = AmbientEcologyPresentation.build(
                 snapshots = recent,
                 samplesSinceOpen = meta?.samplesSinceLastOpen ?: 0,
+                meta = meta,
+                lastEvent = lastEvt,
+                workScheduled = workOk,
             )
             _ui.value = LineageUiState(
                 identity = id,

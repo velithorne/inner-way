@@ -1,5 +1,6 @@
 package com.velithorne.vessel.viewmodel
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.velithorne.vessel.background.AmbientEventIngestor
@@ -12,6 +13,7 @@ import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.telemetry.TelemetryRepository
 
 class TelemetryViewModelFactory(
+    private val application: Application,
     private val repository: TelemetryRepository,
     private val physiologyEngine: PhysiologyEngine,
     private val seedPodRenderer: SeedPodRenderer,
@@ -26,6 +28,7 @@ class TelemetryViewModelFactory(
         if (modelClass.isAssignableFrom(TelemetryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return TelemetryViewModel(
+                application,
                 repository,
                 physiologyEngine,
                 seedPodRenderer,

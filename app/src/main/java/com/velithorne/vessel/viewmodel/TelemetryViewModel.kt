@@ -1,5 +1,6 @@
 package com.velithorne.vessel.viewmodel
 
+import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.velithorne.vessel.background.AmbientEcologyPresentation
@@ -49,6 +50,7 @@ import kotlinx.coroutines.withContext
  * Telemetry → physiology → **SeedPod** scene for the Vessel tab.
  */
 class TelemetryViewModel(
+    private val application: Application,
     private val repository: TelemetryRepository,
     private val physiologyEngine: PhysiologyEngine,
     private val seedPodRenderer: SeedPodRenderer,
@@ -105,14 +107,22 @@ class TelemetryViewModel(
                         lineageRepository.recentEcologySnapshots(sid, 24)
                     }
                     val meta = withContext(Dispatchers.IO) { lineageRepository.getAmbientEcologyMeta(sid) }
+                    val lastEvt = withContext(Dispatchers.IO) {
+                        lineageRepository.recentAmbientEvents(sid, 1).firstOrNull()
+                    }
+                    val workOk = AmbientEcologyPresentation.workScheduled(application)
                     _ambientEcologyHintLine.value = AmbientEcologyPresentation.build(
                         recent,
                         meta?.samplesSinceLastOpen ?: 0,
+                        meta = meta,
+                        lastEvent = lastEvt,
+                        workScheduled = workOk,
                     ).vesselHintLine
                     if (merged != null && merged.lines.isNotEmpty()) {
                         val key = merged.lines.joinToString("|") + merged.awaySeconds
+                        val ambientHash = ReturnSummaryComposer.ambientSummaryHash(merged.lines)
                         val show = withContext(Dispatchers.IO) {
-                            lineageRepository.shouldShowSeedPodReturn(key)
+                            lineageRepository.shouldShowSeedPodReturnCombined(key, ambientHash)
                         }
                         if (show) {
                             _seedPodReturnSummary.value = merged
@@ -301,7 +311,8 @@ class TelemetryViewModel(
         val s = _seedPodReturnSummary.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val key = s.lines.joinToString("|") + s.awaySeconds
-            lineageRepository.markSeedPodReturnShown(key)
+            val ambientHash = ReturnSummaryComposer.ambientSummaryHash(s.lines)
+            lineageRepository.markSeedPodReturnShown(key, ambientHash)
         }
         _seedPodReturnSummary.value = null
     }

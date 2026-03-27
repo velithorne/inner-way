@@ -38,7 +38,7 @@ fun SeedPodReturnSummarySheet(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "${summary.awaySeconds / 60} min away · saved growth applied",
+                text = formatAwaySubtitle(summary.awaySeconds),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -56,4 +56,16 @@ fun SeedPodReturnSummarySheet(
             }
         }
     }
+}
+
+private fun formatAwaySubtitle(awaySeconds: Long): String {
+    val m = awaySeconds / 60L
+    val h = awaySeconds / 3600L
+    val span = when {
+        h >= 2L -> "~${h}h away"
+        h == 1L -> "~1h away"
+        m >= 2L -> "~${m}m away"
+        else -> "Briefly away"
+    }
+    return "$span · live-open growth + stored ambient accumulation applied"
 }

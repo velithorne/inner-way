@@ -9,6 +9,8 @@ import com.velithorne.vessel.data.db.entity.AmbientEcologyMetaEntity
 import com.velithorne.vessel.data.db.entity.AmbientEventEntity
 import com.velithorne.vessel.data.db.mapper.EcologySnapshotMapper
 import com.velithorne.vessel.data.db.entity.AdaptationEventEntity
+import com.velithorne.vessel.background.AmbientProgressionApplicator
+import com.velithorne.vessel.background.toLabel
 import com.velithorne.vessel.data.db.entity.GrowthEventEntity
 import com.velithorne.vessel.data.db.entity.GrowthStageEventEntity
 import com.velithorne.vessel.data.db.entity.ReturnSummaryEntity
@@ -33,6 +35,7 @@ import com.velithorne.vessel.progression.MilestoneBits
 import com.velithorne.vessel.progression.ProgressBarModelFactory
 import com.velithorne.vessel.lineage.AdaptationKind
 import com.velithorne.vessel.lineage.AdaptationMarker
+import com.velithorne.vessel.lineage.GrowthEventType
 import com.velithorne.vessel.lineage.GrowthHistory
 import com.velithorne.vessel.lineage.LineageEngine
 import com.velithorne.vessel.lineage.LineageSummary
@@ -495,6 +498,7 @@ class LineageRepository(
                 lastShownKey = lastShownKey,
                 lastBackgroundAtMillis = backgroundAt,
                 seedPodLastShownKey = existing?.seedPodLastShownKey,
+                lastAmbientSummaryHash = existing?.lastAmbientSummaryHash,
             ),
         )
     }
@@ -504,15 +508,74 @@ class LineageRepository(
         return m.seedPodLastShownKey != key
     }
 
-    suspend fun markSeedPodReturnShown(key: String) {
+    /** True if either the full line key or the ambient fingerprint changed since last dismiss. */
+    suspend fun shouldShowSeedPodReturnCombined(key: String, ambientSummaryHash: String): Boolean {
+        val m = returnDao.getMeta() ?: return true
+        return m.seedPodLastShownKey != key || m.lastAmbientSummaryHash != ambientSummaryHash
+    }
+
+    suspend fun markSeedPodReturnShown(key: String, ambientSummaryHash: String) {
         val m = returnDao.getMeta()
         returnDao.upsert(
             ReturnSummaryEntity(
                 lastShownKey = m?.lastShownKey,
                 lastBackgroundAtMillis = m?.lastBackgroundAtMillis ?: System.currentTimeMillis(),
                 seedPodLastShownKey = key,
+                lastAmbientSummaryHash = ambientSummaryHash,
             ),
         )
+    }
+
+    /**
+     * Persists adaptation bumps + optional growth event after ambient folding (no full physiology batch).
+     */
+    suspend fun persistAmbientFollowUp(
+        specimenId: String,
+        nudges: AmbientProgressionApplicator.AdaptationNudges,
+        affinityMoved: Boolean,
+        readinessMoved: Boolean,
+    ) {
+        suspend fun bump(kind: AdaptationKind, delta: Float) {
+            if (delta < 1e-4f) return
+            val existing = adaptDao.getAllForSpecimen(specimenId).find { it.kindOrdinal == kind.ordinal }
+            val acc = ((existing?.accumulatedIntensity ?: 0f) + delta).coerceIn(0f, 2.5f)
+            adaptDao.upsert(
+                AdaptationEventEntity(
+                    specimenId = specimenId,
+                    kindOrdinal = kind.ordinal,
+                    accumulatedIntensity = acc,
+                    lastTriggeredAtMillis = System.currentTimeMillis(),
+                    visibleBiasApplied = acc.coerceIn(0f, 1f),
+                    explanationLabel = kind.toLabel(),
+                ),
+            )
+        }
+        bump(AdaptationKind.THERMAL, nudges.thermal)
+        bump(AdaptationKind.SIGNAL, nudges.signal)
+        bump(AdaptationKind.NEURAL, nudges.neural)
+        bump(AdaptationKind.RECOVERY, nudges.recovery)
+        bump(AdaptationKind.RESERVE, nudges.reserve)
+        bump(AdaptationKind.ARCHIVE, nudges.archive)
+        if (affinityMoved || readinessMoved) {
+            growthDao.insertGrowthEvent(
+                GrowthEventEntity(
+                    specimenId = specimenId,
+                    timestampMillis = System.currentTimeMillis(),
+                    eventTypeOrdinal = GrowthEventType.AMBIENT_ECOLOGY_INFLUENCE.ordinal,
+                    affectedRegion = "ambient_ecology",
+                    magnitude = (if (readinessMoved) 1f else 0f) + (if (affinityMoved) 0.5f else 0f),
+                    primaryDriver = "stored_snapshots",
+                    explanation = buildString {
+                        if (readinessMoved) append("Structural readiness nudged from offline ecology.")
+                        if (affinityMoved) {
+                            if (isNotEmpty()) append(" ")
+                            append("Morphology affinities drifted from ambient phone patterns.")
+                        }
+                    },
+                    offlineCatchUp = true,
+                ),
+            )
+        }
     }
 
 }

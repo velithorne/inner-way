@@ -90,4 +90,21 @@ class AppContainer(
             lineageRepository.insertEcologySnapshot(snap, force = true)
         }
     }
+
+    /** Network capability changes — [com.velithorne.vessel.background.ConnectivityReceiver]. */
+    fun recordConnectivityAmbientEvent() {
+        runBlocking(Dispatchers.IO) {
+            val specimenId = lineageRepository.ensureActiveSpecimenExists()
+            val growth = lineageRepository.ensureSeedRowForSpecimen(specimenId)
+            val telem = com.velithorne.vessel.telemetry.PassiveTelemetrySnapshotFactory.build(application, timeProvider)
+            lineageRepository.insertAmbientEvent("NET", telem.networkType.name.lowercase())
+            val snap = EcologySnapshot.fromTelemetryAndState(
+                telem,
+                growth,
+                EcologySnapshotSourceType.CONNECTIVITY_EVENT,
+                notes = "connectivity",
+            )
+            lineageRepository.insertEcologySnapshot(snap, force = true)
+        }
+    }
 }

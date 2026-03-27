@@ -11,4 +11,6 @@ data class ReturnSummaryEntity(
     val lastBackgroundAtMillis: Long,
     /** Seed pod lineage return sheet key. */
     val seedPodLastShownKey: String? = null,
+    /** Fingerprint of last ambient-heavy return lines — suppress exact repeats. */
+    val lastAmbientSummaryHash: String? = null,
 )

@@ -51,6 +51,20 @@ fun AmbientEcologyCard(
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
                 modifier = Modifier.padding(top = 4.dp),
             )
+            state.debugPanel?.let { d ->
+                Text(
+                    text = "DBG · work=${d.periodicWorkScheduled} · lastEvt=${d.lastAmbientEventLabel ?: "—"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    text = "DBG · snapWrite=${d.lastSnapshotWriteMillis ?: "—"} · applied=${d.lastAppliedSnapshotMillis ?: "—"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }

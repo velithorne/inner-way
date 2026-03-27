@@ -29,5 +29,13 @@
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".background.ConnectivityReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_ACTION" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

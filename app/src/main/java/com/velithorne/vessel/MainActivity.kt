@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
         }
         val container = (application as VesselApplication).appContainer
         val factory = TelemetryViewModelFactory(
+            application = application,
             repository = container.telemetryRepository,
             physiologyEngine = container.physiologyEngine,
             seedPodRenderer = container.seedPodRenderer,
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
             ambientEventIngestor = container.ambientEventIngestor,
         )
         val lineageFactory = LineageViewModelFactory(
+            application = application,
             lineageRepository = container.lineageRepository,
             ecologySnapshotStore = container.ecologySnapshotStore,
         )

@@ -16,6 +16,8 @@ enum class GrowthEventType {
     BRANCH_READINESS_UNLOCKED,
     /** A morphology family’s affinity rose meaningfully vs last persist. */
     BRANCH_TENDENCY_STRENGTHENED,
+    /** Background ecology snapshots nudged adaptation / lineage (offline accumulation). */
+    AMBIENT_ECOLOGY_INFLUENCE,
 }
 
 data class GrowthEvent(
