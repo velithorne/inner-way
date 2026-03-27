@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,12 +43,11 @@ import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
 /**
- * Vessel tab: **only** [SeedPodScene] / [com.velithorne.vessel.renderer_seedpod.SeedPodRenderer].
- * Legacy [com.velithorne.vessel.renderer.VesselScene] is not used here.
+ * Vessel tab: **only** [SeedPodScene].
  *
- * **Layout rule:** The seed pod chamber is a **fixed-height** strip **immediately below**
- * [GrowthProgressCard] — not a [weight]-expanded region (which left a huge empty band and made the
- * pod read as “sitting at the bottom” of the screen).
+ * **Order (what you asked for):** header → **Developmental progress** → **Reset / Anatomy + Vessel
+ * overlay + organ chips** (this block sits directly under the progress card) → **seed pod chamber**
+ * fills the rest of the screen below.
  */
 @Composable
 fun VesselScreen(
@@ -76,11 +73,6 @@ fun VesselScreen(
     val gestureController = remember(tuning) { SeedPodGestureController(tuning) }
 
     var chamberOffset by remember { mutableStateOf(Offset.Zero) }
-    val bottomScroll = rememberScrollState()
-    val configuration = LocalConfiguration.current
-    val chamberHeight = remember(configuration.screenHeightDp) {
-        (configuration.screenHeightDp * 0.36f).dp.coerceIn(220.dp, 300.dp)
-    }
 
     Column(
         modifier = modifier
@@ -133,11 +125,68 @@ fun VesselScreen(
             )
         }
 
-        // Chamber: **fixed height** directly under progress — avoids a tall empty [weight] region.
+        // —— Immediately under Developmental progress (not at screen bottom) ——
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VesselControlChip(
+                label = "Reset view",
+                onClick = {
+                    gestureController.requestResetNextFrame()
+                    viewModel.selectSeedPodTarget(null)
+                },
+            )
+            VesselControlChip(
+                label = if (sheetVisible) "Hide detail" else "Anatomy",
+                onClick = {
+                    if (selectedOrgan != null) {
+                        viewModel.showVesselSheet(!sheetVisible)
+                    }
+                },
+            )
+        }
+        VesselStatusOverlay(
+            stateLabel = scene.physiology.species.healthLabel,
+            vitality = scene.physiology.species.vitality,
+            feverLabel = feverWord(scene.physiology.species.fever),
+            hungerLabel = hungerWord(scene.physiology.species.hunger),
+            selectedOrganName = selectedOrgan?.let { organDisplayName(it) },
+            statusLine = scene.physiology.species.stateSummary,
+            growthHint = podUi.statusLine.takeIf { it.isNotEmpty() },
+            expanded = overlayExpanded,
+            onToggleInfo = { overlayExpanded = !overlayExpanded },
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            physiology.organs.distinctBy { it.organType }.forEach { o ->
+                val short = when (o.organType) {
+                    OrganType.METABOLIC_HEART -> "Heart"
+                    OrganType.CORTEX_CLUSTER -> "Cortex"
+                    OrganType.NEURAL_GEL -> "Gel"
+                    OrganType.ARCHIVE_VAULT -> "Vault"
+                    OrganType.SIGNAL_LUNGS -> "Lungs"
+                    OrganType.VESTIBULAR_MUSCULATURE -> "Vestibular"
+                    OrganType.THERMAL_MEMBRANE -> "Thermal"
+                }
+                VesselLegendChip(label = "$short · ${Formatters.formatUnitInterval(o.health)}")
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Seed pod viewport — below the stats block, fills remaining height
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(chamberHeight),
+                .weight(1f, fill = true),
             contentAlignment = Alignment.TopCenter,
         ) {
             Box(
@@ -157,71 +206,6 @@ fun VesselScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-
-        // Controls + readouts: fill remainder and scroll (starts right below chamber, not screen bottom).
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true)
-                .verticalScroll(bottomScroll),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                VesselControlChip(
-                    label = "Reset view",
-                    onClick = {
-                        gestureController.requestResetNextFrame()
-                        viewModel.selectSeedPodTarget(null)
-                    },
-                )
-                VesselControlChip(
-                    label = if (sheetVisible) "Hide detail" else "Anatomy",
-                    onClick = {
-                        if (selectedOrgan != null) {
-                            viewModel.showVesselSheet(!sheetVisible)
-                        }
-                    },
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            VesselStatusOverlay(
-                stateLabel = scene.physiology.species.healthLabel,
-                vitality = scene.physiology.species.vitality,
-                feverLabel = feverWord(scene.physiology.species.fever),
-                hungerLabel = hungerWord(scene.physiology.species.hunger),
-                selectedOrganName = selectedOrgan?.let { organDisplayName(it) },
-                statusLine = scene.physiology.species.stateSummary,
-                growthHint = podUi.statusLine.takeIf { it.isNotEmpty() },
-                expanded = overlayExpanded,
-                onToggleInfo = { overlayExpanded = !overlayExpanded },
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                physiology.organs.distinctBy { it.organType }.forEach { o ->
-                    val short = when (o.organType) {
-                        OrganType.METABOLIC_HEART -> "Heart"
-                        OrganType.CORTEX_CLUSTER -> "Cortex"
-                        OrganType.NEURAL_GEL -> "Gel"
-                        OrganType.ARCHIVE_VAULT -> "Vault"
-                        OrganType.SIGNAL_LUNGS -> "Lungs"
-                        OrganType.VESTIBULAR_MUSCULATURE -> "Vestibular"
-                        OrganType.THERMAL_MEMBRANE -> "Thermal"
-                    }
-                    VesselLegendChip(label = "$short · ${Formatters.formatUnitInterval(o.health)}")
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 

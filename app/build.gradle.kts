@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.7.2-chamber-under-progress"
+        versionCode = 21
+        versionName = "1.7.3-stats-under-progress"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
