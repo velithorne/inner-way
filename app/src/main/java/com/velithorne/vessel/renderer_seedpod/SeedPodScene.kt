@@ -33,7 +33,6 @@ fun SeedPodScene(
     scene: SeedPodSceneState,
     selectedTarget: String?,
     gestureController: SeedPodGestureController,
-    renderOffset: Offset,
     onSelectTarget: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -66,7 +65,7 @@ fun SeedPodScene(
                     )
                 }
             }
-            .pointerInput(scene, physiology.timestampMillis, selectedTarget, renderOffset) {
+            .pointerInput(scene, physiology.timestampMillis, selectedTarget) {
                 detectTapGestures(
                     onDoubleTap = {
                         val parallaxOff = parallax.step(
@@ -87,7 +86,6 @@ fun SeedPodScene(
                         )
                         val hit = SeedPodHitTest.hitTarget(
                             tapCanvas = offset,
-                            renderOffset = renderOffset,
                             camera = gestureController.camera,
                             tuning = tuning,
                             viewportW = size.width.toFloat(),
@@ -136,7 +134,6 @@ fun SeedPodScene(
             parallax = parallaxOff,
             particles = motes,
             camera = gestureController.camera,
-            renderOffset = renderOffset,
         )
 
         val sleepVignette = scene.sleepDimming.coerceIn(0f, 1f)

@@ -6,6 +6,6 @@ package com.velithorne.vessel.renderer_seedpod
  */
 object SeedPodLayout {
     const val anchorXNormalized: Float = 0.5f
-    /** Upper chamber — pod reads in the **upper-middle** of the viewport, not sitting on the bottom edge. */
-    const val anchorYNormalized: Float = 0.30f
+    /** Upper-middle of the fixed viewport (local canvas; see SeedPodPainter — no root offset). */
+    const val anchorYNormalized: Float = 0.38f
 }

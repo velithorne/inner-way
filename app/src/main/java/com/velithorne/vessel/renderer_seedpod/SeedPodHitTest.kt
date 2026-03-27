@@ -18,7 +18,6 @@ object SeedPodHitTest {
 
     fun screenToPodPlane(
         tapCanvas: Offset,
-        renderOffset: Offset,
         camera: SeedPodCameraState,
         tuning: SeedPodTuning,
         viewportW: Float,
@@ -31,7 +30,7 @@ object SeedPodHitTest {
         val c = kotlin.math.cos(rad.toDouble()).toFloat()
         val s = kotlin.math.sin(rad.toDouble()).toFloat()
         val z = camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom)
-        val p = tapCanvas - renderOffset - vc
+        val p = tapCanvas - vc
         val prx = p.x * c - p.y * s
         val pry = p.x * s + p.y * c
         val u = prx / z + vc.x - camera.panX
@@ -44,7 +43,6 @@ object SeedPodHitTest {
      */
     fun hitTarget(
         tapCanvas: Offset,
-        renderOffset: Offset,
         camera: SeedPodCameraState,
         tuning: SeedPodTuning,
         viewportW: Float,
@@ -53,7 +51,7 @@ object SeedPodHitTest {
         stressShiverDeg: Float,
     ): String? {
         if (viewportW <= 1f) return null
-        val p = screenToPodPlane(tapCanvas, renderOffset, camera, tuning, viewportW, viewportH, stressShiverDeg)
+        val p = screenToPodPlane(tapCanvas, camera, tuning, viewportW, viewportH, stressShiverDeg)
         val pod = SeedPodFraming.podCenterPx(viewportW, viewportH, parallax)
         val d = hypot(p.x - pod.x, p.y - pod.y)
         val minDim = min(viewportW, viewportH)

@@ -29,7 +29,6 @@ object SeedPodPainter {
         parallax: Offset,
         particles: List<ParticleDraw>,
         camera: SeedPodCameraState,
-        renderOffset: Offset,
     ) {
         val w = scope.size.width
         val h = scope.size.height
@@ -39,8 +38,9 @@ object SeedPodPainter {
         val d = scene.podDisplay
         val palette = scene.palette
 
-        scope.translate(renderOffset.x, renderOffset.y) {
-            translate(vc.x, vc.y) {
+        // Canvas coordinates are already local to this viewport — do NOT translate by
+        // positionInRoot() (that would shift the entire specimen off the bottom of the canvas).
+        scope.translate(vc.x, vc.y) {
                 rotate(
                     degrees = camera.rotationDeg + camera.tiltDeg * 0.35f + scene.stressShiver * tuning.stressShiverDegrees * 0.25f,
                     pivot = Offset.Zero,
@@ -162,7 +162,6 @@ object SeedPodPainter {
                     }
                 }
             }
-        }
     }
 
     private fun drawChamberBackdrop(
