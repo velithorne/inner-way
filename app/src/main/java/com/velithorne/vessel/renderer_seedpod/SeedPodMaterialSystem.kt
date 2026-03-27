@@ -207,6 +207,17 @@ object SeedPodMaterialSystem {
                 budScale = g.chamberingBudScale,
                 closedness = g.chamberingClosedness,
             )
+            SeedPodGrowthStage.CHAMBER_MATURED -> StageMul(
+                shellDim = g.chamberingShellDim * 1.02f,
+                edgeBoost = g.chamberingEdge * 1.05f,
+                hazeMul = g.chamberingHaze * 1.04f,
+                nucleusBoost = g.chamberingNucleus * 1.05f,
+                facetBoost = g.chamberingFacet * 1.05f,
+                growthFrontMul = g.chamberingGrowthFront * 0.85f,
+                spotlightMul = g.chamberingSpotlight * 1.05f,
+                budScale = g.chamberingBudScale * 1.02f,
+                closedness = (g.chamberingClosedness * 0.92f).coerceIn(0.12f, 0.95f),
+            )
         }
     }
 }

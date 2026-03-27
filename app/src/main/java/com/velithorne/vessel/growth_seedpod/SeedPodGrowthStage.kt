@@ -9,4 +9,9 @@ enum class SeedPodGrowthStage {
     GERMINATING_POD,
     EARLY_BUDDING,
     EARLY_CHAMBERING,
+    /**
+     * Final seed-pod envelope — append-only ordinal for Room; must stay last.
+     * Reached after sustained refinement in early chambering.
+     */
+    CHAMBER_MATURED,
 }

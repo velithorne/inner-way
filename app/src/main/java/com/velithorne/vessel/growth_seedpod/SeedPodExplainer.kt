@@ -18,6 +18,7 @@ object SeedPodExplainer {
         SeedPodGrowthStage.GERMINATING_POD -> "Germinating pod"
         SeedPodGrowthStage.EARLY_BUDDING -> "Early budding"
         SeedPodGrowthStage.EARLY_CHAMBERING -> "Early chambering"
+        SeedPodGrowthStage.CHAMBER_MATURED -> "Chamber matured"
     }
 
     fun statusLine(phys: PhysiologySnapshot, state: SeedPodGrowthState): String {

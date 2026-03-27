@@ -25,7 +25,7 @@ import com.velithorne.vessel.data.db.entity.SpecimenEntity
         AdaptationEventEntity::class,
         ReturnSummaryEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class VesselDatabase : RoomDatabase() {

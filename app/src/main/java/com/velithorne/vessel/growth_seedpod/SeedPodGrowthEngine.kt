@@ -60,6 +60,16 @@ object SeedPodGrowthEngine {
         return SeedPodGrowthState(display = display, budget = budget)
     }
 
+    /** 0..1 — how fully the pod has refined after reaching the chambering phase. */
+    fun maturityScore(d: SeedPodDisplayState): Float {
+        val lat = (d.lateralBudLeft + d.lateralBudRight) * 0.5f
+        return (
+            d.crownNub * 0.12f + lat * 0.12f + d.reserveBulb * 0.1f +
+                d.tissueHaze * 0.2f + d.podCoherence * 0.18f +
+                d.shellThickening * 0.16f + d.thermalVeil * 0.12f
+            ).coerceIn(0f, 1f)
+    }
+
     fun initialDisplay(): SeedPodDisplayState = SeedPodDisplayState(
         stage = SeedPodGrowthStage.DORMANT_POD,
         // Keep activity = crown + lateralL + lateralR + reserve + haze < 0.18 so first frame stays DORMANT.
@@ -81,7 +91,8 @@ object SeedPodGrowthEngine {
             activity < 0.35f -> SeedPodGrowthStage.ACTIVATING_POD
             activity < 0.55f -> SeedPodGrowthStage.GERMINATING_POD
             d.tissueHaze < 0.42f -> SeedPodGrowthStage.EARLY_BUDDING
-            else -> SeedPodGrowthStage.EARLY_CHAMBERING
+            maturityScore(d) < 0.82f -> SeedPodGrowthStage.EARLY_CHAMBERING
+            else -> SeedPodGrowthStage.CHAMBER_MATURED
         }
     }
 }

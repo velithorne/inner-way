@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 30
-        versionName = "2.0.0-seedpod-25d-depth-material"
+        versionCode = 31
+        versionName = "2.0.1-growth-maturity-charge-halo"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

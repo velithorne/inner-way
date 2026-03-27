@@ -105,9 +105,10 @@ class SeedPodGrowthCoordinator(
 
     fun progressFraction(): Float {
         val d = state.display
-        return (
-            d.crownNub * 0.22f + d.lateralBudLeft * 0.18f + d.reserveBulb * 0.18f +
-                d.tissueHaze * 0.22f + d.podCoherence * 0.2f
-            ).coerceIn(0f, 1f)
+        val lastIdx = (SeedPodGrowthStage.entries.size - 1).coerceAtLeast(1)
+        val stageSlot = d.stage.ordinal / lastIdx.toFloat()
+        val refine = SeedPodGrowthEngine.maturityScore(d)
+        // Stage drives the broad arc; maturity fills refinement within / between stages.
+        return (stageSlot * 0.52f + refine * 0.48f).coerceIn(0f, 1f)
     }
 }

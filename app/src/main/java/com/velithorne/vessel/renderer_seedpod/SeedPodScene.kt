@@ -150,19 +150,22 @@ fun SeedPodScene(
             )
         }
 
+        // In-app charge halo: centered on the same anchor as the pod (see SeedPodLayout / SeedPodFraming).
         if (physiology.telemetry.isCharging == true) {
             val s = anim.pulsePhase(0.45f)
+            val podCenter = SeedPodFraming.podCenterPx(size.width, size.height, parallaxOff)
+            val r = size.minDimension * 0.42f
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
                         Color(0xFF4ECDC4).copy(alpha = 0f),
                         Color(0xFF4ECDC4).copy(alpha = 0.1f + sin(s) * 0.05f),
                     ),
-                    center = Offset(size.width * 0.5f, size.height * 0.55f),
-                    radius = size.minDimension * 0.42f,
+                    center = podCenter,
+                    radius = r,
                 ),
-                radius = size.minDimension * 0.42f,
-                center = Offset(size.width * 0.5f, size.height * 0.55f),
+                radius = r,
+                center = podCenter,
             )
         }
     }
