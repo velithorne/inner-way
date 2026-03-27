@@ -2,24 +2,24 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.velithorne.vessel.model.GrowthVisualState
-import com.velithorne.vessel.model.OrganInspectionState
-import com.velithorne.vessel.model.VesselVisualState
-import com.velithorne.vessel.morphogenesis.GrowthExplainer
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
 import com.velithorne.vessel.growthtime.GrowthSessionSummary
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
+import com.velithorne.vessel.growth_seedpod.SeedPodExplainer
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
+import com.velithorne.vessel.model.OrganInspectionState
+import com.velithorne.vessel.model.SeedPodVesselUiState
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.physiology.PhysiologySnapshot
-import com.velithorne.vessel.renderer.VesselRenderer
-import com.velithorne.vessel.renderer.VesselSceneState
+import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
+import com.velithorne.vessel.renderer_seedpod.SeedPodSceneState
 import com.velithorne.vessel.telemetry.TelemetryRepository
 import com.velithorne.vessel.telemetry.TelemetrySnapshot
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,13 +29,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 /**
- * Telemetry → physiology → vessel scene (Phase 3–4).
- * Phase 4: vessel organ selection + inspection content (camera stays in [VesselGestureController]).
+ * Telemetry → physiology → **SeedPod** scene for the Vessel tab.
+ * Legacy [com.velithorne.vessel.renderer.VesselRenderer] is **not** in this pipeline.
  */
 class TelemetryViewModel(
     private val repository: TelemetryRepository,
     private val physiologyEngine: PhysiologyEngine,
-    private val vesselRenderer: VesselRenderer,
+    private val seedPodRenderer: SeedPodRenderer,
+    private val seedPodGrowthCoordinator: SeedPodGrowthCoordinator,
     private val morphogenesisEngine: MorphogenesisEngine,
     private val growthTimeCoordinator: GrowthTimeCoordinator,
 ) : ViewModel() {
@@ -67,8 +68,8 @@ class TelemetryViewModel(
 
     private val initialMorphRaw = morphogenesisEngine.update(initialPhysiology)
     private val initialMorph = growthTimeCoordinator.process(initialMorphRaw)
-    private val initialScene = vesselRenderer.map(initialPhysiology, initialMorph)
 
+    /** Morphogenesis still runs for inspection/anatomy text — not for Vessel canvas. */
     val morphogenesis: StateFlow<MorphogenesisSnapshot> = physiology
         .map { raw ->
             growthTimeCoordinator.process(morphogenesisEngine.update(raw))
@@ -81,28 +82,29 @@ class TelemetryViewModel(
 
     val growthReturnSummary: StateFlow<GrowthSessionSummary?> = growthTimeCoordinator.returnSummary
 
-    val vesselScene: StateFlow<VesselSceneState> = combine(
-        physiology,
-        morphogenesis,
-    ) { phys, morph ->
-        vesselRenderer.map(phys, morph)
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = initialScene,
-    )
+    private val initialPodGrowth = seedPodGrowthCoordinator.process(initialPhysiology)
+    private val initialSeedPodScene = seedPodRenderer.map(initialPhysiology, initialPodGrowth.display)
 
-    val growthVisual: StateFlow<GrowthVisualState> = combine(
-        morphogenesis,
+    val seedPodScene: StateFlow<SeedPodSceneState> = physiology
+        .map { phys ->
+            val growth = seedPodGrowthCoordinator.process(phys)
+            seedPodRenderer.map(phys, growth.display)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = initialSeedPodScene,
+        )
+
+    val seedPodVesselUi: StateFlow<SeedPodVesselUiState> = combine(
+        seedPodScene,
         growthReturnSummary,
-    ) { morph, ret ->
-        GrowthVisualState(
-            snapshot = morph,
-            statusLabel = morph.growthStatusLabel,
-            statusLine = morph.growthStatusLine,
-            visibleActivity = morph.visibleGrowthActivity,
-            germinationStageLabel = GrowthExplainer.stageDisplayName(morph.germinationStage),
-            growthProgressFraction = growthTimeCoordinator.displayProgressFraction(),
+    ) { scene, ret ->
+        val gs = seedPodGrowthCoordinator.current()
+        SeedPodVesselUiState(
+            stageLabel = SeedPodExplainer.stageLabel(scene.stage),
+            statusLine = SeedPodExplainer.statusLine(scene.physiology, gs),
+            growthProgressFraction = seedPodGrowthCoordinator.progressFraction(),
             activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = ret,
@@ -110,13 +112,10 @@ class TelemetryViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = GrowthVisualState(
-            snapshot = initialMorph,
-            statusLabel = initialMorph.growthStatusLabel,
-            statusLine = initialMorph.growthStatusLine,
-            visibleActivity = initialMorph.visibleGrowthActivity,
-            germinationStageLabel = GrowthExplainer.stageDisplayName(initialMorph.germinationStage),
-            growthProgressFraction = growthTimeCoordinator.displayProgressFraction(),
+        initialValue = SeedPodVesselUiState(
+            stageLabel = SeedPodExplainer.stageLabel(initialPodGrowth.display.stage),
+            statusLine = SeedPodExplainer.statusLine(initialPhysiology, initialPodGrowth),
+            growthProgressFraction = seedPodGrowthCoordinator.progressFraction(),
             activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = growthTimeCoordinator.returnSummary.value,
@@ -127,16 +126,12 @@ class TelemetryViewModel(
         growthTimeCoordinator.dismissReturnSummary()
     }
 
-    val vesselVisual: StateFlow<VesselVisualState> = vesselScene
-        .map { VesselVisualState(scene = it) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = VesselVisualState(initialScene),
-        )
-
     private val _selectedVesselOrgan = MutableStateFlow<OrganType?>(null)
     val selectedVesselOrgan: StateFlow<OrganType?> = _selectedVesselOrgan
+
+    /** Seed pod tap target: "pod" | "thermal" — legacy organ selection uses [selectedVesselOrgan]. */
+    private val _selectedSeedPodTarget = MutableStateFlow<String?>(null)
+    val selectedSeedPodTarget: StateFlow<String?> = _selectedSeedPodTarget
 
     private val _vesselSheetVisible = MutableStateFlow(false)
     val vesselSheetVisible: StateFlow<Boolean> = _vesselSheetVisible
@@ -153,10 +148,26 @@ class TelemetryViewModel(
         initialValue = null,
     )
 
-
     fun selectVesselOrgan(type: OrganType?) {
         _selectedVesselOrgan.value = type
         _vesselSheetVisible.value = type != null
+        if (type != null) _selectedSeedPodTarget.value = null
+    }
+
+    fun selectSeedPodTarget(target: String?) {
+        _selectedSeedPodTarget.value = target
+        if (target == null) {
+            _selectedVesselOrgan.value = null
+            _vesselSheetVisible.value = false
+            return
+        }
+        val organ = when (target) {
+            "pod" -> OrganType.METABOLIC_HEART
+            "thermal" -> OrganType.THERMAL_MEMBRANE
+            else -> null
+        }
+        _selectedVesselOrgan.value = organ
+        _vesselSheetVisible.value = organ != null
     }
 
     fun showVesselSheet(visible: Boolean) {

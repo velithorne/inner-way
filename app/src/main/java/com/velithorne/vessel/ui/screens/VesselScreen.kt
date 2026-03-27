@@ -29,9 +29,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.physiology.OrganType
-import com.velithorne.vessel.renderer.RenderTuning
-import com.velithorne.vessel.renderer.VesselGestureController
-import com.velithorne.vessel.renderer.VesselScene
+import com.velithorne.vessel.renderer_seedpod.SeedPodGestureController
+import com.velithorne.vessel.renderer_seedpod.SeedPodScene
+import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
 import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
@@ -42,17 +42,22 @@ import com.velithorne.vessel.ui.components.VesselStatusOverlay
 import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
+/**
+ * Vessel tab: **only** [SeedPodScene] / [com.velithorne.vessel.renderer_seedpod.SeedPodRenderer].
+ * Legacy [com.velithorne.vessel.renderer.VesselScene] is not used here.
+ */
 @Composable
 fun VesselScreen(
     viewModel: TelemetryViewModel,
     modifier: Modifier = Modifier,
 ) {
     val physiology by viewModel.physiology.collectAsState()
-    val scene by viewModel.vesselScene.collectAsState()
-    val selected by viewModel.selectedVesselOrgan.collectAsState()
+    val scene by viewModel.seedPodScene.collectAsState()
+    val selectedOrgan by viewModel.selectedVesselOrgan.collectAsState()
+    val selectedPod by viewModel.selectedSeedPodTarget.collectAsState()
     val inspection by viewModel.organInspection.collectAsState()
     val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
-    val growth by viewModel.growthVisual.collectAsState()
+    val podUi by viewModel.seedPodVesselUi.collectAsState()
     val returnSummaryFlow by viewModel.growthReturnSummary.collectAsState()
     var showReturnSummarySheet by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(returnSummaryFlow) {
@@ -61,8 +66,8 @@ fun VesselScreen(
     }
     var overlayExpanded by rememberSaveable { mutableStateOf(false) }
 
-    val tuning = remember { RenderTuning() }
-    val gestureController = remember(tuning) { VesselGestureController(tuning) }
+    val tuning = remember { SeedPodTuning() }
+    val gestureController = remember(tuning) { SeedPodGestureController(tuning) }
 
     var chamberOffset by remember { mutableStateOf(Offset.Zero) }
 
@@ -77,15 +82,13 @@ fun VesselScreen(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        // Avoid Row+weight squeezing text to 0 width (per-character wrap glitch when sheet opens).
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 3.dp, bottom = 6.dp),
         ) {
-            // Full-width title row — never share a Row with chips (narrow width → per-char wrap).
             Text(
-                text = "Specimen 01 · vesica seed · pinch · pan · tilt · tap body for thermal readout",
+                text = "Specimen 01 · seed pod · pinch · pan · tilt · tap pod for readout",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
                 modifier = Modifier.fillMaxWidth(),
@@ -98,24 +101,23 @@ fun VesselScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(modifier = Modifier.weight(1f))
-                // Single primary stage chip — activity lives in statusLine below (no duplicate "Branching").
                 VesselStageChip(
-                    label = growth.germinationStageLabel,
+                    label = podUi.stageLabel,
                     modifier = Modifier.widthIn(max = 200.dp),
                 )
             }
-            if (growth.statusLine.isNotEmpty()) {
+            if (podUi.statusLine.isNotEmpty()) {
                 Text(
-                    text = growth.statusLine,
+                    text = podUi.statusLine,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
             GrowthProgressCard(
-                progress = growth.growthProgressFraction,
-                activeBudgetChannelLabel = growth.activeBudgetChannelLabel,
-                recentAwayLine = growth.recentAwayLine,
+                progress = podUi.growthProgressFraction,
+                activeBudgetChannelLabel = podUi.activeBudgetChannelLabel,
+                recentAwayLine = podUi.recentAwayLine,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
@@ -132,15 +134,13 @@ fun VesselScreen(
                         chamberOffset = coords.positionInRoot()
                     },
             ) {
-                VesselScene(
+                SeedPodScene(
                     physiology = physiology,
                     scene = scene,
-                    selectedOrgan = selected,
+                    selectedTarget = selectedPod,
                     gestureController = gestureController,
                     renderOffset = chamberOffset,
-                    onSelectOrgan = { organ ->
-                        viewModel.selectVesselOrgan(organ)
-                    },
+                    onSelectTarget = { viewModel.selectSeedPodTarget(it) },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -156,13 +156,13 @@ fun VesselScreen(
                 label = "Reset view",
                 onClick = {
                     gestureController.requestResetNextFrame()
-                    viewModel.selectVesselOrgan(null)
+                    viewModel.selectSeedPodTarget(null)
                 },
             )
             VesselControlChip(
                 label = if (sheetVisible) "Hide detail" else "Anatomy",
                 onClick = {
-                    if (selected != null) {
+                    if (selectedOrgan != null) {
                         viewModel.showVesselSheet(!sheetVisible)
                     }
                 },
@@ -170,13 +170,13 @@ fun VesselScreen(
         }
         Spacer(modifier = Modifier.height(4.dp))
         VesselStatusOverlay(
-            stateLabel = scene.healthLabel,
-            vitality = scene.vitalityDisplay,
-            feverLabel = scene.feverLabel,
-            hungerLabel = scene.hungerLabel,
-            selectedOrganName = selected?.let { organDisplayName(it) },
-            statusLine = scene.statusLine,
-            growthHint = growth.snapshot.explainerLines.firstOrNull(),
+            stateLabel = scene.physiology.species.healthLabel,
+            vitality = scene.physiology.species.vitality,
+            feverLabel = feverWord(scene.physiology.species.fever),
+            hungerLabel = hungerWord(scene.physiology.species.hunger),
+            selectedOrganName = selectedOrgan?.let { organDisplayName(it) },
+            statusLine = scene.physiology.species.stateSummary,
+            growthHint = podUi.statusLine.takeIf { it.isNotEmpty() },
             expanded = overlayExpanded,
             onToggleInfo = { overlayExpanded = !overlayExpanded },
         )
@@ -205,7 +205,7 @@ fun VesselScreen(
 
     VesselOrganSheet(
         inspection = inspection,
-        visible = sheetVisible && selected != null,
+        visible = sheetVisible && selectedOrgan != null,
         onDismiss = { viewModel.dismissVesselSheet() },
     )
 
@@ -217,6 +217,20 @@ fun VesselScreen(
             viewModel.dismissReturnGrowthSummary()
         },
     )
+}
+
+private fun feverWord(f: Float): String = when {
+    f > 0.65f -> "High"
+    f > 0.38f -> "Elevated"
+    f > 0.15f -> "Mild"
+    else -> "Norm"
+}
+
+private fun hungerWord(h: Float): String = when {
+    h > 0.7f -> "Severe"
+    h > 0.45f -> "Moderate"
+    h > 0.22f -> "Light"
+    else -> "Satiated"
 }
 
 private fun organDisplayName(type: OrganType): String = when (type) {

@@ -29,7 +29,8 @@ class MainActivity : ComponentActivity() {
         val factory = TelemetryViewModelFactory(
             repository = container.telemetryRepository,
             physiologyEngine = container.physiologyEngine,
-            vesselRenderer = container.vesselRenderer,
+            seedPodRenderer = container.seedPodRenderer,
+            seedPodGrowthCoordinator = container.seedPodGrowthCoordinator,
             morphogenesisEngine = container.morphogenesisEngine,
             growthTimeCoordinator = container.growthTimeCoordinator,
         )

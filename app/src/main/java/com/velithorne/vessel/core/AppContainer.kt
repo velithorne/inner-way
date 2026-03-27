@@ -2,10 +2,11 @@ package com.velithorne.vessel.core
 
 import android.app.Application
 import com.velithorne.vessel.BuildConfig
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.physiology.PhysiologyEngine
-import com.velithorne.vessel.renderer.VesselRenderer
+import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.telemetry.TelemetryRepository
 
 /**
@@ -25,8 +26,12 @@ class AppContainer(app: Application) {
     /** Process-scoped to preserve EMA state across ticks. */
     val physiologyEngine: PhysiologyEngine = PhysiologyEngine()
 
-    /** Telemetry → scene mapping (stateless); animation state lives in composables. */
-    val vesselRenderer: VesselRenderer = VesselRenderer()
+    /** Legacy organism renderer — **not** used by the Vessel tab (retained for reference / future removal). */
+    // val vesselRenderer: VesselRenderer = VesselRenderer()
+
+    /** Seed pod pipeline (Vessel tab only). */
+    val seedPodGrowthCoordinator: SeedPodGrowthCoordinator = SeedPodGrowthCoordinator(app)
+    val seedPodRenderer: SeedPodRenderer = SeedPodRenderer()
 
     val morphogenesisEngine: MorphogenesisEngine = MorphogenesisEngine()
 

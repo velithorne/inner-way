@@ -2,16 +2,18 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.physiology.PhysiologyEngine
-import com.velithorne.vessel.renderer.VesselRenderer
+import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.telemetry.TelemetryRepository
 
 class TelemetryViewModelFactory(
     private val repository: TelemetryRepository,
     private val physiologyEngine: PhysiologyEngine,
-    private val vesselRenderer: VesselRenderer,
+    private val seedPodRenderer: SeedPodRenderer,
+    private val seedPodGrowthCoordinator: SeedPodGrowthCoordinator,
     private val morphogenesisEngine: MorphogenesisEngine,
     private val growthTimeCoordinator: GrowthTimeCoordinator,
 ) : ViewModelProvider.Factory {
@@ -22,7 +24,8 @@ class TelemetryViewModelFactory(
             return TelemetryViewModel(
                 repository,
                 physiologyEngine,
-                vesselRenderer,
+                seedPodRenderer,
+                seedPodGrowthCoordinator,
                 morphogenesisEngine,
                 growthTimeCoordinator,
             ) as T
