@@ -12,14 +12,18 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.7.6-vessel-lazycolumn-layout"
+        versionCode = 25
+        versionName = "1.7.7-signed-release"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
+            // Unsigned release APKs cannot be installed (Android reports "invalid package").
+            // Sign with the debug keystore so dev/sideload builds install; use a release
+            // keystore + CI secrets for store builds.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
