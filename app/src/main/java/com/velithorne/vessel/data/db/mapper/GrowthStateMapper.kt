@@ -57,7 +57,12 @@ object GrowthStateMapper {
             smoothedStructuralProgress = e.smoothedStructuralProgress,
             morphologyBranch = branch,
         )
-        return SeedPodGrowthState(display = d, budget = b, structural = sg)
+        return SeedPodGrowthState(
+            display = d,
+            budget = b,
+            structural = sg,
+            morphogenesisBlob = e.morphogenesisBlob,
+        )
     }
 
     fun toEntity(
@@ -110,6 +115,7 @@ object GrowthStateMapper {
             leadingBranchOrdinal = state.structural.morphologyBranch.leadingBranchOrdinal,
             branchCommitmentLevel = state.structural.morphologyBranch.commitmentLevel,
             lastVisualExpressionMagnitude = lastVisualExpressionMagnitude,
+            morphogenesisBlob = state.morphogenesisBlob,
         )
     }
 }

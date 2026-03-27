@@ -42,17 +42,21 @@ object SeedPodPainter {
 
         val pod = SeedPodFraming.podCenterPx(w, h, parallax)
         val bv = scene.branchVisual
+        val ga = scene.generatedAnatomy
+        val bio = scene.biographyVisual
+        val phaseSec = anim.seconds + scene.animTimeSec
         val radii = SeedPodContourBuilder.radii(
             minDim = minDim,
             shellThickening = d.shellThickening,
             closedness = appearance.shellClosedness,
             tuning = tuning,
-            branchStretchX = bv.contourStretchXMul,
-            branchStretchY = bv.contourStretchYMul,
+            branchStretchX = bv.contourStretchXMul * (ga?.shellRxMul ?: 1f),
+            branchStretchY = bv.contourStretchYMul * (ga?.shellRyMul ?: 1f),
             shellThicknessMul = bv.shellThicknessMul,
         )
         val coreR = SeedPodContourBuilder.nucleusRadius(minDim, tuning) *
             (0.92f + appearance.nucleusBrightnessMul * 0.06f)
+        val podDraw = pod + Offset(0f, (ga?.verticalSkew ?: 0f) * minDim * 0.06f)
 
         scope.translate(vc.x, vc.y) {
             rotate(
@@ -68,15 +72,15 @@ object SeedPodPainter {
                         val podScope = this
 
                         SeedPodAtmospherePainter.drawBackdrop(podScope, w, h, parallax, palette, scene, tuning)
-                        SeedPodAtmospherePainter.drawRearDepthFog(podScope, w, h, pod, layers.rearAtmosphere, depth.rearDarkening, tuning)
+                        SeedPodAtmospherePainter.drawRearDepthFog(podScope, w, h, podDraw, layers.rearAtmosphere, depth.rearDarkening, tuning)
                         SeedPodAtmospherePainter.drawVolumetricBand(podScope, w, h, parallax, 0f)
                         SeedPodAtmospherePainter.drawVolumetricBand(podScope, w, h, parallax, 1f)
 
-                        SeedPodGlowPainter.drawSpotlight(podScope, w, h, pod, appearance, tuning)
+                        SeedPodGlowPainter.drawSpotlight(podScope, w, h, podDraw, appearance, tuning)
 
                         SeedPodShadowPainter.drawPodGroundShadow(
                             podScope,
-                            pod,
+                            podDraw,
                             radii.shellRx,
                             radii.shellRy,
                             depth,
@@ -85,7 +89,7 @@ object SeedPodPainter {
 
                         SeedPodShellPainter.drawRear(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             rearOffset = layers.rearShell,
                             radii = radii,
                             palette = palette,
@@ -98,7 +102,7 @@ object SeedPodPainter {
 
                         SeedPodInnerVolumePainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             layerOffset = layers.innerHaze,
                             radii = radii,
                             palette = palette,
@@ -110,7 +114,7 @@ object SeedPodPainter {
 
                         SeedPodNucleusPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             layerOffset = layers.nucleus,
                             recess = depth.nucleusRecessOffset,
                             coreR = coreR,
@@ -125,7 +129,7 @@ object SeedPodPainter {
 
                         SeedPodOcclusionPainter.drawNucleusOcclusion(
                             podScope,
-                            nucleusCenter = pod + layers.nucleus + depth.nucleusRecessOffset,
+                            nucleusCenter = podDraw + layers.nucleus + depth.nucleusRecessOffset,
                             coreR = coreR * depth.nucleusBurialScale,
                             depth = depth,
                             appearance = appearance,
@@ -134,7 +138,7 @@ object SeedPodPainter {
 
                         SeedPodBudPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             minDim = minDim,
                             buds = buds,
                             layers = layers,
@@ -148,16 +152,16 @@ object SeedPodPainter {
 
                         SeedPodBracingPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             radii = radii,
                             palette = palette,
                             branch = bv,
-                            phaseSec = anim.seconds,
+                            phaseSec = phaseSec,
                         )
 
                         SeedPodShellPainter.drawFront(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             frontOffset = layers.frontShell,
                             radii = radii,
                             palette = palette,
@@ -165,42 +169,50 @@ object SeedPodPainter {
                             appearance = appearance,
                             lighting = lighting,
                             shellThickening = d.shellThickening,
-                            phaseSec = anim.seconds,
+                            phaseSec = phaseSec,
                             closedness = appearance.shellClosedness,
                             tuning = tuning,
                         )
 
                         SeedPodGrowthFrontPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             layerOffset = layers.frontShell,
                             radii = radii,
                             palette = palette,
                             appearance = appearance,
-                            phaseSec = anim.seconds,
+                            phaseSec = phaseSec,
                             tuning = tuning,
                         )
 
                         SeedPodRimLightPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             rx = radii.shellRx,
                             ry = radii.shellRy,
                             layerOffset = layers.rimLight,
                             lighting = lighting,
                             palette = palette,
-                            phaseSec = anim.seconds,
+                            phaseSec = phaseSec,
+                        )
+
+                        SeedPodBiographyOverlayPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            bio = bio,
+                            phaseSec = phaseSec,
                         )
 
                         SeedPodThermalPainter.draw(
                             scope = podScope,
-                            pod = pod,
+                            pod = podDraw,
                             layerOffset = layers.frontShell,
                             radii = radii,
                             thermal = thermal,
                             lighting = lighting,
                             palette = palette,
-                            phaseSec = anim.seconds,
+                            phaseSec = phaseSec,
                             thermalVeilEmphasisMul = bv.thermalVeilEmphasisMul,
                         )
 

@@ -7,10 +7,13 @@ import com.velithorne.vessel.background.AmbientReopenProcessor
 import com.velithorne.vessel.background.BackgroundTuning
 import com.velithorne.vessel.background.ReturnSummaryComposer
 import com.velithorne.vessel.config.GrowthProfile
+import com.velithorne.vessel.config.SimulationMode
 import com.velithorne.vessel.branching.BranchInfluenceModel
 import com.velithorne.vessel.branching.BranchSelectionEngine
 import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.data.LineageRepository
+import com.velithorne.vessel.morphogenesis_core.MorphogenesisPersistenceCodec
+import com.velithorne.vessel.morphogenesis_core.SelfAssemblyCoordinator
 import com.velithorne.vessel.lineage.SeedPodReturnSummary
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.DevelopmentEngine
@@ -45,12 +48,17 @@ class SeedPodGrowthCoordinator(
     private var backgroundAtMs: Long = 0L
 
     private val maxOfflineCatchUpMs: Long = profile.seedPodMaxOfflineCatchUpMs
+    private val simulationMode: SimulationMode = profile.mode
+
+    private lateinit var selfAssembly: SelfAssemblyCoordinator
 
     init {
         runBlocking(Dispatchers.IO) {
             specimenId = lineageRepository.ensureActiveSpecimenExists()
             state = lineageRepository.ensureSeedRowForSpecimen(specimenId)
             lastWallMs = state.display.lastWallClockMs
+            selfAssembly = SelfAssemblyCoordinator(specimenId, simulationMode)
+            MorphogenesisPersistenceCodec.decode(state.morphogenesisBlob)?.let { selfAssembly.restorePersisted(it) }
         }
     }
 
@@ -235,8 +243,8 @@ class SeedPodGrowthCoordinator(
             tuning = progressionTuning,
         )
         val markers = lineageRepository.getAdaptationMarkersSync(specimenId)
-        val (device, ecology) = BranchInfluenceModel.fromTelemetryForStep(phys.telemetry, markers)
-        val targetAff = BranchInfluenceModel.targetAffinity(device, ecology, branchingTuning)
+        val (deviceProfile, ecology) = BranchInfluenceModel.fromTelemetryForStep(phys.telemetry, markers)
+        val targetAff = BranchInfluenceModel.targetAffinity(deviceProfile, ecology, branchingTuning)
         val branchNext = BranchSelectionEngine.step(
             prev = dev.structural.morphologyBranch,
             target = targetAff,
@@ -247,9 +255,24 @@ class SeedPodGrowthCoordinator(
         )
         val structuralWithBranch = dev.structural.copy(morphologyBranch = branchNext)
         val perm = structuralWithBranch.permanentStage
+        val snap = selfAssembly.step(
+            phys = phys,
+            stage = perm,
+            markers = markers,
+            device = deviceProfile,
+            nowMs = now,
+            timeSec = dtSec,
+        )
+        val blob = MorphogenesisPersistenceCodec.encode(
+            pressure = snap.pressure,
+            hidden = snap.hidden,
+            biography = snap.biography,
+        )
         return afterLive.copy(
             display = afterLive.display.copy(stage = perm),
             structural = structuralWithBranch,
+            morphogenesisBlob = blob,
+            lastSelfAssembly = snap,
         )
     }
 
@@ -267,5 +290,7 @@ class SeedPodGrowthCoordinator(
         state = lineageRepository.ensureSeedRowForSpecimen(specimenId)
         lastWallMs = state.display.lastWallClockMs
         backgroundAtMs = 0L
+        selfAssembly = SelfAssemblyCoordinator(specimenId, simulationMode)
+        MorphogenesisPersistenceCodec.decode(state.morphogenesisBlob)?.let { selfAssembly.restorePersisted(it) }
     }
 }

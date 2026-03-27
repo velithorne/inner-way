@@ -8,6 +8,8 @@ import com.velithorne.vessel.model.SeedPodDepthState
 import com.velithorne.vessel.model.SeedPodLightingState
 import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
+import com.velithorne.vessel.model.BiographyVisualState
+import com.velithorne.vessel.model.GeneratedAnatomyState
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -40,6 +42,11 @@ data class SeedPodSceneState(
     val liveExpression: LiveExpressionState,
     /** Legacy organism renderer is inactive when this pipeline is used — always false for UI/debug. */
     val legacyVesselRendererActive: Boolean,
+    /** Procedural self-assembly contour / tissue output — null before first coordinator step. */
+    val generatedAnatomy: GeneratedAnatomyState? = null,
+    val biographyVisual: BiographyVisualState = BiographyVisualState.neutral(),
+    /** Seconds for subtle phase-based drawing (thermal, scars). */
+    val animTimeSec: Float = 0f,
 ) {
     val stage: SeedPodGrowthStage get() = podDisplay.stage
 }

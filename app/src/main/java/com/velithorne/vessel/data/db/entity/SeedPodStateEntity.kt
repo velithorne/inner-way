@@ -61,4 +61,6 @@ data class SeedPodStateEntity(
     val branchCommitmentLevel: Int = 0,
     /** Last persisted branch visual expression 0..1 — for lineage event thresholds. */
     val lastVisualExpressionMagnitude: Float = 0f,
+    /** Self-assembly morphogenesis memory (pressure, hidden state, biography flags). */
+    val morphogenesisBlob: String? = null,
 )

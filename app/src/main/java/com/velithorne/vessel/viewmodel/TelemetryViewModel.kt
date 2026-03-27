@@ -25,6 +25,7 @@ import com.velithorne.vessel.lineage.SpecimenIdentity
 import com.velithorne.vessel.data.prefs.GrowthStateStore
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
+import com.velithorne.vessel.model.BiographyVisualState
 import com.velithorne.vessel.model.OrganInspectionState
 import com.velithorne.vessel.model.SeedPodVesselUiState
 import com.velithorne.vessel.physiology.OrganType
@@ -201,6 +202,9 @@ class TelemetryViewModel(
         initialPhysiology,
         initialPodGrowth.display.copy(stage = initialPodGrowth.structural.permanentStage),
         initialBranchVisual,
+        generatedAnatomy = initialPodGrowth.lastSelfAssembly?.anatomy,
+        biographyVisual = BiographyVisualState.fromNullable(initialPodGrowth.lastSelfAssembly?.biography),
+        animTimeSec = System.nanoTime() / 1_000_000_000f,
     )
 
     val seedPodScene: StateFlow<SeedPodSceneState> = physiology
@@ -212,7 +216,15 @@ class TelemetryViewModel(
                 growth.structural.permanentStage,
                 growthProfileProvider.profile.branching,
             )
-            seedPodRenderer.map(phys, display, branchVisual)
+            val snap = growth.lastSelfAssembly
+            seedPodRenderer.map(
+                phys,
+                display,
+                branchVisual,
+                generatedAnatomy = snap?.anatomy,
+                biographyVisual = BiographyVisualState.fromNullable(snap?.biography),
+                animTimeSec = System.nanoTime() / 1_000_000_000f,
+            )
         }
         .stateIn(
             scope = viewModelScope,

@@ -3,6 +3,7 @@ package com.velithorne.vessel.renderer_seedpod
 import androidx.compose.ui.geometry.Offset
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.model.BranchVisualState
+import com.velithorne.vessel.model.GeneratedAnatomyState
 import com.velithorne.vessel.model.SeedPodDepthState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
@@ -19,6 +20,7 @@ object SeedPodPseudoVolumeMapper {
         appearance: SeedPodVisualState,
         tuning: SeedPodTuning,
         branch: BranchVisualState = BranchVisualState.neutral(),
+        generatedAnatomy: GeneratedAnatomyState? = null,
     ): SeedPodDepthState {
         val s = physiology.species
         val vitality = s.vitality.coerceIn(0f, 1f)
@@ -45,11 +47,13 @@ object SeedPodPseudoVolumeMapper {
         }
 
         val td = tuning.depth
+        val tissueShell = generatedAnatomy?.tissueCenter?.shellPressure?.let { (it / 2f).coerceIn(0f, 1f) } ?: 0f
         val shellThick = (
             td.shellFrontThicknessBase +
                 appearance.shellOpacityMul * 0.12f +
                 fever * 0.08f +
-                (1f - hunger) * 0.06f
+                (1f - hunger) * 0.06f +
+                tissueShell * 0.06f
             ).coerceIn(0.25f, 1f) * branch.shellBandMul * branch.shellThicknessMul
 
         val rearDark = (
@@ -59,8 +63,9 @@ object SeedPodPseudoVolumeMapper {
                 recovery * 0.08f
             ).coerceIn(0.12f, 0.55f)
 
+        val tissueInner = generatedAnatomy?.tissueCenter?.density?.let { (it / 2f).coerceIn(0f, 1f) } ?: 0f
         val innerVol = (
-            appearance.innerHazeDensity * 0.4f + stageSep * 0.35f + neural * 0.15f
+            appearance.innerHazeDensity * 0.4f + stageSep * 0.35f + neural * 0.15f + tissueInner * 0.08f
             ).coerceIn(0.2f, 1f) * branch.innerMassMul
 
         val budDepth = (

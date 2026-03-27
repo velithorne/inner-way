@@ -64,6 +64,8 @@ object SeedPodGrowthEngine {
             display = display.copy(stage = prev.display.stage),
             budget = budget,
             structural = prev.structural,
+            morphogenesisBlob = prev.morphogenesisBlob,
+            lastSelfAssembly = prev.lastSelfAssembly,
         )
     }
 
