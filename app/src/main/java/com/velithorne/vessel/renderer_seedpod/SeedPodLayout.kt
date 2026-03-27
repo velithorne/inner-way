@@ -6,5 +6,6 @@ package com.velithorne.vessel.renderer_seedpod
  */
 object SeedPodLayout {
     const val anchorXNormalized: Float = 0.5f
-    const val anchorYNormalized: Float = 0.43f
+    /** Upper-mid suspension — reads higher in the chamber viewport. */
+    const val anchorYNormalized: Float = 0.38f
 }
