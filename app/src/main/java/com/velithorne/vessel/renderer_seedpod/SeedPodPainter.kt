@@ -183,11 +183,22 @@ object SeedPodPainter {
             topLeft = Offset.Zero,
             size = Size(w, h),
         )
+        // Mist must fade smoothly — a half-height rect from 0.35h caused a visible horizontal seam.
         val fogA = (0.05f + scene.particleDensity * 0.12f + scene.feverIntensity * 0.06f).coerceIn(0.04f, 0.22f)
+        val mist = palette.chamberMist
         scope.drawRect(
-            color = palette.chamberMist.copy(alpha = fogA * 0.85f),
-            topLeft = Offset(0f, h * 0.35f),
-            size = Size(w, h * 0.65f),
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to mist.copy(alpha = 0f),
+                    0.28f to mist.copy(alpha = fogA * 0.12f),
+                    0.55f to mist.copy(alpha = fogA * 0.45f),
+                    1f to mist.copy(alpha = fogA * 0.85f),
+                ),
+                startY = 0f,
+                endY = h,
+            ),
+            topLeft = Offset.Zero,
+            size = Size(w, h),
         )
     }
 
