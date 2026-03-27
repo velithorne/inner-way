@@ -2,6 +2,11 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.velithorne.vessel.background.AmbientEcologyPresentation
+import com.velithorne.vessel.background.AmbientEventIngestor
+import com.velithorne.vessel.background.EcologySnapshot
+import com.velithorne.vessel.background.EcologySnapshotSourceType
+import com.velithorne.vessel.background.ReturnSummaryComposer
 import com.velithorne.vessel.branching.BranchExplainer
 import com.velithorne.vessel.branching.BranchInfluenceModel
 import com.velithorne.vessel.branching.BranchingTuning
@@ -51,6 +56,7 @@ class TelemetryViewModel(
     private val morphogenesisEngine: MorphogenesisEngine,
     private val growthTimeCoordinator: GrowthTimeCoordinator,
     private val lineageRepository: LineageRepository,
+    private val ambientEventIngestor: AmbientEventIngestor,
 ) : ViewModel() {
 
     private val _seedPodReturnSummary = MutableStateFlow<SeedPodReturnSummary?>(null)
@@ -62,25 +68,54 @@ class TelemetryViewModel(
     private val _lineageSummary = MutableStateFlow<LineageSummary?>(null)
     val lineageSummary: StateFlow<LineageSummary?> = _lineageSummary.asStateFlow()
 
+    private val _ambientEcologyHintLine = MutableStateFlow("")
+
     init {
         loadIdentity()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 growthTimeCoordinator.markBackground()
                 seedPodGrowthCoordinator.markBackground()
+                viewModelScope.launch {
+                    ambientEventIngestor.onAppBackground()
+                }
             }
 
             override fun onStart(owner: LifecycleOwner) {
                 viewModelScope.launch {
                     val phys = physiologyEngine.update(repository.snapshot.value)
+                    val folded = seedPodGrowthCoordinator.foldPendingAmbientEcology(phys)
                     val summary = seedPodGrowthCoordinator.catchUpOffline(phys)
-                    if (summary != null && summary.lines.isNotEmpty()) {
-                        val key = summary.lines.joinToString("|") + summary.awaySeconds
+                    val merged = ReturnSummaryComposer.mergeWithExisting(
+                        folded?.lines.orEmpty(),
+                        summary,
+                        awaySeconds = summary?.awaySeconds ?: folded?.awaySeconds ?: 0L,
+                    )
+                    ambientEventIngestor.onAppForeground()
+                    val gs = seedPodGrowthCoordinator.current()
+                    lineageRepository.tryRecordEcologySnapshot(
+                        EcologySnapshot.fromTelemetryAndState(
+                            repository.snapshot.value,
+                            gs,
+                            EcologySnapshotSourceType.APP_RESUME,
+                        ),
+                    )
+                    val sid = seedPodGrowthCoordinator.specimenId()
+                    val recent = withContext(Dispatchers.IO) {
+                        lineageRepository.recentEcologySnapshots(sid, 24)
+                    }
+                    val meta = withContext(Dispatchers.IO) { lineageRepository.getAmbientEcologyMeta(sid) }
+                    _ambientEcologyHintLine.value = AmbientEcologyPresentation.build(
+                        recent,
+                        meta?.samplesSinceLastOpen ?: 0,
+                    ).vesselHintLine
+                    if (merged != null && merged.lines.isNotEmpty()) {
+                        val key = merged.lines.joinToString("|") + merged.awaySeconds
                         val show = withContext(Dispatchers.IO) {
                             lineageRepository.shouldShowSeedPodReturn(key)
                         }
                         if (show) {
-                            _seedPodReturnSummary.value = summary
+                            _seedPodReturnSummary.value = merged
                         }
                     }
                 }
@@ -165,7 +200,8 @@ class TelemetryViewModel(
         seedPodScene,
         growthReturnSummary,
         seedPodReturnSummary,
-    ) { scene, ret, seedRet ->
+        _ambientEcologyHintLine,
+    ) { scene, ret, seedRet, ambientHint ->
         val gs = seedPodGrowthCoordinator.current()
         val strain = scene.physiology.species.let {
             (it.stress * 0.5f + it.fever * 0.35f + (1f - it.vitality) * 0.15f).coerceIn(0f, 1f)
@@ -206,6 +242,7 @@ class TelemetryViewModel(
                     append(BranchExplainer.vignetteLine(lead, eco))
                 }
             },
+            ambientEcologyHintLine = ambientHint,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -251,6 +288,7 @@ class TelemetryViewModel(
                         append(BranchExplainer.vignetteLine(lead, eco))
                     }
                 },
+                ambientEcologyHintLine = "",
             )
         },
     )

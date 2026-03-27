@@ -169,6 +169,14 @@ fun VesselScreen(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+            if (podUi.ambientEcologyHintLine.isNotEmpty()) {
+                Text(
+                    text = podUi.ambientEcologyHintLine,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.42f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
         GrowthProgressCard(
             progress = podUi.growthProgressFraction,

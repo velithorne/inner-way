@@ -36,9 +36,11 @@ class MainActivity : ComponentActivity() {
             morphogenesisEngine = container.morphogenesisEngine,
             growthTimeCoordinator = container.growthTimeCoordinator,
             lineageRepository = container.lineageRepository,
+            ambientEventIngestor = container.ambientEventIngestor,
         )
         val lineageFactory = LineageViewModelFactory(
             lineageRepository = container.lineageRepository,
+            ecologySnapshotStore = container.ecologySnapshotStore,
         )
         setContent {
             VelithorneVesselTheme {

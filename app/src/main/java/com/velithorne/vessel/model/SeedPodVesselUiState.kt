@@ -23,4 +23,6 @@ data class SeedPodVesselUiState(
     /** Shown after lineage differentiation — morphology family leaning. */
     val branchStatusLine: String,
     val branchReasonLine: String,
+    /** One line about coarse background ecology sampling (WorkManager). */
+    val ambientEcologyHintLine: String,
 )

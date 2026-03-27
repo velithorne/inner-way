@@ -2,6 +2,8 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.velithorne.vessel.background.AmbientEcologyPresentation
+import com.velithorne.vessel.background.EcologySnapshotStore
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.lineage.AdaptationMarker
 import com.velithorne.vessel.lineage.GrowthEvent
@@ -10,6 +12,7 @@ import com.velithorne.vessel.lineage.LineageSummary
 import com.velithorne.vessel.lineage.SpecimenIdentity
 import com.velithorne.vessel.lineage.SpecimenLineage
 import com.velithorne.vessel.lineage.StageTransition
+import com.velithorne.vessel.model.AmbientEcologyUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,10 +27,12 @@ data class LineageUiState(
     val growthEvents: List<GrowthEvent> = emptyList(),
     val stageTransitions: List<StageTransition> = emptyList(),
     val adaptations: List<AdaptationMarker> = emptyList(),
+    val ambientEcology: AmbientEcologyUiState? = null,
 )
 
 class LineageViewModel(
     private val lineageRepository: LineageRepository,
+    private val ecologySnapshotStore: EcologySnapshotStore,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(LineageUiState())
@@ -51,6 +56,16 @@ class LineageViewModel(
             val adapt = withContext(Dispatchers.IO) {
                 lineageRepository.getAdaptationMarkers(id.specimenId)
             }
+            val recent = withContext(Dispatchers.IO) {
+                ecologySnapshotStore.recent(id.specimenId, 24)
+            }
+            val meta = withContext(Dispatchers.IO) {
+                lineageRepository.getAmbientEcologyMeta(id.specimenId)
+            }
+            val ambient = AmbientEcologyPresentation.build(
+                snapshots = recent,
+                samplesSinceOpen = meta?.samplesSinceLastOpen ?: 0,
+            )
             _ui.value = LineageUiState(
                 identity = id,
                 lineage = lineage,
@@ -58,6 +73,7 @@ class LineageViewModel(
                 growthEvents = hist.growthEvents,
                 stageTransitions = hist.stageTransitions,
                 adaptations = adapt,
+                ambientEcology = ambient,
             )
         }
     }

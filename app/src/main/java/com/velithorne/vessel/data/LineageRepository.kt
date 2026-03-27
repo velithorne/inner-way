@@ -2,7 +2,12 @@ package com.velithorne.vessel.data
 
 import android.content.Context
 import com.velithorne.vessel.BuildConfig
+import com.velithorne.vessel.background.BackgroundTuning
+import com.velithorne.vessel.background.EcologySnapshot
 import com.velithorne.vessel.data.db.VesselDatabase
+import com.velithorne.vessel.data.db.entity.AmbientEcologyMetaEntity
+import com.velithorne.vessel.data.db.entity.AmbientEventEntity
+import com.velithorne.vessel.data.db.mapper.EcologySnapshotMapper
 import com.velithorne.vessel.data.db.entity.AdaptationEventEntity
 import com.velithorne.vessel.data.db.entity.GrowthEventEntity
 import com.velithorne.vessel.data.db.entity.GrowthStageEventEntity
@@ -55,6 +60,9 @@ class LineageRepository(
     private val growthDao = db.growthEventDao()
     private val adaptDao = db.adaptationDao()
     private val returnDao = db.returnSummaryDao()
+    private val ecologyDao = db.ecologySnapshotDao()
+    private val ambientEventDao = db.ambientEventDao()
+    private val ambientMetaDao = db.ambientEcologyMetaDao()
     private val legacyPrefs = SeedPodStateStore(context)
 
     /** In-memory cache of last persisted pod row for diffing (updated after each persist). */
@@ -64,6 +72,9 @@ class LineageRepository(
 
     @Volatile
     private var cachedSpecimenId: String? = null
+
+    /** Active specimen id after [ensureActiveSpecimenExists] — for ambient hooks. */
+    val activeSpecimenIdOrNull: String? get() = cachedSpecimenId
 
     /**
      * **Where saved state is restored:** load from Room, or seed row from prefs if missing.
@@ -398,10 +409,82 @@ class LineageRepository(
         seedDao.deleteAll()
         specimenDao.deleteAll()
         returnDao.deleteAll()
+        ecologyDao.deleteAll()
+        ambientEventDao.deleteAll()
+        ambientMetaDao.deleteAll()
         legacyPrefs.clear()
         cachedSeedEntity = null
         cachedSpecimenId = null
     }
+
+    private val backgroundTuning = BackgroundTuning()
+
+    suspend fun insertEcologySnapshot(snap: EcologySnapshot, force: Boolean = false): Boolean {
+        val id = cachedSpecimenId ?: return false
+        val meta = ambientMetaDao.get(id) ?: AmbientEcologyMetaEntity(specimenId = id)
+        if (!force && snap.timestampMillis - meta.lastSnapshotWriteMillis < backgroundTuning.snapshotWriteDebounceMs) {
+            return false
+        }
+        val entity = EcologySnapshotMapper.toEntity(id, snap)
+        ecologyDao.insert(entity)
+        val count = ecologyDao.countForSpecimen(id)
+        val max = backgroundTuning.maxEcologySnapshotsPerSpecimen
+        if (count > max) ecologyDao.deleteOldestExcess(id, count - max)
+        ambientMetaDao.upsert(
+            meta.copy(
+                lastSnapshotWriteMillis = snap.timestampMillis,
+                samplesSinceLastOpen = meta.samplesSinceLastOpen + 1,
+            ),
+        )
+        return true
+    }
+
+    suspend fun insertAmbientEvent(kind: String, detail: String) {
+        val id = cachedSpecimenId ?: return
+        ambientEventDao.insert(
+            AmbientEventEntity(
+                specimenId = id,
+                timestampMillis = System.currentTimeMillis(),
+                kind = kind,
+                detail = detail,
+            ),
+        )
+        val count = ambientEventDao.countForSpecimen(id)
+        val max = backgroundTuning.maxAmbientEventsPerSpecimen
+        if (count > max) ambientEventDao.deleteOldestExcess(id, count - max)
+    }
+
+    suspend fun getAmbientEcologyMeta(specimenId: String): AmbientEcologyMetaEntity? =
+        ambientMetaDao.get(specimenId)
+
+    suspend fun upsertAmbientMeta(e: AmbientEcologyMetaEntity) {
+        ambientMetaDao.upsert(e)
+    }
+
+    suspend fun resetSamplesSinceOpen(specimenId: String) {
+        val m = ambientMetaDao.get(specimenId) ?: return
+        ambientMetaDao.upsert(m.copy(samplesSinceLastOpen = 0))
+    }
+
+    suspend fun updateLastAppliedSnapshotMillis(specimenId: String, ms: Long) {
+        val m = ambientMetaDao.get(specimenId) ?: AmbientEcologyMetaEntity(specimenId = specimenId)
+        ambientMetaDao.upsert(m.copy(lastAppliedSnapshotMillis = ms))
+    }
+
+    suspend fun unappliedEcologySnapshots(specimenId: String): List<EcologySnapshot> {
+        val meta = ambientMetaDao.get(specimenId) ?: return emptyList()
+        val rows = ecologyDao.since(specimenId, meta.lastAppliedSnapshotMillis)
+        return rows.map { EcologySnapshotMapper.fromEntity(it) }
+    }
+
+    suspend fun recentEcologySnapshots(specimenId: String, limit: Int = 12): List<EcologySnapshot> =
+        ecologyDao.recent(specimenId, limit).map { EcologySnapshotMapper.fromEntity(it) }
+
+    suspend fun recentAmbientEvents(specimenId: String, limit: Int = 8) =
+        ambientEventDao.recent(specimenId, limit)
+
+    /** Debounced ecology write from foreground — same rules as [insertEcologySnapshot]. */
+    suspend fun tryRecordEcologySnapshot(snap: EcologySnapshot): Boolean = insertEcologySnapshot(snap)
 
     suspend fun getReturnMeta(): ReturnSummaryEntity? = returnDao.getMeta()
 
