@@ -57,6 +57,7 @@ object LineageEngine {
         physiology: PhysiologySnapshot,
         offlineCatchUp: Boolean,
         nowMs: Long,
+        branchingTuning: BranchingTuning = BranchingTuning(),
     ): PersistenceBatch {
         val prevDisplay = previousEntity?.let { e ->
             SeedPodDisplayState(
@@ -117,7 +118,7 @@ object LineageEngine {
             lines += "Morphology family lead updated toward ${toB.displayName}."
         }
 
-        val bt = BranchingTuning()
+        val bt = branchingTuning
         if (previousEntity != null) {
             val prevR = previousEntity.branchReadiness
             val nextR = next.structural.morphologyBranch.branchReadiness

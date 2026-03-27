@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.velithorne.vessel.background.AmbientEcologyPresentation
 import com.velithorne.vessel.background.EcologySnapshotStore
+import com.velithorne.vessel.config.GrowthProfileProvider
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.lineage.AdaptationMarker
 import com.velithorne.vessel.lineage.GrowthEvent
@@ -35,6 +36,7 @@ class LineageViewModel(
     private val application: Application,
     private val lineageRepository: LineageRepository,
     private val ecologySnapshotStore: EcologySnapshotStore,
+    private val growthProfileProvider: GrowthProfileProvider,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(LineageUiState())
@@ -74,6 +76,7 @@ class LineageViewModel(
                 meta = meta,
                 lastEvent = lastEvt,
                 workScheduled = workOk,
+                tuning = growthProfileProvider.profile.background,
             )
             _ui.value = LineageUiState(
                 identity = id,

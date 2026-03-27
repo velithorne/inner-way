@@ -14,9 +14,9 @@ import kotlinx.coroutines.flow.asStateFlow
 class GrowthTimeCoordinator(
     context: Context,
     private val morphogenesisEngine: MorphogenesisEngine,
-    appVersionCode: Int,
+    timeTuning: TimeTuning,
 ) {
-    private val timeTuning = TimeTuning()
+    private val timeTuning = timeTuning
     private val growthStore = GrowthStateStore(context)
 
     private var budget: GrowthBudget = GrowthBudget()
@@ -122,6 +122,19 @@ class GrowthTimeCoordinator(
     }
 
     fun dismissReturnSummary() {
+        _returnSummary.value = null
+    }
+
+    /**
+     * Clears morphogenesis temporal state (prefs) — use after manual dev specimen reset or lineage wipe.
+     */
+    fun resetSessionState() {
+        growthStore.clear()
+        budget = GrowthBudget()
+        display = null
+        stageEnteredAtMs = GrowthClock.nowMillis()
+        lastWallMs = GrowthClock.nowMillis()
+        backgroundAtMs = 0L
         _returnSummary.value = null
     }
 

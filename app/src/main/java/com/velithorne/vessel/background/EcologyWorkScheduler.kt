@@ -13,8 +13,7 @@ const val ECOLOGY_PERIODIC_WORK_NAME = "velithorne_ecology_periodic"
 
 object EcologyWorkScheduler {
 
-    fun schedule(context: Context) {
-        val tuning = BackgroundTuning()
+    fun schedule(context: Context, tuning: BackgroundTuning) {
         val intervalMs = if (BuildConfig.DEBUG) tuning.devPeriodicWorkIntervalMs else tuning.periodicWorkIntervalMs
         val intervalMin = TimeUnit.MILLISECONDS.toMinutes(intervalMs).coerceAtLeast(15L)
         val constraints = Constraints.Builder()

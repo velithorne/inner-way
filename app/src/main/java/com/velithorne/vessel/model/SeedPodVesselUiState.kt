@@ -25,4 +25,6 @@ data class SeedPodVesselUiState(
     val branchReasonLine: String,
     /** One line about coarse background ecology sampling (WorkManager). */
     val ambientEcologyHintLine: String,
+    /** Non-null in debug when [com.velithorne.vessel.config.SimulationMode.DEV_SIMULATION] is active. */
+    val devSimulationHintLine: String? = null,
 )

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.velithorne.vessel.background.AmbientEventIngestor
+import com.velithorne.vessel.config.GrowthProfileProvider
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
@@ -22,6 +23,7 @@ class TelemetryViewModelFactory(
     private val growthTimeCoordinator: GrowthTimeCoordinator,
     private val lineageRepository: LineageRepository,
     private val ambientEventIngestor: AmbientEventIngestor,
+    private val growthProfileProvider: GrowthProfileProvider,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -37,6 +39,7 @@ class TelemetryViewModelFactory(
                 growthTimeCoordinator,
                 lineageRepository,
                 ambientEventIngestor,
+                growthProfileProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

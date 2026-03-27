@@ -17,11 +17,14 @@ object SeedPodGrowthEngine {
         phys: PhysiologySnapshot,
         prev: SeedPodGrowthState,
         dtSec: Float,
+        tuning: SeedPodGrowthTuning = SeedPodGrowthTuning.default(),
     ): SeedPodGrowthState {
         val s = phys.species
         val b0 = prev.budget
+        val gain = BUDGET_GAIN * tuning.budgetGainMultiplier
+        val decay = BUDGET_DECAY * tuning.budgetDecayMultiplier
         fun add(base: Float, pressure: Float) =
-            (base + pressure * BUDGET_GAIN * dtSec - BUDGET_DECAY * base * dtSec).coerceIn(0f, 1f)
+            (base + pressure * gain * dtSec - decay * base * dtSec).coerceIn(0f, 1f)
 
         val budget = SeedPodGrowthBudget(
             crown = add(b0.crown, s.neuralActivity),
@@ -33,8 +36,9 @@ object SeedPodGrowthEngine {
         )
 
         val d0 = prev.display
+        val lerp = LERP * tuning.displayLerpMultiplier
         fun toward(current: Float, target: Float): Float =
-            current + (target - current) * (LERP * max(0.5f, dtSec * 60f / 16f)).coerceIn(0.04f, 0.35f)
+            current + (target - current) * (lerp * max(0.5f, dtSec * 60f / 16f)).coerceIn(0.04f, 0.45f)
 
         val crownT = (budget.crown * 0.55f + s.neuralActivity * 0.35f).coerceIn(0f, 1f)
         val latT = (budget.lateral * 0.5f + s.signalArousal * 0.4f).coerceIn(0f, 1f)
@@ -64,13 +68,14 @@ object SeedPodGrowthEngine {
     }
 
     /** 0..1 — how fully the pod has refined after reaching the chambering phase. */
-    fun maturityScore(d: SeedPodDisplayState): Float {
+    fun maturityScore(d: SeedPodDisplayState, tuning: SeedPodGrowthTuning = SeedPodGrowthTuning.default()): Float {
         val lat = (d.lateralBudLeft + d.lateralBudRight) * 0.5f
-        return (
+        val m = (
             d.crownNub * 0.12f + lat * 0.12f + d.reserveBulb * 0.1f +
                 d.tissueHaze * 0.2f + d.podCoherence * 0.18f +
                 d.shellThickening * 0.16f + d.thermalVeil * 0.12f
-            ).coerceIn(0f, 1f)
+            ) * tuning.maturityScoreMultiplier
+        return m.coerceIn(0f, 1f)
     }
 
     fun initialDisplay(): SeedPodDisplayState = SeedPodDisplayState(

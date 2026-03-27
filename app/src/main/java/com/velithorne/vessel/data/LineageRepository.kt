@@ -2,6 +2,7 @@ package com.velithorne.vessel.data
 
 import android.content.Context
 import com.velithorne.vessel.BuildConfig
+import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.background.BackgroundTuning
 import com.velithorne.vessel.background.EcologySnapshot
 import com.velithorne.vessel.data.db.VesselDatabase
@@ -56,6 +57,8 @@ import kotlin.math.max
  */
 class LineageRepository(
     context: Context,
+    private val branchingTuning: BranchingTuning = BranchingTuning(),
+    private val backgroundTuning: BackgroundTuning = BackgroundTuning(),
 ) {
     private val db = VesselDatabase.create(context)
     private val specimenDao = db.specimenDao()
@@ -185,7 +188,14 @@ class LineageRepository(
         force: Boolean,
     ): LineageEngine.PersistenceBatch? {
         val now = System.currentTimeMillis()
-        val batch = LineageEngine.buildBatch(previousEntity, next, physiology, offlineCatchUp, now)
+        val batch = LineageEngine.buildBatch(
+            previousEntity,
+            next,
+            physiology,
+            offlineCatchUp,
+            now,
+            branchingTuning,
+        )
         val important = batch.stageTransition != null || batch.growthEvents.isNotEmpty() ||
             batch.returnSummaryLines.isNotEmpty() || offlineCatchUp
         if (!force && !important) return null
@@ -419,8 +429,6 @@ class LineageRepository(
         cachedSeedEntity = null
         cachedSpecimenId = null
     }
-
-    private val backgroundTuning = BackgroundTuning()
 
     suspend fun insertEcologySnapshot(snap: EcologySnapshot, force: Boolean = false): Boolean {
         val id = cachedSpecimenId ?: return false

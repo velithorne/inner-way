@@ -2,6 +2,7 @@ package com.velithorne.vessel.core
 
 import android.app.Application
 import com.velithorne.vessel.BuildConfig
+import com.velithorne.vessel.config.GrowthProfileProvider
 import com.velithorne.vessel.background.AmbientEventIngestor
 import com.velithorne.vessel.background.EcologySnapshot
 import com.velithorne.vessel.background.EcologySnapshotSourceType
@@ -37,7 +38,16 @@ class AppContainer(
 
     val physiologyEngine: PhysiologyEngine = PhysiologyEngine()
 
-    val lineageRepository: LineageRepository = LineageRepository(application)
+    /** Resolved once — drives progression, branching, ambient, temporal growth. */
+    val growthProfileProvider: GrowthProfileProvider = GrowthProfileProvider(application)
+
+    private val profile get() = growthProfileProvider.profile
+
+    val lineageRepository: LineageRepository = LineageRepository(
+        context = application,
+        branchingTuning = profile.branching,
+        backgroundTuning = profile.background,
+    )
 
     val morphogenesisEngine: MorphogenesisEngine = MorphogenesisEngine()
 
@@ -49,21 +59,22 @@ class AppContainer(
             growthStore = GrowthStateStore(application),
             morphogenesisEngine = morphogenesisEngine,
             lineageRepository = lineageRepository,
-            tuning = TimeTuning(),
+            tuning = profile.time,
         )
-        EcologyWorkScheduler.schedule(application)
+        EcologyWorkScheduler.schedule(application, profile.background)
     }
 
     val seedPodGrowthCoordinator: SeedPodGrowthCoordinator = SeedPodGrowthCoordinator(
         context = application,
         lineageRepository = lineageRepository,
+        profile = profile,
     )
     val seedPodRenderer: SeedPodRenderer = SeedPodRenderer()
 
     val growthTimeCoordinator: GrowthTimeCoordinator = GrowthTimeCoordinator(
         context = application,
         morphogenesisEngine = morphogenesisEngine,
-        appVersionCode = BuildConfig.VERSION_CODE,
+        timeTuning = profile.time,
     )
 
     val ecologySnapshotStore: EcologySnapshotStore = EcologySnapshotStore(lineageRepository)

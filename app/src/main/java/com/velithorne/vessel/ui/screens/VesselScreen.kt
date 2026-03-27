@@ -30,10 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.velithorne.vessel.BuildConfig
+import com.velithorne.vessel.config.SimulationMode
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.renderer_seedpod.SeedPodGestureController
 import com.velithorne.vessel.renderer_seedpod.SeedPodScene
 import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
+import com.velithorne.vessel.ui.components.DevSimulationCard
 import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.LiveConditionChip
 import com.velithorne.vessel.ui.components.StageStatusChip
@@ -177,6 +180,23 @@ fun VesselScreen(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
+            podUi.devSimulationHintLine?.let { hint ->
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        if (BuildConfig.DEBUG && podUi.devSimulationHintLine != null) {
+            DevSimulationCard(
+                mode = SimulationMode.DEV_SIMULATION,
+                onResetSpecimen = { viewModel.requestDevSpecimenReset() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            )
         }
         GrowthProgressCard(
             progress = podUi.growthProgressFraction,

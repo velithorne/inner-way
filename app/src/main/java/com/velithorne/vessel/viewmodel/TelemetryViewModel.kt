@@ -7,10 +7,13 @@ import com.velithorne.vessel.background.AmbientEcologyPresentation
 import com.velithorne.vessel.background.AmbientEventIngestor
 import com.velithorne.vessel.background.EcologySnapshot
 import com.velithorne.vessel.background.EcologySnapshotSourceType
+import com.velithorne.vessel.BuildConfig
 import com.velithorne.vessel.background.ReturnSummaryComposer
+import com.velithorne.vessel.config.DevSettingsStore
+import com.velithorne.vessel.config.GrowthProfileProvider
+import com.velithorne.vessel.config.SimulationMode
 import com.velithorne.vessel.branching.BranchExplainer
 import com.velithorne.vessel.branching.BranchInfluenceModel
-import com.velithorne.vessel.branching.BranchingTuning
 import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
@@ -19,6 +22,7 @@ import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.lineage.LineageSummary
 import com.velithorne.vessel.lineage.SeedPodReturnSummary
 import com.velithorne.vessel.lineage.SpecimenIdentity
+import com.velithorne.vessel.data.prefs.GrowthStateStore
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.model.OrganInspectionState
@@ -59,7 +63,12 @@ class TelemetryViewModel(
     private val growthTimeCoordinator: GrowthTimeCoordinator,
     private val lineageRepository: LineageRepository,
     private val ambientEventIngestor: AmbientEventIngestor,
+    private val growthProfileProvider: GrowthProfileProvider,
 ) : ViewModel() {
+
+    private val profile get() = growthProfileProvider.profile
+    private val branchingTuning get() = profile.branching
+    private val devSettings = DevSettingsStore(application)
 
     private val _seedPodReturnSummary = MutableStateFlow<SeedPodReturnSummary?>(null)
     val seedPodReturnSummary: StateFlow<SeedPodReturnSummary?> = _seedPodReturnSummary.asStateFlow()
@@ -73,6 +82,12 @@ class TelemetryViewModel(
     private val _ambientEcologyHintLine = MutableStateFlow("")
 
     init {
+        viewModelScope.launch {
+            if (devSettings.pendingSpecimenReset && BuildConfig.DEBUG) {
+                performDevSpecimenReset()
+                devSettings.clearPendingReset()
+            }
+        }
         loadIdentity()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
@@ -117,6 +132,7 @@ class TelemetryViewModel(
                         meta = meta,
                         lastEvent = lastEvt,
                         workScheduled = workOk,
+                        tuning = profile.background,
                     ).vesselHintLine
                     if (merged != null && merged.lines.isNotEmpty()) {
                         val key = merged.lines.joinToString("|") + merged.awaySeconds
@@ -174,8 +190,6 @@ class TelemetryViewModel(
         )
 
     val growthReturnSummary = growthTimeCoordinator.returnSummary
-
-    private val branchingTuning = BranchingTuning()
 
     private val initialPodGrowth = seedPodGrowthCoordinator.process(initialPhysiology)
     private val initialBranchVisual = SeedPodBranchMapper.map(
@@ -253,6 +267,9 @@ class TelemetryViewModel(
                 }
             },
             ambientEcologyHintLine = ambientHint,
+            devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
+                "Accelerated growth profile (dev)"
+            } else null,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -299,9 +316,30 @@ class TelemetryViewModel(
                     }
                 },
                 ambientEcologyHintLine = "",
+                devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
+                    "Accelerated growth profile (dev)"
+                } else null,
             )
         },
     )
+
+    fun requestDevSpecimenReset() {
+        if (!BuildConfig.DEBUG || profile.mode != SimulationMode.DEV_SIMULATION) return
+        devSettings.pendingSpecimenReset = true
+        viewModelScope.launch { performDevSpecimenReset() }
+    }
+
+    private suspend fun performDevSpecimenReset() {
+        withContext(Dispatchers.IO) {
+            lineageRepository.clearAllLineage()
+            GrowthStateStore(application).clear()
+        }
+        morphogenesisEngine.resetForNewBuild()
+        growthTimeCoordinator.resetSessionState()
+        seedPodGrowthCoordinator.reloadFromRepository()
+        _seedPodReturnSummary.value = null
+        loadIdentity()
+    }
 
     fun dismissReturnGrowthSummary() {
         growthTimeCoordinator.dismissReturnSummary()

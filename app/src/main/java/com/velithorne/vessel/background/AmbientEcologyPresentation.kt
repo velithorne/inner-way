@@ -15,7 +15,7 @@ object AmbientEcologyPresentation {
         meta: AmbientEcologyMetaEntity?,
         lastEvent: AmbientEventEntity?,
         workScheduled: Boolean,
-        tuning: BackgroundTuning = BackgroundTuning(),
+        tuning: BackgroundTuning,
     ): AmbientEcologyUiState {
         val acc = AmbientGrowthAccumulator.accumulate(snapshots, tuning)
         val driver = when (acc.dominantDriver) {

@@ -6,6 +6,7 @@ import com.velithorne.vessel.background.AmbientProgressionApplicator
 import com.velithorne.vessel.background.AmbientReopenProcessor
 import com.velithorne.vessel.background.BackgroundTuning
 import com.velithorne.vessel.background.ReturnSummaryComposer
+import com.velithorne.vessel.config.GrowthProfile
 import com.velithorne.vessel.branching.BranchInfluenceModel
 import com.velithorne.vessel.branching.BranchSelectionEngine
 import com.velithorne.vessel.branching.BranchingTuning
@@ -27,6 +28,7 @@ import kotlin.math.min
 class SeedPodGrowthCoordinator(
     context: Context,
     private val lineageRepository: LineageRepository,
+    profile: GrowthProfile,
 ) {
     private var state: SeedPodGrowthState
     private var lastWallMs: Long = System.currentTimeMillis()
@@ -34,14 +36,15 @@ class SeedPodGrowthCoordinator(
     private var tick: Int = 0
     private lateinit var specimenId: String
 
-    private val progressionTuning = ProgressionTuning()
-    private val branchingTuning = BranchingTuning()
-    private val ambientTuning = BackgroundTuning()
+    private val progressionTuning: ProgressionTuning = profile.progression
+    private val branchingTuning: BranchingTuning = profile.branching
+    private val ambientTuning: BackgroundTuning = profile.background
+    private val seedGrowthTuning: SeedPodGrowthTuning = profile.seedPodGrowth
 
     /** Wall time when app went to background — for resume catch-up. */
     private var backgroundAtMs: Long = 0L
 
-    private val maxOfflineCatchUpMs = 120_000L
+    private val maxOfflineCatchUpMs: Long = profile.seedPodMaxOfflineCatchUpMs
 
     init {
         runBlocking(Dispatchers.IO) {
@@ -220,8 +223,8 @@ class SeedPodGrowthCoordinator(
 
     private fun stepWithProgression(phys: PhysiologySnapshot, prev: SeedPodGrowthState, dtSec: Float): SeedPodGrowthState {
         val now = System.currentTimeMillis()
-        val afterLive = SeedPodGrowthEngine.step(phys, prev, dtSec)
-        val mat = SeedPodGrowthEngine.maturityScore(afterLive.display)
+        val afterLive = SeedPodGrowthEngine.step(phys, prev, dtSec, seedGrowthTuning)
+        val mat = SeedPodGrowthEngine.maturityScore(afterLive.display, seedGrowthTuning)
         val dev = DevelopmentEngine.step(
             prev = afterLive.structural,
             liveDisplay = afterLive.display,
@@ -255,4 +258,14 @@ class SeedPodGrowthCoordinator(
     fun specimenId(): String = specimenId
 
     fun progressFraction(): Float = state.structural.smoothedStructuralProgress
+
+    /**
+     * After [LineageRepository.clearAllLineage] (e.g. manual dev reset), reload specimen + state from Room.
+     */
+    suspend fun reloadFromRepository() {
+        specimenId = lineageRepository.ensureActiveSpecimenExists()
+        state = lineageRepository.ensureSeedRowForSpecimen(specimenId)
+        lastWallMs = state.display.lastWallClockMs
+        backgroundAtMs = 0L
+    }
 }
