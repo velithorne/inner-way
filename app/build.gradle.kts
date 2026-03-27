@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.7.3-stats-under-progress"
+        versionCode = 22
+        versionName = "1.7.4-chamber-visible-no-scroll-hunt"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
