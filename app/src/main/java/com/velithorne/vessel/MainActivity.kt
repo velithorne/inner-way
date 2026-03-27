@@ -13,6 +13,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.velithorne.vessel.ui.screens.VesselMainScreen
 import com.velithorne.vessel.ui.theme.VelithorneVesselTheme
 import com.velithorne.vessel.ui.theme.VesselBg
+import com.velithorne.vessel.viewmodel.LineageViewModel
+import com.velithorne.vessel.viewmodel.LineageViewModelFactory
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 import com.velithorne.vessel.viewmodel.TelemetryViewModelFactory
 
@@ -33,6 +35,10 @@ class MainActivity : ComponentActivity() {
             seedPodGrowthCoordinator = container.seedPodGrowthCoordinator,
             morphogenesisEngine = container.morphogenesisEngine,
             growthTimeCoordinator = container.growthTimeCoordinator,
+            lineageRepository = container.lineageRepository,
+        )
+        val lineageFactory = LineageViewModelFactory(
+            lineageRepository = container.lineageRepository,
         )
         setContent {
             VelithorneVesselTheme {
@@ -42,7 +48,11 @@ class MainActivity : ComponentActivity() {
                         .background(VesselBg),
                 ) {
                     val vm: TelemetryViewModel = viewModel(factory = factory)
-                    VesselMainScreen(viewModel = vm)
+                    val lineageVm: LineageViewModel = viewModel(factory = lineageFactory)
+                    VesselMainScreen(
+                        viewModel = vm,
+                        lineageViewModel = lineageVm,
+                    )
                 }
             }
         }

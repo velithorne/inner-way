@@ -1,5 +1,6 @@
 package com.velithorne.vessel.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,7 @@ import com.velithorne.vessel.renderer_seedpod.SeedPodScene
 import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
 import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
+import com.velithorne.vessel.ui.components.SeedPodReturnSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
@@ -68,6 +70,7 @@ private fun Modifier.vesselDebugBorder(
 fun VesselScreen(
     viewModel: TelemetryViewModel,
     modifier: Modifier = Modifier,
+    onOpenLineage: () -> Unit = {},
 ) {
     val physiology by viewModel.physiology.collectAsState()
     val scene by viewModel.seedPodScene.collectAsState()
@@ -77,10 +80,15 @@ fun VesselScreen(
     val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
     val podUi by viewModel.seedPodVesselUi.collectAsState()
     val returnSummaryFlow by viewModel.growthReturnSummary.collectAsState()
+    val seedPodReturn by viewModel.seedPodReturnSummary.collectAsState()
     var showReturnSummarySheet by rememberSaveable { mutableStateOf(false) }
+    var showSeedPodReturnSheet by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(returnSummaryFlow) {
         val s = returnSummaryFlow
         showReturnSummarySheet = s != null && s.deltas.isNotEmpty()
+    }
+    LaunchedEffect(seedPodReturn) {
+        showSeedPodReturnSheet = seedPodReturn != null && seedPodReturn!!.lines.isNotEmpty()
     }
     var overlayExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -96,11 +104,25 @@ fun VesselScreen(
             .verticalScroll(scrollState),
     ) {
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Silicon seed chamber",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Silicon seed chamber",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = "Lineage",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable { onOpenLineage() }
+                    .padding(start = 8.dp),
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -247,6 +269,15 @@ fun VesselScreen(
         onDismiss = {
             showReturnSummarySheet = false
             viewModel.dismissReturnGrowthSummary()
+        },
+    )
+
+    SeedPodReturnSummarySheet(
+        summary = seedPodReturn,
+        visible = showSeedPodReturnSheet,
+        onDismiss = {
+            showSeedPodReturnSheet = false
+            viewModel.dismissSeedPodReturnSummary()
         },
     )
 }

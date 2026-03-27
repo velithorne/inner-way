@@ -1,7 +1,6 @@
 package com.velithorne.vessel.growthtime
 
 import android.content.Context
-import com.velithorne.vessel.data.prefs.AppBuildStateStore
 import com.velithorne.vessel.data.prefs.GrowthStateStore
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
@@ -18,7 +17,6 @@ class GrowthTimeCoordinator(
     appVersionCode: Int,
 ) {
     private val timeTuning = TimeTuning()
-    private val buildStore = AppBuildStateStore(context)
     private val growthStore = GrowthStateStore(context)
 
     private var budget: GrowthBudget = GrowthBudget()
@@ -31,13 +29,7 @@ class GrowthTimeCoordinator(
     val returnSummary: StateFlow<GrowthSessionSummary?> = _returnSummary.asStateFlow()
 
     init {
-        GrowthResetPolicy.applyIfNewBuild(
-            currentVersionCode = appVersionCode,
-            buildStore = buildStore,
-            growthStore = growthStore,
-            morphogenesisEngine = morphogenesisEngine,
-            tuning = timeTuning,
-        )
+        // Growth reset runs in AppContainer before GrowthTimeCoordinator is constructed.
         growthStore.loadDisplayOrNull()?.let { (d, se) ->
             display = d
             stageEnteredAtMs = se

@@ -2,10 +2,13 @@ package com.velithorne.vessel.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.velithorne.vessel.growthtime.GrowthSessionSummary
+import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.growth_seedpod.SeedPodExplainer
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
+import com.velithorne.vessel.lineage.LineageSummary
+import com.velithorne.vessel.lineage.SeedPodReturnSummary
+import com.velithorne.vessel.lineage.SpecimenIdentity
 import com.velithorne.vessel.morphogenesis.MorphogenesisEngine
 import com.velithorne.vessel.morphogenesis.MorphogenesisSnapshot
 import com.velithorne.vessel.model.OrganInspectionState
@@ -20,17 +23,20 @@ import com.velithorne.vessel.telemetry.TelemetrySnapshot
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Telemetry → physiology → **SeedPod** scene for the Vessel tab.
- * Legacy [com.velithorne.vessel.renderer.VesselRenderer] is **not** in this pipeline.
  */
 class TelemetryViewModel(
     private val repository: TelemetryRepository,
@@ -39,14 +45,52 @@ class TelemetryViewModel(
     private val seedPodGrowthCoordinator: SeedPodGrowthCoordinator,
     private val morphogenesisEngine: MorphogenesisEngine,
     private val growthTimeCoordinator: GrowthTimeCoordinator,
+    private val lineageRepository: LineageRepository,
 ) : ViewModel() {
 
+    private val _seedPodReturnSummary = MutableStateFlow<SeedPodReturnSummary?>(null)
+    val seedPodReturnSummary: StateFlow<SeedPodReturnSummary?> = _seedPodReturnSummary.asStateFlow()
+
+    private val _specimenIdentity = MutableStateFlow<SpecimenIdentity?>(null)
+    val specimenIdentity: StateFlow<SpecimenIdentity?> = _specimenIdentity.asStateFlow()
+
+    private val _lineageSummary = MutableStateFlow<LineageSummary?>(null)
+    val lineageSummary: StateFlow<LineageSummary?> = _lineageSummary.asStateFlow()
+
     init {
+        loadIdentity()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 growthTimeCoordinator.markBackground()
+                seedPodGrowthCoordinator.markBackground()
+            }
+
+            override fun onStart(owner: LifecycleOwner) {
+                viewModelScope.launch {
+                    val phys = physiologyEngine.update(repository.snapshot.value)
+                    val summary = seedPodGrowthCoordinator.catchUpOffline(phys)
+                    if (summary != null && summary.lines.isNotEmpty()) {
+                        val key = summary.lines.joinToString("|") + summary.awaySeconds
+                        val show = withContext(Dispatchers.IO) {
+                            lineageRepository.shouldShowSeedPodReturn(key)
+                        }
+                        if (show) {
+                            _seedPodReturnSummary.value = summary
+                        }
+                    }
+                }
             }
         })
+    }
+
+    private fun loadIdentity() {
+        viewModelScope.launch {
+            val id = withContext(Dispatchers.IO) { lineageRepository.getActiveIdentity() }
+            _specimenIdentity.value = id
+            if (id != null) {
+                _lineageSummary.value = lineageRepository.lineageSummaryFromIdentity(id)
+            }
+        }
     }
 
     val telemetry: StateFlow<TelemetrySnapshot> = repository.snapshot
@@ -69,7 +113,6 @@ class TelemetryViewModel(
     private val initialMorphRaw = morphogenesisEngine.update(initialPhysiology)
     private val initialMorph = growthTimeCoordinator.process(initialMorphRaw)
 
-    /** Morphogenesis still runs for inspection/anatomy text — not for Vessel canvas. */
     val morphogenesis: StateFlow<MorphogenesisSnapshot> = physiology
         .map { raw ->
             growthTimeCoordinator.process(morphogenesisEngine.update(raw))
@@ -80,7 +123,7 @@ class TelemetryViewModel(
             initialValue = growthTimeCoordinator.process(initialMorph),
         )
 
-    val growthReturnSummary: StateFlow<GrowthSessionSummary?> = growthTimeCoordinator.returnSummary
+    val growthReturnSummary = growthTimeCoordinator.returnSummary
 
     private val initialPodGrowth = seedPodGrowthCoordinator.process(initialPhysiology)
     private val initialSeedPodScene = seedPodRenderer.map(initialPhysiology, initialPodGrowth.display)
@@ -99,7 +142,8 @@ class TelemetryViewModel(
     val seedPodVesselUi: StateFlow<SeedPodVesselUiState> = combine(
         seedPodScene,
         growthReturnSummary,
-    ) { scene, ret ->
+        seedPodReturnSummary,
+    ) { scene, ret, seedRet ->
         val gs = seedPodGrowthCoordinator.current()
         SeedPodVesselUiState(
             stageLabel = SeedPodExplainer.stageLabel(scene.stage),
@@ -108,6 +152,7 @@ class TelemetryViewModel(
             activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = ret,
+            seedPodReturnSummary = seedRet,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -119,6 +164,7 @@ class TelemetryViewModel(
             activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = growthTimeCoordinator.returnSummary.value,
+            seedPodReturnSummary = null,
         ),
     )
 
@@ -126,10 +172,18 @@ class TelemetryViewModel(
         growthTimeCoordinator.dismissReturnSummary()
     }
 
+    fun dismissSeedPodReturnSummary() {
+        val s = _seedPodReturnSummary.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val key = s.lines.joinToString("|") + s.awaySeconds
+            lineageRepository.markSeedPodReturnShown(key)
+        }
+        _seedPodReturnSummary.value = null
+    }
+
     private val _selectedVesselOrgan = MutableStateFlow<OrganType?>(null)
     val selectedVesselOrgan: StateFlow<OrganType?> = _selectedVesselOrgan
 
-    /** Seed pod tap target: "pod" | "thermal" — legacy organ selection uses [selectedVesselOrgan]. */
     private val _selectedSeedPodTarget = MutableStateFlow<String?>(null)
     val selectedSeedPodTarget: StateFlow<String?> = _selectedSeedPodTarget
 

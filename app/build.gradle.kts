@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 28
-        versionName = "1.8.0-seed-pod-visual-identity"
+        versionCode = 29
+        versionName = "1.9.0-persistent-lineage-memory"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -62,4 +63,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.ui.theme.VesselBg
+import com.velithorne.vessel.viewmodel.LineageViewModel
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
 /**
@@ -32,6 +33,7 @@ import com.velithorne.vessel.viewmodel.TelemetryViewModel
 @Composable
 fun VesselMainScreen(
     viewModel: TelemetryViewModel,
+    lineageViewModel: LineageViewModel,
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -40,6 +42,7 @@ fun VesselMainScreen(
     var prevTab by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(tab) {
         if (tab == 0 && prevTab != 0) vesselSession++
+        if (tab == 3) lineageViewModel.refresh()
         prevTab = tab
     }
     Scaffold(
@@ -76,6 +79,11 @@ fun VesselMainScreen(
                     onClick = { tab = 2 },
                     text = { Text("Physiology") },
                 )
+                Tab(
+                    selected = tab == 3,
+                    onClick = { tab = 3 },
+                    text = { Text("Lineage") },
+                )
             }
         },
     ) { innerPadding ->
@@ -87,9 +95,15 @@ fun VesselMainScreen(
         ) {
             when (tab) {
                 // Fresh chamber + camera each time user returns to Vessel (clear stray zoom/pan/tilt).
-                0 -> key(vesselSession) { VesselScreen(viewModel = viewModel) }
+                0 -> key(vesselSession) {
+                    VesselScreen(
+                        viewModel = viewModel,
+                        onOpenLineage = { tab = 3 },
+                    )
+                }
                 1 -> TelemetryDebugScreen(viewModel = viewModel)
                 2 -> PhysiologyDebugScreen(viewModel = viewModel)
+                3 -> LineageScreen(viewModel = lineageViewModel)
             }
         }
     }
