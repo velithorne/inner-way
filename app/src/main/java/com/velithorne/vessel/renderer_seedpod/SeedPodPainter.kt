@@ -44,6 +44,10 @@ object SeedPodPainter {
         val bv = scene.branchVisual
         val ga = scene.generatedAnatomy
         val bio = scene.biographyVisual
+        val vm = scene.visibleMorphology
+        val trace = scene.seedTrace
+        val gInf = vm.generatedTopologyInfluence.coerceIn(0f, 1f)
+        val seedFallback = vm.fallbackSeedInfluence.coerceIn(0f, 1f)
         val phaseSec = anim.seconds + scene.animTimeSec
         val radii = SeedPodContourBuilder.radii(
             minDim = minDim,
@@ -98,6 +102,26 @@ object SeedPodPainter {
                             depth = depth,
                             shellThickening = d.shellThickening,
                             tuning = tuning,
+                            seedFallbackAlpha = seedFallback,
+                        )
+
+                        GeneratedContourPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            base = radii,
+                            anatomy = ga,
+                            visible = vm,
+                            paletteLine = palette.shellEdge,
+                            phaseSec = phaseSec,
+                        )
+
+                        GeneratedShellPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            visible = vm,
+                            phaseSec = phaseSec,
                         )
 
                         SeedPodInnerVolumePainter.draw(
@@ -110,6 +134,27 @@ object SeedPodPainter {
                             depth = depth,
                             tuning = tuning,
                             branch = bv,
+                            anatomy = ga,
+                            generatedInfluence = gInf,
+                        )
+
+                        GeneratedChamberPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            minDim = minDim,
+                            radii = radii,
+                            palette = palette,
+                            visible = vm,
+                            phaseSec = phaseSec,
+                        )
+
+                        SeedTracePainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            minDim = minDim,
+                            radii = radii,
+                            palette = palette,
+                            trace = trace,
                         )
 
                         SeedPodNucleusPainter.draw(
@@ -125,6 +170,7 @@ object SeedPodPainter {
                             appearance = appearance,
                             anim = anim,
                             tuning = tuning,
+                            seedNucleusAlpha = seedFallback,
                         )
 
                         SeedPodOcclusionPainter.drawNucleusOcclusion(
@@ -134,6 +180,18 @@ object SeedPodPainter {
                             depth = depth,
                             appearance = appearance,
                             tuning = tuning,
+                            seedNucleusAlpha = seedFallback,
+                        )
+
+                        GeneratedFrondPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            minDim = minDim,
+                            buds = buds,
+                            radii = radii,
+                            palette = palette,
+                            visible = vm,
+                            phaseSec = phaseSec,
                         )
 
                         SeedPodBudPainter.draw(
@@ -148,6 +206,7 @@ object SeedPodPainter {
                             palette = palette,
                             tuning = tuning,
                             branch = bv,
+                            stockLateralAlpha = seedFallback,
                         )
 
                         SeedPodBracingPainter.draw(
@@ -172,6 +231,7 @@ object SeedPodPainter {
                             phaseSec = phaseSec,
                             closedness = appearance.shellClosedness,
                             tuning = tuning,
+                            seedFallbackAlpha = seedFallback,
                         )
 
                         SeedPodGrowthFrontPainter.draw(
@@ -196,11 +256,21 @@ object SeedPodPainter {
                             phaseSec = phaseSec,
                         )
 
-                        SeedPodBiographyOverlayPainter.draw(
+                        GeneratedScarPainter.draw(
                             scope = podScope,
                             pod = podDraw,
                             radii = radii,
                             bio = bio,
+                            visible = vm,
+                            phaseSec = phaseSec,
+                        )
+
+                        GeneratedReroutePainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            bio = bio,
+                            visible = vm,
                             phaseSec = phaseSec,
                         )
 
@@ -236,7 +306,7 @@ object SeedPodPainter {
                         )
 
                         if (tuning.showSeedPodDebug) {
-                            drawDebugOverlay(podScope, w, h, pod, d.stage.name)
+                            drawDebugOverlay(podScope, w, h, pod, d.stage.name, vm, scene.fallbackMode)
                         }
                     }
                 }
@@ -244,7 +314,15 @@ object SeedPodPainter {
         }
     }
 
-    private fun drawDebugOverlay(scope: DrawScope, w: Float, h: Float, pod: Offset, stageName: String) {
+    private fun drawDebugOverlay(
+        scope: DrawScope,
+        w: Float,
+        h: Float,
+        pod: Offset,
+        stageName: String,
+        vm: com.velithorne.vessel.model.VisibleMorphologyState,
+        mode: SeedPodFallbackMode,
+    ) {
         val dbg = Color(0xFF00FFAA).copy(alpha = 0.5f)
         scope.drawRect(color = dbg.copy(alpha = 0.15f), style = androidx.compose.ui.graphics.drawscope.Stroke(2f), topLeft = Offset.Zero, size = Size(w, h))
         scope.drawLine(dbg, Offset(pod.x - 14f, pod.y), Offset(pod.x + 14f, pod.y), strokeWidth = 2f)

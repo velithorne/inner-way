@@ -7,6 +7,10 @@ import com.velithorne.vessel.background.AmbientEcologyPresentation
 import com.velithorne.vessel.background.EcologySnapshotStore
 import com.velithorne.vessel.config.GrowthProfileProvider
 import com.velithorne.vessel.data.LineageRepository
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
+import com.velithorne.vessel.model.BiographyVisualState
+import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
+import com.velithorne.vessel.renderer_seedpod.VisibilityOverrideMapper
 import com.velithorne.vessel.lineage.AdaptationMarker
 import com.velithorne.vessel.lineage.GrowthEvent
 import com.velithorne.vessel.lineage.GrowthHistory
@@ -30,6 +34,8 @@ data class LineageUiState(
     val stageTransitions: List<StageTransition> = emptyList(),
     val adaptations: List<AdaptationMarker> = emptyList(),
     val ambientEcology: AmbientEcologyUiState? = null,
+    val visibleTopologyLines: List<String> = emptyList(),
+    val morphologyDriverLine: String? = null,
 )
 
 class LineageViewModel(
@@ -37,7 +43,10 @@ class LineageViewModel(
     private val lineageRepository: LineageRepository,
     private val ecologySnapshotStore: EcologySnapshotStore,
     private val growthProfileProvider: GrowthProfileProvider,
+    private val seedPodGrowthCoordinator: SeedPodGrowthCoordinator,
 ) : ViewModel() {
+
+    private val profile get() = growthProfileProvider.profile
 
     private val _ui = MutableStateFlow(LineageUiState())
     val ui: StateFlow<LineageUiState> = _ui.asStateFlow()
@@ -78,6 +87,23 @@ class LineageViewModel(
                 workScheduled = workOk,
                 tuning = growthProfileProvider.profile.background,
             )
+            val gs = seedPodGrowthCoordinator.current()
+            val snap = gs.lastSelfAssembly
+            val branch = SeedPodBranchMapper.map(
+                gs.structural.morphologyBranch,
+                gs.structural.permanentStage,
+                profile.branching,
+            )
+            val bio = BiographyVisualState.fromNullable(snap?.biography)
+            val vis = VisibilityOverrideMapper.map(
+                anatomy = snap?.anatomy,
+                biography = bio,
+                branch = branch,
+                stage = gs.structural.permanentStage,
+                structuralProgress = gs.structural.smoothedStructuralProgress,
+                mode = profile.mode,
+                pressure = snap?.pressure,
+            )
             _ui.value = LineageUiState(
                 identity = id,
                 lineage = lineage,
@@ -86,6 +112,8 @@ class LineageViewModel(
                 stageTransitions = hist.stageTransitions,
                 adaptations = adapt,
                 ambientEcology = ambient,
+                visibleTopologyLines = vis.visible.topologySummaryLines,
+                morphologyDriverLine = "Contour driver: ${vis.visible.dominantContourDriver}",
             )
         }
     }

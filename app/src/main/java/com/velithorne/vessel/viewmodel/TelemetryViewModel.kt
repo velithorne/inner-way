@@ -34,6 +34,7 @@ import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.ProgressBarModelFactory
 import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.renderer_seedpod.SeedPodSceneState
+import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
 import com.velithorne.vessel.telemetry.TelemetryRepository
 import com.velithorne.vessel.telemetry.TelemetrySnapshot
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -205,6 +206,9 @@ class TelemetryViewModel(
         generatedAnatomy = initialPodGrowth.lastSelfAssembly?.anatomy,
         biographyVisual = BiographyVisualState.fromNullable(initialPodGrowth.lastSelfAssembly?.biography),
         animTimeSec = System.nanoTime() / 1_000_000_000f,
+        simulationMode = profile.mode,
+        structuralProgress = initialPodGrowth.structural.smoothedStructuralProgress,
+        growthPressure = initialPodGrowth.lastSelfAssembly?.pressure,
     )
 
     val seedPodScene: StateFlow<SeedPodSceneState> = physiology
@@ -224,6 +228,9 @@ class TelemetryViewModel(
                 generatedAnatomy = snap?.anatomy,
                 biographyVisual = BiographyVisualState.fromNullable(snap?.biography),
                 animTimeSec = System.nanoTime() / 1_000_000_000f,
+                simulationMode = profile.mode,
+                structuralProgress = growth.structural.smoothedStructuralProgress,
+                growthPressure = snap?.pressure,
             )
         }
         .stateIn(
@@ -248,6 +255,12 @@ class TelemetryViewModel(
             nextAccum = gs.structural.nextStageAccum,
             strain = strain,
         )
+        val vm = scene.visibleMorphology
+        val driver = vm.dominantContourDriver
+        val topoLines = vm.topologySummaryLines
+        val debugVis = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
+            "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}%"
+        } else null
         SeedPodVesselUiState(
             structuralStageLabel = SeedPodExplainer.stageLabel(gs.structural.permanentStage),
             liveConditionLabel = scene.liveExpression.conditionLabel,
@@ -282,6 +295,9 @@ class TelemetryViewModel(
             devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
                 "Accelerated growth profile (dev)"
             } else null,
+            visibleTopologyLines = topoLines,
+            morphologyDriverLine = "Contour driver: $driver",
+            visibilityDebugLine = debugVis,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -330,6 +346,12 @@ class TelemetryViewModel(
                 ambientEcologyHintLine = "",
                 devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
                     "Accelerated growth profile (dev)"
+                } else null,
+                visibleTopologyLines = initialSeedPodScene.visibleMorphology.topologySummaryLines,
+                morphologyDriverLine = "Contour driver: ${initialSeedPodScene.visibleMorphology.dominantContourDriver}",
+                visibilityDebugLine = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
+                    val vm = initialSeedPodScene.visibleMorphology
+                    "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}%"
                 } else null,
             )
         },

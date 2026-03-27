@@ -42,6 +42,7 @@ import com.velithorne.vessel.ui.components.LiveConditionChip
 import com.velithorne.vessel.ui.components.StageStatusChip
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.SeedPodReturnSummarySheet
+import com.velithorne.vessel.ui.components.MorphologyTraitCard
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
@@ -185,6 +186,22 @@ fun VesselScreen(
                     text = hint,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (podUi.visibleTopologyLines.isNotEmpty() || podUi.morphologyDriverLine != null) {
+                MorphologyTraitCard(
+                    title = "Visible topology",
+                    lines = podUi.visibleTopologyLines,
+                    driverLine = podUi.morphologyDriverLine,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            podUi.visibilityDebugLine?.let { dbg ->
+                Text(
+                    text = dbg,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f),
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }

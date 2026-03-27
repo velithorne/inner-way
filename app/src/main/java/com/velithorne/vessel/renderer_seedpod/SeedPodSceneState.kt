@@ -10,7 +10,10 @@ import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.BiographyVisualState
 import com.velithorne.vessel.model.GeneratedAnatomyState
+import com.velithorne.vessel.model.GeneratedTopologyState
 import com.velithorne.vessel.model.SeedThermalVisualState
+import com.velithorne.vessel.model.SeedTraceState
+import com.velithorne.vessel.model.VisibleMorphologyState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionState
@@ -47,6 +50,10 @@ data class SeedPodSceneState(
     val biographyVisual: BiographyVisualState = BiographyVisualState.neutral(),
     /** Seconds for subtle phase-based drawing (thermal, scars). */
     val animTimeSec: Float = 0f,
+    val visibleMorphology: VisibleMorphologyState = VisibleMorphologyState.neutral(),
+    val seedTrace: SeedTraceState = SeedTraceState.default(),
+    val generatedTopology: GeneratedTopologyState? = null,
+    val fallbackMode: SeedPodFallbackMode = SeedPodFallbackMode.SEED_DOMINANT,
 ) {
     val stage: SeedPodGrowthStage get() = podDisplay.stage
 }

@@ -27,4 +27,10 @@ data class SeedPodVesselUiState(
     val ambientEcologyHintLine: String,
     /** Non-null in debug when [com.velithorne.vessel.config.SimulationMode.DEV_SIMULATION] is active. */
     val devSimulationHintLine: String? = null,
+    /** Lines describing visible topology — must align with canvas. */
+    val visibleTopologyLines: List<String> = emptyList(),
+    /** Short line: dominant contour driver from self-assembly. */
+    val morphologyDriverLine: String? = null,
+    /** Debug-only: influence split + asymmetry (default null). */
+    val visibilityDebugLine: String? = null,
 )

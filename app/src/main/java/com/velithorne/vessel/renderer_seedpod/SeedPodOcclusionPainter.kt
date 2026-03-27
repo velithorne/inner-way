@@ -18,8 +18,10 @@ object SeedPodOcclusionPainter {
         depth: SeedPodDepthState,
         appearance: SeedPodVisualState,
         tuning: SeedPodTuning,
+        seedNucleusAlpha: Float = 1f,
     ) {
-        val a = (tuning.depth.occlusionAlphaMax * (0.35f + depth.shellThicknessVisual * 0.55f)).coerceIn(0.04f, 0.24f)
+        val sa = seedNucleusAlpha.coerceIn(0f, 1f)
+        val a = (tuning.depth.occlusionAlphaMax * (0.35f + depth.shellThicknessVisual * 0.55f)).coerceIn(0.04f, 0.24f) * sa
         scope.drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(

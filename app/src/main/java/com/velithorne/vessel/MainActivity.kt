@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
             lineageRepository = container.lineageRepository,
             ecologySnapshotStore = container.ecologySnapshotStore,
             growthProfileProvider = container.growthProfileProvider,
+            seedPodGrowthCoordinator = container.seedPodGrowthCoordinator,
         )
         setContent {
             VelithorneVesselTheme {

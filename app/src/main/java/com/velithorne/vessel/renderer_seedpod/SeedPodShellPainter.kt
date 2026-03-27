@@ -28,10 +28,12 @@ object SeedPodShellPainter {
         depth: SeedPodDepthState,
         shellThickening: Float,
         tuning: SeedPodTuning,
+        /** 0..1 — dims authored vesica shell when generated topology dominates. */
+        seedFallbackAlpha: Float = 1f,
     ) {
         val c = pod + rearOffset
         val st = shellThickening.coerceIn(0f, 1f)
-        val op = appearance.shellOpacityMul.coerceIn(0.3f, 1.3f)
+        val op = appearance.shellOpacityMul.coerceIn(0.3f, 1.3f) * seedFallbackAlpha.coerceIn(0f, 1f)
         val dark = 1f - depth.rearDarkening * 0.35f
 
         scope.drawOval(
@@ -83,10 +85,11 @@ object SeedPodShellPainter {
         phaseSec: Float,
         closedness: Float,
         tuning: SeedPodTuning,
+        seedFallbackAlpha: Float = 1f,
     ) {
         val c = pod + frontOffset
         val st = shellThickening.coerceIn(0f, 1f)
-        val op = appearance.shellOpacityMul.coerceIn(0.3f, 1.3f)
+        val op = appearance.shellOpacityMul.coerceIn(0.3f, 1.3f) * seedFallbackAlpha.coerceIn(0f, 1f)
         val edge = appearance.shellEdgeBright.coerceIn(0.3f, 1.3f) * (0.85f + lighting.shellCatchlight * 0.15f)
 
         scope.drawOval(
@@ -96,7 +99,7 @@ object SeedPodShellPainter {
             style = Stroke(width = 1.1f + closedness * 0.9f + st * 0.8f),
         )
 
-        val n = tuning.conductiveSeamCount
+        val n = (tuning.conductiveSeamCount * seedFallbackAlpha.coerceIn(0f, 1f)).toInt().coerceAtLeast(0)
         val shimmer = (sin(phaseSec * 1.8f).toFloat() * 0.5f + 0.5f)
         for (i in 0 until n) {
             val ang = (i / n.toFloat()) * kotlin.math.PI.toFloat() * 2f

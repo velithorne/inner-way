@@ -32,6 +32,8 @@ object SeedPodBudPainter {
         palette: VesselPaletteState,
         tuning: SeedPodTuning,
         branch: BranchVisualState = BranchVisualState.neutral(),
+        /** Dims stock symmetric lateral fronds when generated routing takes over. */
+        stockLateralAlpha: Float = 1f,
     ) {
         val w = minDim
         val crown = buds.crown
@@ -81,8 +83,8 @@ object SeedPodBudPainter {
             )
         }
 
-        val latL = buds.lateralLeft
-        val latR = buds.lateralRight
+        val latL = buds.lateralLeft * stockLateralAlpha.coerceIn(0f, 1f)
+        val latR = buds.lateralRight * stockLateralAlpha.coerceIn(0f, 1f)
         if (max(latL, latR) > 0.02f) {
             val mul = tuning.lateralBudSizeCurve * depth.budDepthMul
             val y = pod.y + layers.budsLateral.y + w * 0.015f

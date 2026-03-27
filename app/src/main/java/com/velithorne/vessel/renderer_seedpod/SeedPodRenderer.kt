@@ -1,5 +1,6 @@
 package com.velithorne.vessel.renderer_seedpod
 
+import com.velithorne.vessel.config.SimulationMode
 import com.velithorne.vessel.model.BiographyVisualState
 import com.velithorne.vessel.model.BranchVisualState
 import com.velithorne.vessel.model.GeneratedAnatomyState
@@ -8,6 +9,7 @@ import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionMapper
 import com.velithorne.vessel.renderer.VesselPalette
+import com.velithorne.vessel.morphogenesis_core.GrowthPressureState
 
 /**
  * Physiology + seed pod growth → [SeedPodSceneState]. Does **not** use [com.velithorne.vessel.renderer.VesselRenderer].
@@ -23,6 +25,9 @@ class SeedPodRenderer(
         generatedAnatomy: GeneratedAnatomyState? = null,
         biographyVisual: BiographyVisualState = BiographyVisualState.neutral(),
         animTimeSec: Float = 0f,
+        simulationMode: SimulationMode = SimulationMode.RELEASE_REALTIME,
+        structuralProgress: Float = 0f,
+        growthPressure: GrowthPressureState? = null,
     ): SeedPodSceneState {
         val s = physiology.species
         val telem = physiology.telemetry
@@ -50,6 +55,16 @@ class SeedPodRenderer(
             0.2f + s.respiration * 0.15f + s.neuralActivity * 0.2f + s.fever * 0.12f
             ).coerceIn(0f, 1f)
 
+        val vis = VisibilityOverrideMapper.map(
+            anatomy = generatedAnatomy,
+            biography = biographyVisual,
+            branch = branchVisual,
+            stage = podDisplay.stage,
+            structuralProgress = structuralProgress,
+            mode = simulationMode,
+            pressure = growthPressure,
+        )
+
         return SeedPodSceneState(
             physiology = physiology,
             podDisplay = podDisplay,
@@ -74,6 +89,10 @@ class SeedPodRenderer(
             generatedAnatomy = generatedAnatomy,
             biographyVisual = biographyVisual,
             animTimeSec = animTimeSec,
+            visibleMorphology = vis.visible,
+            seedTrace = vis.seedTrace,
+            generatedTopology = vis.topology,
+            fallbackMode = vis.fallbackMode,
         )
     }
 }

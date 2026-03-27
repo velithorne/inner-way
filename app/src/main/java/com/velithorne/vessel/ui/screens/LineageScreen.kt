@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.ui.components.AmbientEcologyCard
 import com.velithorne.vessel.ui.components.BranchAffinityCard
 import com.velithorne.vessel.ui.components.BranchVariantCard
+import com.velithorne.vessel.ui.components.MorphologyTraitCard
 import com.velithorne.vessel.ui.components.AdaptationChip
 import com.velithorne.vessel.ui.components.GrowthEventRow
 import com.velithorne.vessel.ui.components.LineageCard
@@ -61,6 +62,13 @@ fun LineageScreen(
             SpecimenIdentityCard(lineage = l)
             BranchAffinityCard(lineage = l)
             BranchVariantCard(lineage = l)
+        }
+        if (state.visibleTopologyLines.isNotEmpty() || state.morphologyDriverLine != null) {
+            MorphologyTraitCard(
+                title = "Visible topology",
+                lines = state.visibleTopologyLines,
+                driverLine = state.morphologyDriverLine,
+            )
         }
         state.ambientEcology?.let { AmbientEcologyCard(state = it) }
         Text(

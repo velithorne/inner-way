@@ -29,10 +29,12 @@ object SeedPodNucleusPainter {
         appearance: SeedPodVisualState,
         anim: VesselAnimationController,
         tuning: SeedPodTuning,
+        /** Dims stock ring-stack nucleus when generated chambers dominate. */
+        seedNucleusAlpha: Float = 1f,
     ) {
         val center = pod + layerOffset + recess
         val pulse = anim.pulsePhase(1.05f)
-        val nb = appearance.nucleusBrightnessMul.coerceIn(0.25f, 1.4f)
+        val nb = appearance.nucleusBrightnessMul.coerceIn(0.25f, 1.4f) * seedNucleusAlpha.coerceIn(0f, 1f)
         val bloom = appearance.nucleusBloomMul.coerceIn(0.2f, 1.25f) * lighting.coreBloom.coerceIn(0.2f, 1.2f)
         val facetA = appearance.facetLineAlpha.coerceIn(0.06f, 0.55f)
 
