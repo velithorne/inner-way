@@ -14,12 +14,14 @@ object SeedPodGrowthFrontPainter {
     fun draw(
         scope: DrawScope,
         pod: Offset,
+        layerOffset: Offset,
         radii: SeedPodContourBuilder.PodRadii,
         palette: VesselPaletteState,
         appearance: SeedPodVisualState,
         phaseSec: Float,
         tuning: SeedPodTuning,
     ) {
+        val c = pod + layerOffset
         val a = (appearance.growthFrontAlpha * tuning.growthFrontAlphaMax).coerceIn(0f, 1f)
         if (a < 0.04f) return
         val shim = sin(phaseSec * 2.2f).toFloat() * 0.5f + 0.5f
@@ -27,7 +29,7 @@ object SeedPodGrowthFrontPainter {
         val ry = radii.shellRy * (1.0f + 0.06f * shim)
         scope.drawOval(
             color = palette.accentSignal.copy(alpha = a * (0.12f + shim * 0.18f)),
-            topLeft = Offset(pod.x - rx, pod.y - ry),
+            topLeft = Offset(c.x - rx, c.y - ry),
             size = androidx.compose.ui.geometry.Size(rx * 2f, ry * 2f),
             style = Stroke(width = 1.2f + a * 4f),
         )

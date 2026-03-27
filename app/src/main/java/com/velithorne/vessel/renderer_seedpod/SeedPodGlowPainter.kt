@@ -19,7 +19,7 @@ object SeedPodGlowPainter {
         appearance: SeedPodVisualState,
         tuning: SeedPodTuning,
     ) {
-        val s = appearance.spotlightStrength.coerceIn(0.2f, 1f)
+        val s = appearance.spotlightStrength.coerceIn(0.2f, 1f) * tuning.depth.spotlightAlphaMul
         val fall = tuning.chamberSpotlightFalloff
         scope.drawOval(
             brush = Brush.radialGradient(

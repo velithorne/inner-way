@@ -39,7 +39,36 @@ data class SeedPodTuning(
     val nucleusFacetCount: Int = 6,
     val conductiveSeamCount: Int = 8,
     val stageVisual: StageVisualGroup = StageVisualGroup(),
+    val depth: DepthTuningGroup = DepthTuningGroup(),
+    /** Slightly forgiving taps for layered shell. */
+    val hitTestRadiusMul: Float = 1.06f,
     val showSeedPodDebug: Boolean = false,
+)
+
+/** 2.5D depth / parallax / pseudo-volume (grouped). */
+data class DepthTuningGroup(
+    val shellFrontThicknessBase: Float = 0.42f,
+    val rearDarkeningBase: Float = 0.18f,
+    val nucleusDepthOffsetPx: Float = 2.8f,
+    val nucleusBurialBase: Float = 0.88f,
+    val budDepthMulBase: Float = 0.62f,
+    val occlusionAlphaMax: Float = 0.28f,
+    val rimLightBase: Float = 0.35f,
+    val coreBloomBase: Float = 0.38f,
+    val innerVolumeFalloffMul: Float = 1.15f,
+    val chamberFogRearMul: Float = 0.85f,
+    val spotlightAlphaMul: Float = 1f,
+    val parallaxRearAtmosphere: Float = 0.04f,
+    val parallaxRearShell: Float = 0.07f,
+    val parallaxInnerHaze: Float = 0.09f,
+    val parallaxNucleus: Float = 0.11f,
+    val parallaxMidChamber: Float = 0.1f,
+    val parallaxBudCrown: Float = 0.12f,
+    val parallaxBudLateral: Float = 0.13f,
+    val parallaxBudReserve: Float = 0.1f,
+    val parallaxFrontShell: Float = 0.15f,
+    val parallaxRim: Float = 0.16f,
+    val parallaxGlassOpposite: Float = 0.12f,
 )
 
 /**

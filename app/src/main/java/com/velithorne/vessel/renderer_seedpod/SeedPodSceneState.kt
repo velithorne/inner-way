@@ -3,6 +3,9 @@ package com.velithorne.vessel.renderer_seedpod
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.model.SeedBudVisualState
+import com.velithorne.vessel.model.SeedPodDepthState
+import com.velithorne.vessel.model.SeedPodLightingState
+import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.VesselPaletteState
@@ -17,6 +20,9 @@ data class SeedPodSceneState(
     val palette: VesselPaletteState,
     val seedPodPalette: SeedPodPalette,
     val appearance: SeedPodVisualState,
+    val materialState: SeedPodMaterialState,
+    val depthState: SeedPodDepthState,
+    val lightingState: SeedPodLightingState,
     val buds: SeedBudVisualState,
     val thermal: SeedThermalVisualState,
     val vitalityGlow: Float,

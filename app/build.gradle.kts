@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.9.0-persistent-lineage-memory"
+        versionCode = 30
+        versionName = "2.0.0-seedpod-25d-depth-material"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

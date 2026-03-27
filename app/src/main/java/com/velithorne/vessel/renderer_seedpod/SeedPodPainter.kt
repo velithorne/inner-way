@@ -12,7 +12,8 @@ import com.velithorne.vessel.renderer.ParticleDraw
 import com.velithorne.vessel.renderer.VesselAnimationController
 
 /**
- * Seed pod canvas orchestration — **replaces** legacy [com.velithorne.vessel.renderer.VesselPainter] for the Vessel tab.
+ * Depth-aware orchestration: atmosphere → shell rear → inner volume → nucleus → occlusion → buds →
+ * shell front → growth front → rim → thermal → particles → glass.
  */
 object SeedPodPainter {
 
@@ -35,6 +36,9 @@ object SeedPodPainter {
         val appearance = scene.appearance
         val buds = scene.buds
         val thermal = scene.thermal
+        val depth = scene.depthState
+        val lighting = scene.lightingState
+        val layers = SeedPodParallaxModel.compute(parallax, depth, tuning)
 
         val pod = SeedPodFraming.podCenterPx(w, h, parallax)
         val radii = SeedPodContourBuilder.radii(
@@ -58,39 +62,68 @@ object SeedPodPainter {
                 ) {
                     translate(-vc.x + camera.panX, -vc.y + camera.panY) {
                         val podScope = this
-                        drawChamberBackdrop(podScope, w, h, parallax, palette, scene)
+
+                        SeedPodAtmospherePainter.drawBackdrop(podScope, w, h, parallax, palette, scene, tuning)
+                        SeedPodAtmospherePainter.drawRearDepthFog(podScope, w, h, pod, layers.rearAtmosphere, depth.rearDarkening, tuning)
+                        SeedPodAtmospherePainter.drawVolumetricBand(podScope, w, h, parallax, 0f)
+                        SeedPodAtmospherePainter.drawVolumetricBand(podScope, w, h, parallax, 1f)
+
                         SeedPodGlowPainter.drawSpotlight(podScope, w, h, pod, appearance, tuning)
 
-                        // Shell / membrane (behind core)
-                        SeedPodShellPainter.draw(
+                        SeedPodShadowPainter.drawPodGroundShadow(
+                            podScope,
+                            pod,
+                            radii.shellRx,
+                            radii.shellRy,
+                            depth,
+                            appearance,
+                        )
+
+                        SeedPodShellPainter.drawRear(
                             scope = podScope,
                             pod = pod,
+                            rearOffset = layers.rearShell,
                             radii = radii,
                             palette = palette,
                             seedPalette = seedPal,
                             appearance = appearance,
+                            depth = depth,
                             shellThickening = d.shellThickening,
-                            phaseSec = anim.seconds,
                             tuning = tuning,
                         )
 
-                        SeedPodGlowPainter.drawInnerChamberHaze(
+                        SeedPodInnerVolumePainter.draw(
                             scope = podScope,
                             pod = pod,
+                            layerOffset = layers.innerHaze,
                             radii = radii,
                             palette = palette,
                             appearance = appearance,
+                            depth = depth,
                             tuning = tuning,
                         )
 
-                        SeedPodCorePainter.draw(
+                        SeedPodNucleusPainter.draw(
                             scope = podScope,
                             pod = pod,
+                            layerOffset = layers.nucleus,
+                            recess = depth.nucleusRecessOffset,
                             coreR = coreR,
+                            depth = depth,
+                            lighting = lighting,
                             palette = palette,
                             seedPalette = seedPal,
                             appearance = appearance,
                             anim = anim,
+                            tuning = tuning,
+                        )
+
+                        SeedPodOcclusionPainter.drawNucleusOcclusion(
+                            podScope,
+                            nucleusCenter = pod + layers.nucleus + depth.nucleusRecessOffset,
+                            coreR = coreR * depth.nucleusBurialScale,
+                            depth = depth,
+                            appearance = appearance,
                             tuning = tuning,
                         )
 
@@ -99,14 +132,33 @@ object SeedPodPainter {
                             pod = pod,
                             minDim = minDim,
                             buds = buds,
+                            layers = layers,
+                            radii = radii,
+                            depth = depth,
+                            lighting = lighting,
+                            palette = palette,
+                            tuning = tuning,
+                        )
+
+                        SeedPodShellPainter.drawFront(
+                            scope = podScope,
+                            pod = pod,
+                            frontOffset = layers.frontShell,
                             radii = radii,
                             palette = palette,
+                            seedPalette = seedPal,
+                            appearance = appearance,
+                            lighting = lighting,
+                            shellThickening = d.shellThickening,
+                            phaseSec = anim.seconds,
+                            closedness = appearance.shellClosedness,
                             tuning = tuning,
                         )
 
                         SeedPodGrowthFrontPainter.draw(
                             scope = podScope,
                             pod = pod,
+                            layerOffset = layers.frontShell,
                             radii = radii,
                             palette = palette,
                             appearance = appearance,
@@ -114,11 +166,24 @@ object SeedPodPainter {
                             tuning = tuning,
                         )
 
+                        SeedPodRimLightPainter.draw(
+                            scope = podScope,
+                            pod = pod,
+                            rx = radii.shellRx,
+                            ry = radii.shellRy,
+                            layerOffset = layers.rimLight,
+                            lighting = lighting,
+                            palette = palette,
+                            phaseSec = anim.seconds,
+                        )
+
                         SeedPodThermalPainter.draw(
                             scope = podScope,
                             pod = pod,
+                            layerOffset = layers.frontShell,
                             radii = radii,
                             thermal = thermal,
+                            lighting = lighting,
                             palette = palette,
                             phaseSec = anim.seconds,
                         )
@@ -137,6 +202,7 @@ object SeedPodPainter {
                             scope = podScope,
                             w = w,
                             h = h,
+                            glassOffset = layers.glass,
                             appearance = appearance,
                             vitalityHint = scene.vitalityGlow.coerceIn(0f, 1f),
                         )
@@ -148,43 +214,6 @@ object SeedPodPainter {
                 }
             }
         }
-    }
-
-    private fun drawChamberBackdrop(
-        scope: DrawScope,
-        w: Float,
-        h: Float,
-        parallax: Offset,
-        palette: com.velithorne.vessel.model.VesselPaletteState,
-        scene: SeedPodSceneState,
-    ) {
-        val ox = parallax.x * 0.06f
-        val oy = parallax.y * 0.05f
-        scope.drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color(0xFF101828), Color(0xFF080C14), Color(0xFF030508)),
-                startY = oy,
-                endY = h + oy,
-            ),
-            topLeft = Offset.Zero,
-            size = Size(w, h),
-        )
-        val fogA = (0.05f + scene.particleDensity * 0.12f + scene.feverIntensity * 0.06f).coerceIn(0.04f, 0.22f)
-        val mist = palette.chamberMist
-        scope.drawRect(
-            brush = Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0f to mist.copy(alpha = 0f),
-                    0.28f to mist.copy(alpha = fogA * 0.12f),
-                    0.55f to mist.copy(alpha = fogA * 0.45f),
-                    1f to mist.copy(alpha = fogA * 0.85f),
-                ),
-                startY = 0f,
-                endY = h,
-            ),
-            topLeft = Offset.Zero,
-            size = Size(w, h),
-        )
     }
 
     private fun drawDebugOverlay(scope: DrawScope, w: Float, h: Float, pod: Offset, stageName: String) {

@@ -23,8 +23,11 @@ class SeedPodRenderer(
         val seedPodPalette = SeedPodPalette(base = palette)
 
         val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning)
+        val materialState = SeedPodMaterialSystem.deriveMaterialState(physiology, appearance)
+        val depthState = SeedPodPseudoVolumeMapper.map(physiology, podDisplay.stage, appearance, tuning)
         val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance)
         val thermal = SeedPodMaterialSystem.deriveThermal(physiology, podDisplay, palette, tuning)
+        val lightingState = SeedPodLightingModel.compute(physiology, appearance, thermal, tuning)
 
         val vitalityGlow = (s.vitality * 1.15f).coerceIn(0f, 1.4f)
         val stressShiver = (s.stress * tuning.stressShiverDegrees / 8f).coerceIn(0f, 1f)
@@ -38,6 +41,9 @@ class SeedPodRenderer(
             palette = palette,
             seedPodPalette = seedPodPalette,
             appearance = appearance,
+            materialState = materialState,
+            depthState = depthState,
+            lightingState = lightingState,
             buds = buds,
             thermal = thermal,
             vitalityGlow = vitalityGlow,

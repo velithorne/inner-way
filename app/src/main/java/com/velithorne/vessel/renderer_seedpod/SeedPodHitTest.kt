@@ -55,9 +55,10 @@ object SeedPodHitTest {
         val pod = SeedPodFraming.podCenterPx(viewportW, viewportH, parallax)
         val d = hypot(p.x - pod.x, p.y - pod.y)
         val minDim = min(viewportW, viewportH)
-        val rCore = minDim * tuning.podCoreRadiusMul * 2.2f
-        val rShell = minDim * tuning.podShellRadiusMul * 2.4f
-        val rVeil = minDim * 0.22f
+        val hm = tuning.hitTestRadiusMul
+        val rCore = minDim * tuning.podCoreRadiusMul * 2.2f * hm
+        val rShell = minDim * tuning.podShellRadiusMul * 2.4f * hm
+        val rVeil = minDim * 0.22f * hm
         return when {
             d <= rCore -> "pod"
             d <= rShell -> "pod"

@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.model.SeedBudVisualState
+import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.VesselPaletteState
@@ -80,6 +81,22 @@ object SeedPodMaterialSystem {
             particleScale = particleScale,
             stageBudScale = sm.budScale,
             shellClosedness = sm.closedness,
+        )
+    }
+
+    fun deriveMaterialState(
+        physiology: PhysiologySnapshot,
+        appearance: SeedPodVisualState,
+    ): SeedPodMaterialState {
+        val s = physiology.species
+        return SeedPodMaterialState(
+            shellTranslucency = appearance.shellOpacityMul.coerceIn(0.3f, 1.2f),
+            shellThicknessNorm = (0.35f + s.fever * 0.15f + s.structuralLoad * 0.1f).coerceIn(0.2f, 1f),
+            edgeBrightness = appearance.shellEdgeBright,
+            innerHaze = appearance.innerHazeDensity,
+            thermalHaze = s.fever.coerceIn(0f, 1f),
+            recoverySmoothing = s.recovery.coerceIn(0f, 1f),
+            hungerDim = s.hunger.coerceIn(0f, 1f),
         )
     }
 

@@ -17,12 +17,13 @@ object SeedPodGlassPainter {
         scope: DrawScope,
         w: Float,
         h: Float,
+        glassOffset: Offset,
         appearance: SeedPodVisualState,
         vitalityHint: Float,
     ) {
         val a = appearance.glassReflectionAlpha.coerceIn(0.06f, 0.32f)
         val pad = 12f
-        val rect = Rect(Offset(pad, pad), Size(w - pad * 2, h - pad * 2))
+        val rect = Rect(Offset(pad + glassOffset.x, pad + glassOffset.y), Size(w - pad * 2, h - pad * 2))
         scope.drawRoundRect(
             brush = Brush.linearGradient(
                 colors = listOf(
