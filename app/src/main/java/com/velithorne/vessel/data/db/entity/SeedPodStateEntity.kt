@@ -38,4 +38,14 @@ data class SeedPodStateEntity(
     val lastVisibleGrowthMs: Long,
     val lastStageTransitionMs: Long,
     val lastAdaptationUpdateMs: Long,
+    /** Irreversible milestone bit flags — [com.velithorne.vessel.progression.DevelopmentMilestone]. */
+    val milestoneFlags: Long = 0L,
+    val nextStageAccum: Float = 0f,
+    val confirmedMaturityHigh: Float = 0f,
+    val leanThermal: Float = 0.25f,
+    val leanNeural: Float = 0.25f,
+    val leanSignal: Float = 0.25f,
+    val leanReserve: Float = 0.25f,
+    val smoothedStructuralProgress: Float = 0f,
+    val structuralStageEnteredAtMs: Long = 0L,
 )

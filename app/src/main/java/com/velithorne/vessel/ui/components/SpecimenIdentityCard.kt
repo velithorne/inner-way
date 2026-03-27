@@ -40,9 +40,31 @@ fun SpecimenIdentityCard(
                 modifier = Modifier.padding(top = 8.dp),
             )
             Text(
-                text = "Stage · ${lineage.currentStageLabel}",
+                text = "Structural stage · ${lineage.currentStageLabel}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f),
+            )
+            Text(
+                text = "Next target · ${lineage.nextStageTargetLabel}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                text = lineage.timeInCurrentStageFormatted,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+            )
+            Text(
+                text = lineage.lineageTendencyLine,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                text = "Milestones · ${lineage.unlockedMilestonesSummary}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
             )
             Text(
                 text = "Last shift · ${lineage.lastMajorChangeLabel}",

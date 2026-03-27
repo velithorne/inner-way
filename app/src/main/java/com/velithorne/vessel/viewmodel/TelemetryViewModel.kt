@@ -16,6 +16,7 @@ import com.velithorne.vessel.model.SeedPodVesselUiState
 import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.progression.ProgressBarModelFactory
 import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.renderer_seedpod.SeedPodSceneState
 import com.velithorne.vessel.telemetry.TelemetryRepository
@@ -126,12 +127,16 @@ class TelemetryViewModel(
     val growthReturnSummary = growthTimeCoordinator.returnSummary
 
     private val initialPodGrowth = seedPodGrowthCoordinator.process(initialPhysiology)
-    private val initialSeedPodScene = seedPodRenderer.map(initialPhysiology, initialPodGrowth.display)
+    private val initialSeedPodScene = seedPodRenderer.map(
+        initialPhysiology,
+        initialPodGrowth.display.copy(stage = initialPodGrowth.structural.permanentStage),
+    )
 
     val seedPodScene: StateFlow<SeedPodSceneState> = physiology
         .map { phys ->
             val growth = seedPodGrowthCoordinator.process(phys)
-            seedPodRenderer.map(phys, growth.display)
+            val display = growth.display.copy(stage = growth.structural.permanentStage)
+            seedPodRenderer.map(phys, display)
         }
         .stateIn(
             scope = viewModelScope,
@@ -145,10 +150,23 @@ class TelemetryViewModel(
         seedPodReturnSummary,
     ) { scene, ret, seedRet ->
         val gs = seedPodGrowthCoordinator.current()
+        val strain = scene.physiology.species.let {
+            (it.stress * 0.5f + it.fever * 0.35f + (1f - it.vitality) * 0.15f).coerceIn(0f, 1f)
+        }
+        val pb = ProgressBarModelFactory.build(
+            stage = gs.structural.permanentStage,
+            smoothedProgress = gs.structural.smoothedStructuralProgress,
+            nextAccum = gs.structural.nextStageAccum,
+            strain = strain,
+        )
         SeedPodVesselUiState(
-            stageLabel = SeedPodExplainer.stageLabel(scene.stage),
+            structuralStageLabel = SeedPodExplainer.stageLabel(gs.structural.permanentStage),
+            liveConditionLabel = scene.liveExpression.conditionLabel,
             statusLine = SeedPodExplainer.statusLine(scene.physiology, gs),
-            growthProgressFraction = seedPodGrowthCoordinator.progressFraction(),
+            growthProgressFraction = pb.structuralProgress,
+            progressCaption = pb.progressCaption,
+            nextStageLabel = pb.nextStageLabel,
+            liveStrainIndicator = pb.liveStrainIndicator,
             activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
             recentAwayLine = growthTimeCoordinator.recentAwayLine(),
             returnSummary = ret,
@@ -157,15 +175,31 @@ class TelemetryViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = SeedPodVesselUiState(
-            stageLabel = SeedPodExplainer.stageLabel(initialPodGrowth.display.stage),
-            statusLine = SeedPodExplainer.statusLine(initialPhysiology, initialPodGrowth),
-            growthProgressFraction = seedPodGrowthCoordinator.progressFraction(),
-            activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
-            recentAwayLine = growthTimeCoordinator.recentAwayLine(),
-            returnSummary = growthTimeCoordinator.returnSummary.value,
-            seedPodReturnSummary = null,
-        ),
+        initialValue = run {
+            val gs = initialPodGrowth
+            val strain = initialPhysiology.species.let {
+                (it.stress * 0.5f + it.fever * 0.35f + (1f - it.vitality) * 0.15f).coerceIn(0f, 1f)
+            }
+            val pb = ProgressBarModelFactory.build(
+                gs.structural.permanentStage,
+                gs.structural.smoothedStructuralProgress,
+                gs.structural.nextStageAccum,
+                strain,
+            )
+            SeedPodVesselUiState(
+                structuralStageLabel = SeedPodExplainer.stageLabel(gs.structural.permanentStage),
+                liveConditionLabel = com.velithorne.vessel.progression.LiveExpressionMapper.map(initialPhysiology).conditionLabel,
+                statusLine = SeedPodExplainer.statusLine(initialPhysiology, gs),
+                growthProgressFraction = pb.structuralProgress,
+                progressCaption = pb.progressCaption,
+                nextStageLabel = pb.nextStageLabel,
+                liveStrainIndicator = pb.liveStrainIndicator,
+                activeBudgetChannelLabel = growthTimeCoordinator.activeBudgetChannelLabel(),
+                recentAwayLine = growthTimeCoordinator.recentAwayLine(),
+                returnSummary = growthTimeCoordinator.returnSummary.value,
+                seedPodReturnSummary = null,
+            )
+        },
     )
 
     fun dismissReturnGrowthSummary() {

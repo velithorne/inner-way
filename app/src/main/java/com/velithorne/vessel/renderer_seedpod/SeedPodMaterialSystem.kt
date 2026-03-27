@@ -9,6 +9,7 @@ import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.progression.LiveExpressionState
 /**
  * Maps physiology + display growth + stage → material parameters for the seed pod renderer.
  */
@@ -19,6 +20,7 @@ object SeedPodMaterialSystem {
         podDisplay: SeedPodDisplayState,
         palette: VesselPaletteState,
         tuning: SeedPodTuning,
+        live: LiveExpressionState? = null,
     ): SeedPodVisualState {
         val s = physiology.species
         val stage = podDisplay.stage
@@ -68,7 +70,7 @@ object SeedPodMaterialSystem {
 
         val particleScale = (0.75f + physiology.species.respiration * 0.15f + fever * 0.1f).coerceIn(0.6f, 1.25f)
 
-        return SeedPodVisualState(
+        var out = SeedPodVisualState(
             shellOpacityMul = shellOpacityMul,
             shellEdgeBright = shellEdgeBright,
             innerHazeDensity = innerHaze,
@@ -82,6 +84,18 @@ object SeedPodMaterialSystem {
             stageBudScale = sm.budScale,
             shellClosedness = sm.closedness,
         )
+        live?.let { lv ->
+            out = out.copy(
+                shellOpacityMul = (out.shellOpacityMul * lv.vitalityBrightnessMul * lv.shellCoherenceMul).coerceIn(0.25f, 1.25f),
+                shellEdgeBright = (out.shellEdgeBright * (0.85f + lv.stressShimmerMul * 0.15f)).coerceIn(0.3f, 1.3f),
+                innerHazeDensity = (out.innerHazeDensity * (0.7f + lv.thermalAgitationMul * 0.3f)).coerceIn(0f, 1f),
+                nucleusBrightnessMul = (out.nucleusBrightnessMul * lv.vitalityBrightnessMul).coerceIn(0.2f, 1.4f),
+                nucleusBloomMul = (out.nucleusBloomMul * (0.85f + lv.crownGlowMul * 0.15f)).coerceIn(0.15f, 1.25f),
+                growthFrontAlpha = (out.growthFrontAlpha * (0.75f + lv.stressShimmerMul * 0.25f)).coerceIn(0f, 1f),
+                spotlightStrength = (out.spotlightStrength * lv.vitalityBrightnessMul).coerceIn(0.2f, 1f),
+            )
+        }
+        return out
     }
 
     fun deriveMaterialState(
@@ -104,17 +118,29 @@ object SeedPodMaterialSystem {
         podDisplay: SeedPodDisplayState,
         tuning: SeedPodTuning,
         stageVisual: SeedPodVisualState,
+        live: LiveExpressionState? = null,
     ): SeedBudVisualState {
         fun gate(raw: Float, threshold: Float): Float {
             if (raw < threshold) return 0f
             val over = (raw - threshold) / (1f - threshold + 1e-4f)
             return (over * stageVisual.stageBudScale).coerceIn(0f, 1.2f)
         }
-        val crown = gate(podDisplay.crownNub, tuning.budVisibilityThresholdCrown)
-        val latL = gate(podDisplay.lateralBudLeft, tuning.budVisibilityThresholdLateral)
-        val latR = gate(podDisplay.lateralBudRight, tuning.budVisibilityThresholdLateral)
-        val res = gate(podDisplay.reserveBulb, tuning.budVisibilityThresholdReserve)
-        return SeedBudVisualState(crown = crown, lateralLeft = latL, lateralRight = latR, reserve = res)
+        var crown = gate(podDisplay.crownNub, tuning.budVisibilityThresholdCrown)
+        var latL = gate(podDisplay.lateralBudLeft, tuning.budVisibilityThresholdLateral)
+        var latR = gate(podDisplay.lateralBudRight, tuning.budVisibilityThresholdLateral)
+        var res = gate(podDisplay.reserveBulb, tuning.budVisibilityThresholdReserve)
+        live?.let { lv ->
+            crown *= lv.crownGlowMul.coerceIn(0.5f, 1.15f)
+            latL *= lv.lateralInflationMul.coerceIn(0.5f, 1.15f)
+            latR *= lv.lateralInflationMul.coerceIn(0.5f, 1.15f)
+            res *= lv.reserveDimMul.coerceIn(0.45f, 1.1f)
+        }
+        return SeedBudVisualState(
+            crown = crown.coerceIn(0f, 1.2f),
+            lateralLeft = latL.coerceIn(0f, 1.2f),
+            lateralRight = latR.coerceIn(0f, 1.2f),
+            reserve = res.coerceIn(0f, 1.2f),
+        )
     }
 
     fun deriveThermal(
@@ -217,6 +243,21 @@ object SeedPodMaterialSystem {
                 spotlightMul = g.chamberingSpotlight * 1.05f,
                 budScale = g.chamberingBudScale * 1.02f,
                 closedness = (g.chamberingClosedness * 0.92f).coerceIn(0.12f, 0.95f),
+            )
+            SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
+            SeedPodGrowthStage.FIRST_BRANCH_FORMING,
+            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
+            SeedPodGrowthStage.SPECIALIZATION_READY,
+            -> StageMul(
+                shellDim = g.chamberingShellDim * 1.04f,
+                edgeBoost = g.chamberingEdge * 1.08f,
+                hazeMul = g.chamberingHaze * 1.06f,
+                nucleusBoost = g.chamberingNucleus * 1.08f,
+                facetBoost = g.chamberingFacet * 1.08f,
+                growthFrontMul = g.chamberingGrowthFront * 0.85f,
+                spotlightMul = g.chamberingSpotlight * 1.08f,
+                budScale = g.chamberingBudScale * 1.05f,
+                closedness = (g.chamberingClosedness * 0.88f).coerceIn(0.1f, 0.95f),
             )
         }
     }

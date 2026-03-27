@@ -1,6 +1,7 @@
 package com.velithorne.vessel.growth_seedpod
 
 import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.progression.StructuralGrowthState
 import kotlin.math.max
 
 /**
@@ -43,7 +44,7 @@ object SeedPodGrowthEngine {
         val hazeT = ((budget.crown + budget.lateral) * 0.35f + s.recovery * 0.25f).coerceIn(0f, 0.85f)
         val cohT = (budget.coherence * 0.55f + s.recovery * 0.35f).coerceIn(0f, 1f)
 
-        var display = d0.copy(
+        val display = d0.copy(
             crownNub = toward(d0.crownNub, crownT),
             lateralBudLeft = toward(d0.lateralBudLeft, latT),
             lateralBudRight = toward(d0.lateralBudRight, latT * 0.95f),
@@ -54,10 +55,12 @@ object SeedPodGrowthEngine {
             podCoherence = toward(d0.podCoherence, cohT),
             lastWallClockMs = System.currentTimeMillis(),
         )
-
-        display = display.copy(stage = classifyStage(display))
-
-        return SeedPodGrowthState(display = display, budget = budget)
+        // Permanent stage updated in [SeedPodGrowthCoordinator] via [com.velithorne.vessel.progression.DevelopmentEngine].
+        return SeedPodGrowthState(
+            display = display.copy(stage = prev.display.stage),
+            budget = budget,
+            structural = prev.structural,
+        )
     }
 
     /** 0..1 — how fully the pod has refined after reaching the chambering phase. */
@@ -84,15 +87,4 @@ object SeedPodGrowthEngine {
         lastWallClockMs = System.currentTimeMillis(),
     )
 
-    private fun classifyStage(d: SeedPodDisplayState): SeedPodGrowthStage {
-        val activity = d.crownNub + d.lateralBudLeft + d.reserveBulb + d.tissueHaze
-        return when {
-            activity < 0.18f && d.shellThickening < 0.22f -> SeedPodGrowthStage.DORMANT_POD
-            activity < 0.35f -> SeedPodGrowthStage.ACTIVATING_POD
-            activity < 0.55f -> SeedPodGrowthStage.GERMINATING_POD
-            d.tissueHaze < 0.42f -> SeedPodGrowthStage.EARLY_BUDDING
-            maturityScore(d) < 0.78f -> SeedPodGrowthStage.EARLY_CHAMBERING
-            else -> SeedPodGrowthStage.CHAMBER_MATURED
-        }
-    }
 }

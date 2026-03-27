@@ -35,12 +35,13 @@ import com.velithorne.vessel.renderer_seedpod.SeedPodGestureController
 import com.velithorne.vessel.renderer_seedpod.SeedPodScene
 import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
 import com.velithorne.vessel.ui.components.GrowthProgressCard
+import com.velithorne.vessel.ui.components.LiveConditionChip
+import com.velithorne.vessel.ui.components.StageStatusChip
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.SeedPodReturnSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
-import com.velithorne.vessel.ui.components.VesselStageChip
 import com.velithorne.vessel.ui.components.VesselStatusOverlay
 import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
@@ -138,13 +139,11 @@ fun VesselScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                VesselStageChip(
-                    label = podUi.stageLabel,
-                    modifier = Modifier.widthIn(max = 200.dp),
-                )
+                LiveConditionChip(label = podUi.liveConditionLabel)
+                StageStatusChip(structuralStageLabel = podUi.structuralStageLabel)
             }
             if (podUi.statusLine.isNotEmpty()) {
                 Text(
@@ -157,8 +156,10 @@ fun VesselScreen(
         }
         GrowthProgressCard(
             progress = podUi.growthProgressFraction,
+            progressCaption = podUi.progressCaption,
             activeBudgetChannelLabel = podUi.activeBudgetChannelLabel,
             recentAwayLine = podUi.recentAwayLine,
+            liveStrainIndicator = podUi.liveStrainIndicator,
             modifier = Modifier
                 .padding(top = 8.dp)
                 .vesselDebugBorder(

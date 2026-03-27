@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 32
-        versionName = "2.0.2-signal-lung-fronds"
+        versionCode = 33
+        versionName = "2.1.0-growth-stability-irreversible"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

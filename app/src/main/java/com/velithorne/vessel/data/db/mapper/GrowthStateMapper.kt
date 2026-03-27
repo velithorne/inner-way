@@ -5,6 +5,7 @@ import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthBudget
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthState
+import com.velithorne.vessel.progression.StructuralGrowthState
 
 object GrowthStateMapper {
 
@@ -30,7 +31,19 @@ object GrowthStateMapper {
             thermal = e.budgetThermal,
             coherence = e.budgetCoherence,
         )
-        return SeedPodGrowthState(display = d, budget = b)
+        val sg = StructuralGrowthState(
+            permanentStage = st,
+            milestoneFlags = e.milestoneFlags,
+            stageEnteredAtMs = e.structuralStageEnteredAtMs.takeIf { it > 0L } ?: e.lastWallClockMs,
+            nextStageAccum = e.nextStageAccum,
+            confirmedMaturityHigh = e.confirmedMaturityHigh,
+            leanThermal = e.leanThermal,
+            leanNeural = e.leanNeural,
+            leanSignal = e.leanSignal,
+            leanReserve = e.leanReserve,
+            smoothedStructuralProgress = e.smoothedStructuralProgress,
+        )
+        return SeedPodGrowthState(display = d, budget = b, structural = sg)
     }
 
     fun toEntity(
@@ -42,7 +55,7 @@ object GrowthStateMapper {
     ): SeedPodStateEntity =
         SeedPodStateEntity(
             specimenId = specimenId,
-            stageOrdinal = state.display.stage.ordinal,
+            stageOrdinal = state.structural.permanentStage.ordinal,
             crownNub = state.display.crownNub,
             lateralBudLeft = state.display.lateralBudLeft,
             lateralBudRight = state.display.lateralBudRight,
@@ -61,5 +74,14 @@ object GrowthStateMapper {
             lastVisibleGrowthMs = lastVisibleGrowthMs,
             lastStageTransitionMs = lastStageTransitionMs,
             lastAdaptationUpdateMs = lastAdaptationUpdateMs,
+            milestoneFlags = state.structural.milestoneFlags,
+            nextStageAccum = state.structural.nextStageAccum,
+            confirmedMaturityHigh = state.structural.confirmedMaturityHigh,
+            leanThermal = state.structural.leanThermal,
+            leanNeural = state.structural.leanNeural,
+            leanSignal = state.structural.leanSignal,
+            leanReserve = state.structural.leanReserve,
+            smoothedStructuralProgress = state.structural.smoothedStructuralProgress,
+            structuralStageEnteredAtMs = state.structural.stageEnteredAtMs,
         )
 }

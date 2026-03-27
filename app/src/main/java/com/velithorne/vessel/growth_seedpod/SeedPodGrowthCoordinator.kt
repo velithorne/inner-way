@@ -4,15 +4,16 @@ import android.content.Context
 import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.lineage.SeedPodReturnSummary
 import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.progression.DevelopmentEngine
+import com.velithorne.vessel.progression.ProgressionTuning
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlin.math.min
 
 /**
- * Owns seed-pod growth state + **Room** persistence ([LineageRepository]). Legacy prefs are only read once to migrate.
- *
- * **Build reset (fresh specimen on new APK):** [com.velithorne.vessel.growthtime.GrowthResetPolicy] clears
- * the lineage DB; [LineageRepository.ensureActiveSpecimenExists] creates a new specimen on next launch.
+ * Owns seed-pod growth state + **Room** persistence ([LineageRepository]).
+ * **Irreversible stage** is advanced only by [com.velithorne.vessel.progression.DevelopmentEngine].
+ * **Build reset:** [com.velithorne.vessel.growthtime.GrowthResetPolicy] clears Room — structural milestones reset with new specimen.
  */
 class SeedPodGrowthCoordinator(
     context: Context,
@@ -23,6 +24,8 @@ class SeedPodGrowthCoordinator(
     private var lastPersistMs: Long = 0L
     private var tick: Int = 0
     private lateinit var specimenId: String
+
+    private val progressionTuning = ProgressionTuning()
 
     /** Wall time when app went to background — for resume catch-up. */
     private var backgroundAtMs: Long = 0L
@@ -41,9 +44,6 @@ class SeedPodGrowthCoordinator(
         backgroundAtMs = System.currentTimeMillis()
     }
 
-    /**
-     * Apply offline growth simulation from background → foreground; persists with [offlineCatchUp] = true.
-     */
     fun catchUpOffline(phys: PhysiologySnapshot): SeedPodReturnSummary? {
         if (backgroundAtMs <= 0L) return null
         val elapsed = System.currentTimeMillis() - backgroundAtMs
@@ -56,7 +56,7 @@ class SeedPodGrowthCoordinator(
         val totalSec = capped / 1000f
         while (t < totalSec) {
             val dt = min(2f, totalSec - t)
-            s = SeedPodGrowthEngine.step(phys, s, dt)
+            s = stepWithProgression(phys, s, dt)
             t += dt
         }
         state = s
@@ -79,12 +79,10 @@ class SeedPodGrowthCoordinator(
         val dtSec = ((now - lastWallMs) / 1000f).coerceIn(0.001f, 2f)
         lastWallMs = now
         val prevEntity = lineageRepository.cachedSeedEntity
-        state = SeedPodGrowthEngine.step(phys, state, dtSec)
+        state = stepWithProgression(phys, state, dtSec)
         tick++
 
-        val stageChanged = prevEntity?.let { e ->
-            e.stageOrdinal != state.display.stage.ordinal
-        } ?: false
+        val stageChanged = prevEntity?.stageOrdinal != state.structural.permanentStage.ordinal
         val periodic = (now - lastPersistMs) > 8_000L || tick % 30 == 0
         val force = stageChanged || periodic
         lineageRepository.persistGrowthStep(
@@ -99,16 +97,29 @@ class SeedPodGrowthCoordinator(
         return state
     }
 
+    private fun stepWithProgression(phys: PhysiologySnapshot, prev: SeedPodGrowthState, dtSec: Float): SeedPodGrowthState {
+        val now = System.currentTimeMillis()
+        val afterLive = SeedPodGrowthEngine.step(phys, prev, dtSec)
+        val mat = SeedPodGrowthEngine.maturityScore(afterLive.display)
+        val dev = DevelopmentEngine.step(
+            prev = afterLive.structural,
+            liveDisplay = afterLive.display,
+            maturityScore = mat,
+            phys = phys,
+            dtSec = dtSec,
+            nowMs = now,
+            tuning = progressionTuning,
+        )
+        val perm = dev.structural.permanentStage
+        return afterLive.copy(
+            display = afterLive.display.copy(stage = perm),
+            structural = dev.structural,
+        )
+    }
+
     fun current(): SeedPodGrowthState = state
 
     fun specimenId(): String = specimenId
 
-    fun progressFraction(): Float {
-        val d = state.display
-        val lastIdx = (SeedPodGrowthStage.entries.size - 1).coerceAtLeast(1)
-        val stageSlot = d.stage.ordinal / lastIdx.toFloat()
-        val refine = SeedPodGrowthEngine.maturityScore(d)
-        // Stage drives the broad arc; maturity fills refinement within / between stages.
-        return (stageSlot * 0.52f + refine * 0.48f).coerceIn(0f, 1f)
-    }
+    fun progressFraction(): Float = state.structural.smoothedStructuralProgress
 }

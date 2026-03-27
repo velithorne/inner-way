@@ -34,6 +34,11 @@ object SeedPodPseudoVolumeMapper {
             SeedPodGrowthStage.EARLY_BUDDING -> 0.92f
             SeedPodGrowthStage.EARLY_CHAMBERING -> 0.96f
             SeedPodGrowthStage.CHAMBER_MATURED -> 1f
+            SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
+            SeedPodGrowthStage.FIRST_BRANCH_FORMING,
+            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
+            SeedPodGrowthStage.SPECIALIZATION_READY,
+            -> 1f
         }
 
         val td = tuning.depth
@@ -66,6 +71,11 @@ object SeedPodPseudoVolumeMapper {
             SeedPodGrowthStage.EARLY_BUDDING -> 0.12f
             SeedPodGrowthStage.EARLY_CHAMBERING -> 0.1f
             SeedPodGrowthStage.CHAMBER_MATURED -> 0.14f
+            SeedPodGrowthStage.LINEAGE_DIFFERENTIATING,
+            SeedPodGrowthStage.FIRST_BRANCH_FORMING,
+            SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT,
+            SeedPodGrowthStage.SPECIALIZATION_READY,
+            -> 0.16f
         }
         val burial = (
             td.nucleusBurialBase +

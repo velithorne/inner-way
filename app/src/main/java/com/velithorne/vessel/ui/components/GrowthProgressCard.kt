@@ -14,11 +14,14 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun GrowthProgressCard(
     progress: Float,
+    progressCaption: String,
     activeBudgetChannelLabel: String,
     recentAwayLine: String,
+    liveStrainIndicator: Float,
     modifier: Modifier = Modifier,
 ) {
     val p = progress.coerceIn(0f, 1f)
+    val strain = liveStrainIndicator.coerceIn(0f, 1f)
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
@@ -26,7 +29,7 @@ fun GrowthProgressCard(
     ) {
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(
-                text = "Developmental progress",
+                text = "Permanent structural growth",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
             )
@@ -36,6 +39,20 @@ fun GrowthProgressCard(
                     .fillMaxWidth()
                     .padding(top = 6.dp),
             )
+            Text(
+                text = progressCaption,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            if (strain > 0.08f) {
+                Text(
+                    text = "Live strain · ${(strain * 100f).toInt()}% (does not reduce earned structure)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             Text(
                 text = "Budget · $activeBudgetChannelLabel",
                 style = MaterialTheme.typography.labelSmall,

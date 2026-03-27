@@ -3,6 +3,7 @@ package com.velithorne.vessel.renderer_seedpod
 import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
+import com.velithorne.vessel.progression.LiveExpressionMapper
 import com.velithorne.vessel.renderer.VesselPalette
 
 /**
@@ -22,10 +23,11 @@ class SeedPodRenderer(
         val palette: VesselPaletteState = VesselPalette.fromSpecies(s, signalStrained, com.velithorne.vessel.renderer.RenderTuning())
         val seedPodPalette = SeedPodPalette(base = palette)
 
-        val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning)
+        val live = LiveExpressionMapper.map(physiology)
+        val appearance = SeedPodMaterialSystem.deriveAppearance(physiology, podDisplay, palette, tuning, live)
         val materialState = SeedPodMaterialSystem.deriveMaterialState(physiology, appearance)
         val depthState = SeedPodPseudoVolumeMapper.map(physiology, podDisplay.stage, appearance, tuning)
-        val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance)
+        val buds = SeedPodMaterialSystem.deriveBuds(podDisplay, tuning, appearance, live)
         val thermal = SeedPodMaterialSystem.deriveThermal(physiology, podDisplay, palette, tuning)
         val lightingState = SeedPodLightingModel.compute(physiology, appearance, thermal, tuning)
 
@@ -54,6 +56,7 @@ class SeedPodRenderer(
             particleDensity = particleDensity,
             stressShiver = stressShiver,
             legacyVesselRendererActive = false,
+            liveExpression = live,
         )
     }
 }

@@ -5,6 +5,7 @@ import com.velithorne.vessel.growth_seedpod.SeedPodDisplayState
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthBudget
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthState
+import com.velithorne.vessel.progression.StructuralGrowthState
 
 private const val PREFS = "velithorne_seedpod"
 private const val KEY_HAS = "has"
@@ -70,7 +71,11 @@ class SeedPodStateStore(context: Context) {
             thermal = p.getFloat("b_therm", 0f),
             coherence = p.getFloat("b_coh", 0f),
         )
-        return SeedPodGrowthState(display = d, budget = b)
+        return SeedPodGrowthState(
+            display = d,
+            budget = b,
+            structural = StructuralGrowthState.initial(d.lastWallClockMs),
+        )
     }
 
     fun clear() {

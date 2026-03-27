@@ -69,6 +69,9 @@ object LineageEngine {
                 lastWallClockMs = e.lastWallClockMs,
             )
         }
+        val prevStructuralStage = previousEntity?.let { e ->
+            SeedPodGrowthStage.entries.getOrNull(e.stageOrdinal) ?: SeedPodGrowthStage.DORMANT_POD
+        }
         val d = next.display
         val events = mutableListOf<GrowthEventRecord>()
         val adaptations = mutableListOf<AdaptationUpsert>()
@@ -81,12 +84,13 @@ object LineageEngine {
         var lastStage = prevLastStage
         var lastAdapt = prevLastAdapt
 
-        // Stage transition
+        // Irreversible structural stage transition (not live display flicker)
         var stageRec: StageTransitionRecord? = null
-        if (prevDisplay != null && prevDisplay.stage != d.stage) {
+        val nextStructural = next.structural.permanentStage
+        if (prevStructuralStage != null && prevStructuralStage != nextStructural) {
             val ch = dominantChannel(next, physiology)
-            val expl = LineageExplainer.stageTransition(prevDisplay.stage, d.stage, ch)
-            stageRec = StageTransitionRecord(prevDisplay.stage, d.stage, ch, expl)
+            val expl = LineageExplainer.stageTransition(prevStructuralStage, nextStructural, ch)
+            stageRec = StageTransitionRecord(prevStructuralStage, nextStructural, ch, expl)
             lastStage = nowMs
             lines += expl
         }

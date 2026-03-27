@@ -19,6 +19,10 @@ object SeedPodExplainer {
         SeedPodGrowthStage.EARLY_BUDDING -> "Early budding"
         SeedPodGrowthStage.EARLY_CHAMBERING -> "Early chambering"
         SeedPodGrowthStage.CHAMBER_MATURED -> "Chamber matured"
+        SeedPodGrowthStage.LINEAGE_DIFFERENTIATING -> "Lineage differentiating"
+        SeedPodGrowthStage.FIRST_BRANCH_FORMING -> "First branch forming"
+        SeedPodGrowthStage.ADAPTIVE_SHELL_VARIANT -> "Adaptive shell variant"
+        SeedPodGrowthStage.SPECIALIZATION_READY -> "Specialization ready"
     }
 
     fun statusLine(phys: PhysiologySnapshot, state: SeedPodGrowthState): String {
