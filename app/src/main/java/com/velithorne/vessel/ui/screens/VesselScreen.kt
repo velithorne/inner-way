@@ -1,18 +1,22 @@
 package com.velithorne.vessel.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
@@ -36,19 +41,33 @@ import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
-import com.velithorne.vessel.ui.components.VesselStageChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
+import com.velithorne.vessel.ui.components.VesselStageChip
 import com.velithorne.vessel.ui.components.VesselStatusOverlay
 import com.velithorne.vessel.util.Formatters
 import com.velithorne.vessel.viewmodel.TelemetryViewModel
 
 /**
+ * Set to `true` temporarily to tint/border progress, chamber viewport, and status card
+ * and verify top-to-bottom layout order (disable before release).
+ */
+private const val DEBUG_VESSEL_LAYOUT_BORDERS = false
+
+@Composable
+private fun Modifier.vesselDebugBorder(
+    enabled: Boolean,
+    color: Color,
+): Modifier {
+    if (!enabled) return this
+    return border(width = 2.dp, color = color)
+}
+
+/**
  * Vessel tab: [SeedPodScene] only.
  *
- * **Layout:** Header + progress (wrap) → **chamber [weight(1f)]** fills the **entire middle** of the
- * tab (organism sits **under** progress in the **upper-mid** of that region via [SeedPodLayout]) →
- * controls + overlay + chips **wrap height at bottom** — no [weight] on the bottom block, so no
- * huge empty band between progress and the organism.
+ * **Layout:** Strict top-to-bottom order in a [LazyColumn] — developmental progress, then a
+ * **fixed-height** chamber card (not weighted), then actions, status, organ chips. No
+ * [Spacer] with [weight], no [Arrangement.SpaceBetween] on the root, no bottom-aligned viewport.
  */
 @Composable
 fun VesselScreen(
@@ -75,89 +94,117 @@ fun VesselScreen(
 
     var chamberOffset by remember { mutableStateOf(Offset.Zero) }
 
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
+        verticalArrangement = Arrangement.Top,
     ) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Silicon seed chamber",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 3.dp, bottom = 4.dp),
-        ) {
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        item {
             Text(
-                text = "Specimen 01 · seed pod · pinch · pan · tilt · tap pod for readout",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
-                modifier = Modifier.fillMaxWidth(),
+                text = "Silicon seed chamber",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
             )
-            Row(
+        }
+        item {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(top = 3.dp, bottom = 4.dp),
             ) {
-                Spacer(modifier = Modifier.weight(1f))
-                VesselStageChip(
-                    label = podUi.stageLabel,
-                    modifier = Modifier.widthIn(max = 200.dp),
-                )
-            }
-            if (podUi.statusLine.isNotEmpty()) {
                 Text(
-                    text = podUi.statusLine,
+                    text = "Specimen 01 · seed pod · pinch · pan · tilt · tap pod for readout",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
-                    modifier = Modifier.padding(top = 4.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VesselStageChip(
+                        label = podUi.stageLabel,
+                        modifier = Modifier.widthIn(max = 200.dp),
+                    )
+                }
+                if (podUi.statusLine.isNotEmpty()) {
+                    Text(
+                        text = podUi.statusLine,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
             }
+        }
+        item {
             GrowthProgressCard(
                 progress = podUi.growthProgressFraction,
                 activeBudgetChannelLabel = podUi.activeBudgetChannelLabel,
                 recentAwayLine = podUi.recentAwayLine,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .vesselDebugBorder(
+                        DEBUG_VESSEL_LAYOUT_BORDERS,
+                        Color.Magenta.copy(alpha = 0.85f),
+                    ),
             )
         }
-
-        // Fills **all space** between progress and bottom chrome — organism is the main viewport (upper-mid in canvas).
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Box(
+        // 12–16dp between progress and chamber viewport
+        item {
+            Spacer(modifier = Modifier.height(14.dp))
+        }
+        item {
+            Surface(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .onGloballyPositioned { coords ->
-                        chamberOffset = coords.positionInRoot()
-                    },
+                    .fillMaxWidth()
+                    .vesselDebugBorder(
+                        DEBUG_VESSEL_LAYOUT_BORDERS,
+                        Color.Cyan.copy(alpha = 0.9f),
+                    ),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
+                tonalElevation = 0.dp,
             ) {
-                SeedPodScene(
-                    physiology = physiology,
-                    scene = scene,
-                    selectedTarget = selectedPod,
-                    gestureController = gestureController,
-                    renderOffset = chamberOffset,
-                    onSelectTarget = { viewModel.selectSeedPodTarget(it) },
-                    modifier = Modifier.fillMaxSize(),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coords ->
+                                chamberOffset = coords.positionInRoot()
+                            },
+                    ) {
+                        SeedPodScene(
+                            physiology = physiology,
+                            scene = scene,
+                            selectedTarget = selectedPod,
+                            gestureController = gestureController,
+                            renderOffset = chamberOffset,
+                            onSelectTarget = { viewModel.selectSeedPodTarget(it) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
             }
         }
-
-        // Wrap height only — does **not** expand to create a dead gap above the organism.
-        Column(modifier = Modifier.fillMaxWidth()) {
+        // 8–12dp between viewport and action row
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp, bottom = 4.dp),
+                    .padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -177,6 +224,9 @@ fun VesselScreen(
                     },
                 )
             }
+        }
+        // 8–12dp between action row and status card
+        item {
             VesselStatusOverlay(
                 stateLabel = scene.physiology.species.healthLabel,
                 vitality = scene.physiology.species.vitality,
@@ -187,8 +237,18 @@ fun VesselScreen(
                 growthHint = podUi.statusLine.takeIf { it.isNotEmpty() },
                 expanded = overlayExpanded,
                 onToggleInfo = { overlayExpanded = !overlayExpanded },
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .vesselDebugBorder(
+                        DEBUG_VESSEL_LAYOUT_BORDERS,
+                        Color.Yellow.copy(alpha = 0.9f),
+                    ),
             )
+        }
+        item {
             Spacer(modifier = Modifier.height(6.dp))
+        }
+        item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -208,7 +268,6 @@ fun VesselScreen(
                     VesselLegendChip(label = "$short · ${Formatters.formatUnitInterval(o.health)}")
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 

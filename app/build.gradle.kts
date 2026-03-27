@@ -12,8 +12,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.7.5-chamber-fills-middle"
+        versionCode = 24
+        versionName = "1.7.6-vessel-lazycolumn-layout"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
