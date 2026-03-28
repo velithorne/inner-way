@@ -38,6 +38,7 @@ import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.renderer_seedpod.SeedPodGestureController
 import com.velithorne.vessel.renderer_seedpod.SeedPodScene
 import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
+import com.velithorne.vessel.ui.components.DevEvolutionSpeedCard
 import com.velithorne.vessel.ui.components.DevSimulationCard
 import com.velithorne.vessel.ui.components.GrowthProgressCard
 import com.velithorne.vessel.ui.components.LiveConditionChip
@@ -90,6 +91,7 @@ fun VesselScreen(
     val inspection by viewModel.organInspection.collectAsState()
     val sheetVisible by viewModel.vesselSheetVisible.collectAsState()
     val podUi by viewModel.seedPodVesselUi.collectAsState()
+    val devEvolutionSpeed by viewModel.devEvolutionSpeedMultiplier.collectAsState()
     val returnSummaryFlow by viewModel.growthReturnSummary.collectAsState()
     val seedPodReturn by viewModel.seedPodReturnSummary.collectAsState()
     var showReturnSummarySheet by rememberSaveable { mutableStateOf(false) }
@@ -239,6 +241,13 @@ fun VesselScreen(
             DevSimulationCard(
                 mode = SimulationMode.DEV_SIMULATION,
                 onResetSpecimen = { viewModel.requestDevSpecimenReset() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            )
+            DevEvolutionSpeedCard(
+                multiplier = devEvolutionSpeed,
+                onMultiplierChange = { viewModel.setDevEvolutionSpeedMultiplier(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),

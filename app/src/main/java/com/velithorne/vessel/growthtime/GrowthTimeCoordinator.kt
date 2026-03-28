@@ -16,7 +16,7 @@ class GrowthTimeCoordinator(
     private val morphogenesisEngine: MorphogenesisEngine,
     timeTuning: TimeTuning,
 ) {
-    private val timeTuning = timeTuning
+    private var timeTuning = timeTuning
     private val growthStore = GrowthStateStore(context)
 
     private var budget: GrowthBudget = GrowthBudget()
@@ -166,4 +166,9 @@ class GrowthTimeCoordinator(
     }
 
     fun timeTuning(): TimeTuning = timeTuning
+
+    /** Dev evolution speed slider — replaces temporal tuning without resetting display state. */
+    fun updateTimeTuning(t: TimeTuning) {
+        timeTuning = t
+    }
 }

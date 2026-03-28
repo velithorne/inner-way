@@ -39,18 +39,28 @@ class SeedPodGrowthCoordinator(
     private var tick: Int = 0
     private lateinit var specimenId: String
 
-    private val progressionTuning: ProgressionTuning = profile.progression
-    private val branchingTuning: BranchingTuning = profile.branching
+    private var progressionTuning: ProgressionTuning = profile.progression
+    private var branchingTuning: BranchingTuning = profile.branching
     private val ambientTuning: BackgroundTuning = profile.background
-    private val seedGrowthTuning: SeedPodGrowthTuning = profile.seedPodGrowth
+    private var seedGrowthTuning: SeedPodGrowthTuning = profile.seedPodGrowth
 
     /** Wall time when app went to background — for resume catch-up. */
     private var backgroundAtMs: Long = 0L
 
-    private val maxOfflineCatchUpMs: Long = profile.seedPodMaxOfflineCatchUpMs
+    private var maxOfflineCatchUpMs: Long = profile.seedPodMaxOfflineCatchUpMs
     private val simulationMode: SimulationMode = profile.mode
 
     private lateinit var selfAssembly: SelfAssemblyCoordinator
+
+    /**
+     * Call when dev evolution speed slider changes so structural + seed-pod pacing match [GrowthProfileScaler].
+     */
+    fun updateTuningFromProfile(profile: GrowthProfile) {
+        progressionTuning = profile.progression
+        branchingTuning = profile.branching
+        seedGrowthTuning = profile.seedPodGrowth
+        maxOfflineCatchUpMs = profile.seedPodMaxOfflineCatchUpMs
+    }
 
     init {
         runBlocking(Dispatchers.IO) {

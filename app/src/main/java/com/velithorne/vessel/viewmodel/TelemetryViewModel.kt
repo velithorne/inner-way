@@ -10,7 +10,9 @@ import com.velithorne.vessel.background.EcologySnapshotSourceType
 import com.velithorne.vessel.BuildConfig
 import com.velithorne.vessel.background.ReturnSummaryComposer
 import com.velithorne.vessel.config.DevSettingsStore
+import com.velithorne.vessel.config.GrowthProfile
 import com.velithorne.vessel.config.GrowthProfileProvider
+import com.velithorne.vessel.config.GrowthProfileScaler
 import com.velithorne.vessel.config.SimulationMode
 import com.velithorne.vessel.branching.BranchExplainer
 import com.velithorne.vessel.branching.BranchInfluenceModel
@@ -19,6 +21,7 @@ import com.velithorne.vessel.data.LineageRepository
 import com.velithorne.vessel.growthtime.GrowthTimeCoordinator
 import com.velithorne.vessel.growth_seedpod.SeedPodExplainer
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthState
 import com.velithorne.vessel.lineage.LineageSummary
 import com.velithorne.vessel.lineage.SeedPodReturnSummary
 import com.velithorne.vessel.lineage.SpecimenIdentity
@@ -70,8 +73,38 @@ class TelemetryViewModel(
 ) : ViewModel() {
 
     private val profile get() = growthProfileProvider.profile
-    private val branchingTuning get() = profile.branching
     private val devSettings = DevSettingsStore(application)
+
+    private val _devEvolutionSpeedMultiplier = MutableStateFlow(devSettings.devEvolutionSpeedMultiplier)
+    /** Debug dev mode: persisted evolution speed (1 = default dev profile). */
+    val devEvolutionSpeedMultiplier: StateFlow<Float> = _devEvolutionSpeedMultiplier.asStateFlow()
+
+    private fun scaledGrowthProfile(): GrowthProfile =
+        if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
+            GrowthProfileScaler.scale(profile, devSettings.devEvolutionSpeedMultiplier)
+        } else {
+            profile
+        }
+
+    private fun syncDevEvolutionEnginesFromPrefs() {
+        if (!BuildConfig.DEBUG || profile.mode != SimulationMode.DEV_SIMULATION) return
+        val scaled = scaledGrowthProfile()
+        growthTimeCoordinator.updateTimeTuning(scaled.time)
+        seedPodGrowthCoordinator.updateTuningFromProfile(scaled)
+    }
+
+    /**
+     * Debug dev mode only: scales structural progression, morphogenesis time tuning, and seed-pod display rates.
+     */
+    fun setDevEvolutionSpeedMultiplier(value: Float) {
+        if (!BuildConfig.DEBUG || profile.mode != SimulationMode.DEV_SIMULATION) return
+        val v = GrowthProfileScaler.clampMultiplier(value)
+        devSettings.devEvolutionSpeedMultiplier = v
+        _devEvolutionSpeedMultiplier.value = v
+        val scaled = GrowthProfileScaler.scale(profile, v)
+        growthTimeCoordinator.updateTimeTuning(scaled.time)
+        seedPodGrowthCoordinator.updateTuningFromProfile(scaled)
+    }
 
     private val _seedPodReturnSummary = MutableStateFlow<SeedPodReturnSummary?>(null)
     val seedPodReturnSummary: StateFlow<SeedPodReturnSummary?> = _seedPodReturnSummary.asStateFlow()
@@ -169,7 +202,10 @@ class TelemetryViewModel(
             initialValue = repository.snapshot.value,
         )
 
-    private val initialPhysiology = physiologyEngine.update(repository.snapshot.value)
+    private val initialPhysiology = run {
+        syncDevEvolutionEnginesFromPrefs()
+        physiologyEngine.update(repository.snapshot.value)
+    }
 
     val physiology: StateFlow<PhysiologySnapshot> = repository.snapshot
         .map { physiologyEngine.update(it) }
@@ -198,7 +234,7 @@ class TelemetryViewModel(
     private val initialBranchVisual = SeedPodBranchMapper.map(
         initialPodGrowth.structural.morphologyBranch,
         initialPodGrowth.structural.permanentStage,
-        growthProfileProvider.profile.branching,
+        scaledGrowthProfile().branching,
     )
     private val initialSeedPodScene = seedPodRenderer.map(
         initialPhysiology,
@@ -212,40 +248,57 @@ class TelemetryViewModel(
         growthPressure = initialPodGrowth.lastSelfAssembly?.pressure,
     )
 
-    val seedPodScene: StateFlow<SeedPodSceneState> = physiology
-        .map { phys ->
-            val growth = seedPodGrowthCoordinator.process(phys)
-            val display = growth.display.copy(stage = growth.structural.permanentStage)
-            val branchVisual = SeedPodBranchMapper.map(
-                growth.structural.morphologyBranch,
-                growth.structural.permanentStage,
-                growthProfileProvider.profile.branching,
+    /**
+     * One structural step per physiology tick — do not combine with dev speed here or the slider
+     * would double-advance growth.
+     */
+    private val seedPodAfterPhysiology: StateFlow<Pair<PhysiologySnapshot, SeedPodGrowthState>> =
+        physiology
+            .map { phys ->
+                val growth = seedPodGrowthCoordinator.process(phys)
+                phys to growth
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = initialPhysiology to initialPodGrowth,
             )
-            val snap = growth.lastSelfAssembly
-            seedPodRenderer.map(
-                phys,
-                display,
-                branchVisual,
-                generatedAnatomy = snap?.anatomy,
-                biographyVisual = BiographyVisualState.fromNullable(snap?.biography),
-                animTimeSec = System.nanoTime() / 1_000_000_000f,
-                simulationMode = profile.mode,
-                structuralProgress = growth.structural.smoothedStructuralProgress,
-                growthPressure = snap?.pressure,
-            )
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = initialSeedPodScene,
+
+    val seedPodScene: StateFlow<SeedPodSceneState> = combine(
+        seedPodAfterPhysiology,
+        devEvolutionSpeedMultiplier,
+    ) { (phys, growth), _ ->
+        val display = growth.display.copy(stage = growth.structural.permanentStage)
+        val branchVisual = SeedPodBranchMapper.map(
+            growth.structural.morphologyBranch,
+            growth.structural.permanentStage,
+            scaledGrowthProfile().branching,
         )
+        val snap = growth.lastSelfAssembly
+        seedPodRenderer.map(
+            phys,
+            display,
+            branchVisual,
+            generatedAnatomy = snap?.anatomy,
+            biographyVisual = BiographyVisualState.fromNullable(snap?.biography),
+            animTimeSec = System.nanoTime() / 1_000_000_000f,
+            simulationMode = profile.mode,
+            structuralProgress = growth.structural.smoothedStructuralProgress,
+            growthPressure = snap?.pressure,
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = initialSeedPodScene,
+    )
 
     val seedPodVesselUi: StateFlow<SeedPodVesselUiState> = combine(
         seedPodScene,
         growthReturnSummary,
         seedPodReturnSummary,
         _ambientEcologyHintLine,
-    ) { scene, ret, seedRet, ambientHint ->
+        devEvolutionSpeedMultiplier,
+    ) { scene, ret, seedRet, ambientHint, devSpeed ->
         val gs = seedPodGrowthCoordinator.current()
         val strain = scene.physiology.species.let {
             (it.stress * 0.5f + it.fever * 0.35f + (1f - it.vitality) * 0.15f).coerceIn(0f, 1f)
@@ -324,6 +377,9 @@ class TelemetryViewModel(
             devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
                 "Accelerated growth profile (dev)"
             } else null,
+            devEvolutionSpeedMultiplier = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
+                devSpeed
+            } else null,
             visibleTopologyLines = topoLines,
             morphologyDriverLine = "Contour driver: $driver",
             visibilityDebugLine = debugVis,
@@ -378,6 +434,9 @@ class TelemetryViewModel(
                 ambientEcologyHintLine = "",
                 devSimulationHintLine = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
                     "Accelerated growth profile (dev)"
+                } else null,
+                devEvolutionSpeedMultiplier = if (BuildConfig.DEBUG && profile.mode == SimulationMode.DEV_SIMULATION) {
+                    devSettings.devEvolutionSpeedMultiplier
                 } else null,
                 visibleTopologyLines = initialSeedPodScene.visibleMorphology.topologySummaryLines,
                 morphologyDriverLine = "Contour driver: ${initialSeedPodScene.visibleMorphology.dominantContourDriver}",

@@ -27,6 +27,8 @@ data class SeedPodVesselUiState(
     val ambientEcologyHintLine: String,
     /** Non-null in debug when [com.velithorne.vessel.config.SimulationMode.DEV_SIMULATION] is active. */
     val devSimulationHintLine: String? = null,
+    /** Debug dev mode: persisted evolution speed multiplier (1 = default dev pacing). Null in release. */
+    val devEvolutionSpeedMultiplier: Float? = null,
     /** Lines describing visible topology — must align with canvas. */
     val visibleTopologyLines: List<String> = emptyList(),
     /** Short line: dominant contour driver from self-assembly. */
