@@ -1,14 +1,15 @@
 package com.velithorne.vessel.morphogenesis_core
 
 import com.velithorne.vessel.model.GeneratedAnatomyState
+import com.velithorne.vessel.renderer_seedpod.ContourSampleSet
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 
 object MorphogenesisMapper {
-
-    private const val POLAR_SAMPLES = 12
 
     fun toGeneratedAnatomy(
         graph: StructuralGraph,
@@ -20,7 +21,9 @@ object MorphogenesisMapper {
     ): GeneratedAnatomyState {
         val field = TissueFieldEngine.sampleAt(0.5f, 0.48f, graph, pressure, hidden)
         val contour = IsoContourBuilder.build(field, archetype, era)
-        val polar = buildPolarSilhouette(field, pressure, archetype, graph, hidden)
+        val n = ContourSampleSet.forEra(era)
+        val polar = buildPolarSilhouette(n, field, pressure, archetype, graph, hidden)
+        val hard = buildHardEdgePreserve(n, field, pressure, graph)
         val (offNx, offNy) = innerChamberBias(graph, pressure)
         return GeneratedAnatomyState(
             era = era,
@@ -34,6 +37,7 @@ object MorphogenesisMapper {
             graph = graph,
             usingFieldContour = true,
             silhouettePolarMul = polar,
+            contourHardEdgePreserve = hard,
             innerChamberOffsetNx = offNx,
             innerChamberOffsetNy = offNy,
         )
@@ -48,19 +52,20 @@ object MorphogenesisMapper {
     }
 
     private fun buildPolarSilhouette(
+        n: Int,
         field: TissueField,
         pressure: GrowthPressureState,
         archetype: SeedArchetype,
         graph: StructuralGraph,
         hidden: InternalHiddenState,
     ): FloatArray {
-        val out = FloatArray(POLAR_SAMPLES)
+        val out = FloatArray(n)
         val fr = graph.nodes.find { it.kind == MorphNodeKind.FROND_ROOT }
         val res = graph.nodes.find { it.kind == MorphNodeKind.RESERVE_BASIN_LOCUS }
         val crown = graph.nodes.find { it.kind == MorphNodeKind.CROWN_CHAMBER }
         val asym = archetype.asymmetryTolerance
-        for (i in 0 until POLAR_SAMPLES) {
-            val ang = (i / POLAR_SAMPLES.toFloat()) * (2f * PI.toFloat())
+        for (i in 0 until n) {
+            val ang = (i / n.toFloat()) * (2f * PI.toFloat())
             val ax = cos(ang)
             val ay = sin(ang)
             var m = 1f
@@ -76,5 +81,36 @@ object MorphogenesisMapper {
             out[i] = m.coerceIn(0.82f, 1.28f)
         }
         return out
+    }
+
+    private fun buildHardEdgePreserve(
+        n: Int,
+        field: TissueField,
+        pressure: GrowthPressureState,
+        graph: StructuralGraph,
+    ): FloatArray {
+        val h = FloatArray(n)
+        val th = field.thermalTension.coerceIn(0f, 2f)
+        val arch = field.archiveBurden.coerceIn(0f, 2f)
+        for (i in 0 until n) {
+            val ang = (i / n.toFloat()) * (2f * PI.toFloat())
+            val ay = sin(ang)
+            var v = 0f
+            if (ay < -0.35f) v += th * 0.35f
+            if (arch > 0.8f && abs(ang - PI.toFloat()) < 0.9f) v += arch * 0.12f
+            h[i] = v.coerceIn(0f, 1f)
+        }
+        for (node in graph.nodes) {
+            if (node.kind != MorphNodeKind.SCAR_ANCHOR && node.kind != MorphNodeKind.HEAT_MANTLE_RIDGE) continue
+            val dx = (node.nx - 0.5f).toDouble()
+            val dy = (node.ny - 0.5f).toDouble()
+            val ang = atan2(dy, dx).toFloat()
+            val idx = floor(((ang + PI.toFloat()) / (2f * PI.toFloat())) * n).toInt() % n
+            val bump = node.strength * (if (node.kind == MorphNodeKind.SCAR_ANCHOR) 0.55f else 0.35f)
+            h[idx] = (h[idx] + bump).coerceIn(0f, 1f)
+            h[(idx + 1) % n] = (h[(idx + 1) % n] + bump * 0.5f).coerceIn(0f, 1f)
+            h[(idx + n - 1) % n] = (h[(idx + n - 1) % n] + bump * 0.5f).coerceIn(0f, 1f)
+        }
+        return h
     }
 }

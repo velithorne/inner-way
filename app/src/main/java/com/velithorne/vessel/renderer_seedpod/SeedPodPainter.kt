@@ -46,6 +46,9 @@ object SeedPodPainter {
         val bio = scene.biographyVisual
         val vm = scene.visibleMorphology
         val trace = scene.seedTrace
+        val burial = scene.seedBurial
+        val contourGeom = scene.contourGeometry
+        val rerouteInt = scene.rerouteIntegration
         val gInf = vm.generatedTopologyInfluence.coerceIn(0f, 1f)
         val seedFallback = vm.fallbackSeedInfluence.coerceIn(0f, 1f)
         val phaseSec = anim.seconds + scene.animTimeSec
@@ -103,6 +106,8 @@ object SeedPodPainter {
                             shellThickening = d.shellThickening,
                             tuning = tuning,
                             seedFallbackAlpha = seedFallback,
+                            outerGhostScale = burial.outerShellGhostScale,
+                            outerGhostAlphaMul = burial.outerShellGhostAlphaMul,
                         )
 
                         GeneratedContourPainter.draw(
@@ -111,6 +116,7 @@ object SeedPodPainter {
                             base = radii,
                             anatomy = ga,
                             visible = vm,
+                            geometry = contourGeom,
                             paletteLine = palette.shellEdge,
                             phaseSec = phaseSec,
                         )
@@ -138,6 +144,15 @@ object SeedPodPainter {
                             generatedInfluence = gInf,
                         )
 
+                        SeedTracePainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            minDim = minDim,
+                            radii = radii,
+                            palette = palette,
+                            trace = trace,
+                        )
+
                         GeneratedChamberPainter.draw(
                             scope = podScope,
                             pod = podDraw,
@@ -148,13 +163,16 @@ object SeedPodPainter {
                             phaseSec = phaseSec,
                         )
 
-                        SeedTracePainter.draw(
+                        RerouteIntegrationPainter.draw(
                             scope = podScope,
                             pod = podDraw,
-                            minDim = minDim,
                             radii = radii,
+                            bio = bio,
+                            visible = vm,
+                            integration = rerouteInt,
                             palette = palette,
-                            trace = trace,
+                            phaseSec = phaseSec,
+                            pass = RerouteIntegrationPainter.ReroutePass.SUBSURFACE_BEHIND,
                         )
 
                         SeedPodNucleusPainter.draw(
@@ -232,6 +250,20 @@ object SeedPodPainter {
                             closedness = appearance.shellClosedness,
                             tuning = tuning,
                             seedFallbackAlpha = seedFallback,
+                            outerGhostScale = burial.outerShellGhostScale,
+                            outerGhostAlphaMul = burial.outerShellGhostAlphaMul,
+                        )
+
+                        RerouteIntegrationPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            bio = bio,
+                            visible = vm,
+                            integration = rerouteInt,
+                            palette = palette,
+                            phaseSec = phaseSec,
+                            pass = RerouteIntegrationPainter.ReroutePass.THROUGH_SURFACE,
                         )
 
                         SeedPodGrowthFrontPainter.draw(
@@ -257,15 +289,6 @@ object SeedPodPainter {
                         )
 
                         GeneratedScarPainter.draw(
-                            scope = podScope,
-                            pod = podDraw,
-                            radii = radii,
-                            bio = bio,
-                            visible = vm,
-                            phaseSec = phaseSec,
-                        )
-
-                        GeneratedReroutePainter.draw(
                             scope = podScope,
                             pod = podDraw,
                             radii = radii,
@@ -306,7 +329,10 @@ object SeedPodPainter {
                         )
 
                         if (tuning.showSeedPodDebug) {
-                            drawDebugOverlay(podScope, w, h, pod, d.stage.name, vm, scene.fallbackMode)
+                            drawDebugOverlay(
+                                podScope, w, h, pod, d.stage.name, vm, scene.fallbackMode,
+                                scene.seedBurial, scene.contourGeometry,
+                            )
                         }
                     }
                 }
@@ -322,6 +348,8 @@ object SeedPodPainter {
         stageName: String,
         vm: com.velithorne.vessel.model.VisibleMorphologyState,
         mode: SeedPodFallbackMode,
+        burial: SeedBurialState,
+        contour: com.velithorne.vessel.model.ContourGeometryState,
     ) {
         val dbg = Color(0xFF00FFAA).copy(alpha = 0.5f)
         scope.drawRect(color = dbg.copy(alpha = 0.15f), style = androidx.compose.ui.graphics.drawscope.Stroke(2f), topLeft = Offset.Zero, size = Size(w, h))

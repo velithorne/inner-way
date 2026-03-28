@@ -23,14 +23,14 @@ object SeedTracePainter {
         val a = trace.traceAlpha.coerceIn(0f, 1f)
         if (a < 0.04f) return
         val ox = trace.traceOffsetNx * minDim * 0.08f
-        val oy = trace.traceOffsetNy * minDim * 0.08f
+        val oy = trace.traceOffsetNy * minDim * 0.08f + trace.burialDepthPx
         val c = pod + Offset(ox, oy)
         val r = minDim * 0.022f * trace.coreKnotScaleMul
         scope.drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    palette.shellBase.copy(alpha = 0.22f * a),
-                    palette.neuralPathway.copy(alpha = 0.08f * a),
+                    palette.shellBase.copy(alpha = 0.18f * a),
+                    palette.neuralPathway.copy(alpha = 0.06f * a),
                     Color(0xFF000000).copy(alpha = 0f),
                 ),
                 center = c,

@@ -259,7 +259,9 @@ class TelemetryViewModel(
         val driver = vm.dominantContourDriver
         val topoLines = vm.topologySummaryLines
         val debugVis = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
-            "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}%"
+            val cg = scene.contourGeometry
+            val sb = scene.seedBurial
+            "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%"
         } else null
         SeedPodVesselUiState(
             structuralStageLabel = SeedPodExplainer.stageLabel(gs.structural.permanentStage),
@@ -351,7 +353,9 @@ class TelemetryViewModel(
                 morphologyDriverLine = "Contour driver: ${initialSeedPodScene.visibleMorphology.dominantContourDriver}",
                 visibilityDebugLine = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
                     val vm = initialSeedPodScene.visibleMorphology
-                    "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}%"
+                    val cg = initialSeedPodScene.contourGeometry
+                    val sb = initialSeedPodScene.seedBurial
+                    "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%"
                 } else null,
             )
         },

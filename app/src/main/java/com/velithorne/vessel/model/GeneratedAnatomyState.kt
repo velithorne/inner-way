@@ -7,7 +7,7 @@ import com.velithorne.vessel.morphogenesis_core.TissueField
 
 /**
  * Procedural self-assembly output driving the seed pod renderer.
- * [silhouettePolarMul] length 12 — radius multiplier per polar sample (generated silhouette, not uniform vesica).
+ * [silhouettePolarMul] — radius multiplier per polar sample (32–48 samples typical after smoothing).
  */
 data class GeneratedAnatomyState(
     val era: CanonicalLifeEra,
@@ -20,7 +20,9 @@ data class GeneratedAnatomyState(
     val growthCenters: List<GrowthCenter>,
     val graph: StructuralGraph,
     val usingFieldContour: Boolean,
-    val silhouettePolarMul: FloatArray = FloatArray(12) { 1f },
+    val silhouettePolarMul: FloatArray = FloatArray(40) { 1f },
+    /** Per-sample 0..1 — preserve sharper local edges (plates, scars). */
+    val contourHardEdgePreserve: FloatArray = FloatArray(40) { 0f },
     val innerChamberOffsetNx: Float = 0f,
     val innerChamberOffsetNy: Float = 0f,
 ) {
@@ -39,6 +41,7 @@ data class GeneratedAnatomyState(
         if (graph != other.graph) return false
         if (usingFieldContour != other.usingFieldContour) return false
         if (!silhouettePolarMul.contentEquals(other.silhouettePolarMul)) return false
+        if (!contourHardEdgePreserve.contentEquals(other.contourHardEdgePreserve)) return false
         if (innerChamberOffsetNx != other.innerChamberOffsetNx) return false
         if (innerChamberOffsetNy != other.innerChamberOffsetNy) return false
         return true
@@ -56,6 +59,7 @@ data class GeneratedAnatomyState(
         result = 31 * result + graph.hashCode()
         result = 31 * result + usingFieldContour.hashCode()
         result = 31 * result + silhouettePolarMul.contentHashCode()
+        result = 31 * result + contourHardEdgePreserve.contentHashCode()
         result = 31 * result + innerChamberOffsetNx.hashCode()
         result = 31 * result + innerChamberOffsetNy.hashCode()
         return result

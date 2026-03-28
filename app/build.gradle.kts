@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 41
-        versionName = "2.7.0-self-assembly-visibility-override"
+        versionCode = 42
+        versionName = "2.8.0-seed-burial-contour-smoothing"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

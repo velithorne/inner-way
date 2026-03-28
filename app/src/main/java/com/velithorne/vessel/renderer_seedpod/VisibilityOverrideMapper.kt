@@ -26,6 +26,9 @@ object VisibilityOverrideMapper {
         val seedTrace: SeedTraceState,
         val topology: GeneratedTopologyState,
         val fallbackMode: SeedPodFallbackMode,
+        val seedBurial: SeedBurialState,
+        val contourGeometry: com.velithorne.vessel.model.ContourGeometryState,
+        val rerouteIntegration: com.velithorne.vessel.model.RerouteIntegrationState,
     )
 
     fun map(
@@ -47,26 +50,55 @@ object VisibilityOverrideMapper {
                 seedTrace = SeedTraceState.default(),
                 topology = GeneratedTopologyState(0, 0, biography.rerouteCount, biography.scars.size, p.maxComponent().name, null),
                 fallbackMode = SeedPodFallbackMode.SEED_DOMINANT,
+                seedBurial = SeedBurialMapper.map(era, 0f, mode),
+                contourGeometry = com.velithorne.vessel.model.ContourGeometryState(
+                    sampleCount = ContourSampleSet.MINIMUM,
+                    smoothingPasses = 2,
+                    relaxationIterations = 1,
+                    splineEnabled = true,
+                ),
+                rerouteIntegration = com.velithorne.vessel.model.RerouteIntegrationState(0.2f, 0.35f),
             )
         }
 
         val eraBase = when (era) {
-            CanonicalLifeEra.SEED -> 0.06f
-            CanonicalLifeEra.VEIL_STAGE -> 0.26f
-            CanonicalLifeEra.CORE_ESTABLISHMENT -> 0.52f
-            CanonicalLifeEra.BRANCHING_THRESHOLD -> 0.72f
-            CanonicalLifeEra.ADULTHOOD -> 0.86f
+            CanonicalLifeEra.SEED -> 0.12f
+            CanonicalLifeEra.VEIL_STAGE -> 0.38f
+            CanonicalLifeEra.CORE_ESTABLISHMENT -> 0.62f
+            CanonicalLifeEra.BRANCHING_THRESHOLD -> 0.82f
+            CanonicalLifeEra.ADULTHOOD -> 0.93f
         }
-        val devBoost = if (mode == SimulationMode.DEV_SIMULATION) 0.14f else 0f
-        val stageBoost = (stage.ordinal / 10f).coerceIn(0f, 0.12f)
-        val matBoost = structuralProgress.coerceIn(0f, 1f) * 0.1f
-        val branchBoost = branch.branchReadiness * 0.14f + branch.visualExpressionMagnitude * 0.12f
-        val bioBoost = min(0.22f, biography.scars.size * 0.045f + biography.rerouteCount * 0.035f)
+        val devBoost = if (mode == SimulationMode.DEV_SIMULATION) 0.18f else 0f
+        val stageBoost = (stage.ordinal / 10f).coerceIn(0f, 0.16f)
+        val matBoost = structuralProgress.coerceIn(0f, 1f) * 0.14f
+        val branchBoost = branch.branchReadiness * 0.18f + branch.visualExpressionMagnitude * 0.16f
+        val bioBoost = min(0.26f, biography.scars.size * 0.05f + biography.rerouteCount * 0.04f)
 
         var genInf = (eraBase + devBoost + stageBoost + matBoost + branchBoost + bioBoost).coerceIn(0f, 1f)
         genInf = applyBranchTopologyBias(genInf, branch.leadingBranch)
+        genInf = (genInf + structuralProgress.coerceIn(0f, 1f) * 0.05f).coerceIn(0f, 1f)
 
-        val fallback = (1f - genInf).coerceIn(0f, 1f)
+        var fallback = (1f - genInf).coerceIn(0f, 1f)
+        if (stage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.EARLY_CHAMBERING.ordinal) {
+            fallback *= 0.72f
+        }
+        if (stage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.LINEAGE_DIFFERENTIATING.ordinal) {
+            fallback *= 0.55f
+        }
+        fallback = fallback.coerceIn(0f, 1f)
+
+        val seedBurial = SeedBurialMapper.map(era, genInf, mode)
+        val nSamples = ContourSampleSet.forEra(era)
+        val contourGeometry = com.velithorne.vessel.model.ContourGeometryState(
+            sampleCount = nSamples,
+            smoothingPasses = if (genInf > 0.45f) 3 else 2,
+            relaxationIterations = if (genInf > 0.55f) 2 else 1,
+            splineEnabled = true,
+        )
+        val rerouteIntegration = com.velithorne.vessel.model.RerouteIntegrationState(
+            embeddedStrength = (0.35f + genInf * 0.55f).coerceIn(0.35f, 0.95f),
+            subsurfaceAlpha = (0.25f + genInf * 0.45f).coerceIn(0.25f, 0.75f),
+        )
 
         val crownNode = graph?.nodes?.firstOrNull { it.kind == MorphNodeKind.CROWN_CHAMBER }
         val reserveNode = graph?.nodes?.firstOrNull { it.kind == MorphNodeKind.RESERVE_BASIN_LOCUS }
@@ -131,6 +163,7 @@ object VisibilityOverrideMapper {
             resDepth = resDepth,
             asymScore = asymScore,
             biography = biography,
+            seedBurial = seedBurial,
         )
 
         val visible = VisibleMorphologyState(
@@ -157,14 +190,15 @@ object VisibilityOverrideMapper {
             topologySummaryLines = lines,
         )
 
-        val traceAlpha = (fallback * 0.95f + (1f - genInf) * 0.4f).coerceIn(0.08f, 0.92f)
+        val traceAlpha = (fallback * 0.85f + (1f - genInf) * 0.35f).coerceIn(0.06f, 0.88f)
         val seam = (coreNode?.nx ?: 0.5f) * 0.4f - (coreNode?.ny ?: 0.45f) * 0.35f
         val seedTrace = SeedTraceState(
-            traceAlpha = traceAlpha * (1f - genInf * 0.65f).coerceIn(0.15f, 1f),
+            traceAlpha = traceAlpha * (1f - genInf * 0.72f).coerceIn(0.1f, 1f) * seedBurial.traceAlphaMul,
             seamAngleRad = seam,
-            coreKnotScaleMul = (0.42f + (1f - genInf) * 0.4f).coerceIn(0.35f, 0.85f),
+            coreKnotScaleMul = (0.38f + (1f - genInf) * 0.32f).coerceIn(0.28f, 0.82f) * seedBurial.relicKnotScaleMul,
             traceOffsetNx = (coreNode?.nx ?: 0.5f) - 0.5f,
             traceOffsetNy = (coreNode?.ny ?: 0.45f) - 0.45f,
+            burialDepthPx = seedBurial.burialDepthPx,
         )
 
         val topo = GeneratedTopologyState(
@@ -183,7 +217,15 @@ object VisibilityOverrideMapper {
             else -> SeedPodFallbackMode.GENERATED_OVERRIDE
         }
 
-        return VisibilityBundle(visible, seedTrace, topo, fbMode)
+        return VisibilityBundle(
+            visible,
+            seedTrace,
+            topo,
+            fbMode,
+            seedBurial,
+            contourGeometry,
+            rerouteIntegration,
+        )
     }
 
     private fun applyBranchTopologyBias(genInf: Float, lead: LineageBranch): Float {
@@ -207,14 +249,16 @@ object VisibilityOverrideMapper {
         resDepth: Float,
         asymScore: Float,
         biography: BiographyVisualState,
+        seedBurial: SeedBurialState,
     ): List<String> {
         val out = mutableListOf<String>()
         when {
-            genInf < 0.22f -> out += "Seed trace dominant — topology forming"
-            genInf < 0.45f -> out += "Generated chambers emerging through veil"
-            genInf < 0.72f -> out += "Self-assembly contour shaping shell and chambers"
-            else -> out += "Generated anatomy dominates — seed visible as trace only"
+            genInf < 0.28f -> out += "Seed trace strong — topology forming"
+            genInf < 0.52f -> out += "Generated shell emerging — seed beginning to bury"
+            genInf < 0.78f -> out += "Self-assembly contour primary — seed as inner relic"
+            else -> out += "Generated anatomy dominant — original pod seam as fossil trace"
         }
+        seedBurial.burialSummaryLine?.let { out += it }
         when (branch) {
             LineageBranch.CROWN_NEURAL -> out += "Crown-expanded upper chamber (neural bias)"
             LineageBranch.SIGNAL_FROND -> out += "Lateral signal routing asymmetry"
@@ -227,7 +271,8 @@ object VisibilityOverrideMapper {
         if (shellUpper > 0.62f) out += "Upper thermal veil / shell plates emphasized"
         if (resDepth > 0.95f) out += "Reserve basin depth pronounced"
         if (asymScore > 0.35f) out += "Visible asymmetry from history"
-        if (biography.rerouteCount > 0) out += "Reroute seams preserved (${biography.rerouteCount})"
+        if (biography.rerouteCount > 0 && genInf > 0.35f) out += "Reroute seams integrated into lateral structure (${biography.rerouteCount})"
+        else if (biography.rerouteCount > 0) out += "Reroute seams recorded (${biography.rerouteCount})"
         if (biography.scars.isNotEmpty()) out += "Growth scars on ${biography.scars.size} loci"
         return out.distinct().take(6)
     }

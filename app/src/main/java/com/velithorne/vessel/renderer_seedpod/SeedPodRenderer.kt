@@ -93,6 +93,9 @@ class SeedPodRenderer(
             seedTrace = vis.seedTrace,
             generatedTopology = vis.topology,
             fallbackMode = vis.fallbackMode,
+            seedBurial = vis.seedBurial,
+            contourGeometry = vis.contourGeometry,
+            rerouteIntegration = vis.rerouteIntegration,
         )
     }
 }

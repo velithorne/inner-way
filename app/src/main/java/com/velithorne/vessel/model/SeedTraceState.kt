@@ -13,6 +13,8 @@ data class SeedTraceState(
     /** Normalized offset of trace center from pod anchor. */
     val traceOffsetNx: Float,
     val traceOffsetNy: Float,
+    /** Positive Y — draw relic slightly deeper behind generated mass. */
+    val burialDepthPx: Float = 0f,
 ) {
     companion object {
         fun default() = SeedTraceState(
@@ -21,6 +23,7 @@ data class SeedTraceState(
             coreKnotScaleMul = 0.62f,
             traceOffsetNx = 0f,
             traceOffsetNy = 0f,
+            burialDepthPx = 0f,
         )
     }
 }

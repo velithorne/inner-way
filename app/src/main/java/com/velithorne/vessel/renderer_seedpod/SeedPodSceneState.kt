@@ -9,8 +9,12 @@ import com.velithorne.vessel.model.SeedPodLightingState
 import com.velithorne.vessel.model.SeedPodMaterialState
 import com.velithorne.vessel.model.SeedPodVisualState
 import com.velithorne.vessel.model.BiographyVisualState
+import com.velithorne.vessel.config.SimulationMode
+import com.velithorne.vessel.model.ContourGeometryState
 import com.velithorne.vessel.model.GeneratedAnatomyState
 import com.velithorne.vessel.model.GeneratedTopologyState
+import com.velithorne.vessel.model.RerouteIntegrationState
+import com.velithorne.vessel.morphogenesis_core.CanonicalLifeEra
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.SeedTraceState
 import com.velithorne.vessel.model.VisibleMorphologyState
@@ -54,6 +58,14 @@ data class SeedPodSceneState(
     val seedTrace: SeedTraceState = SeedTraceState.default(),
     val generatedTopology: GeneratedTopologyState? = null,
     val fallbackMode: SeedPodFallbackMode = SeedPodFallbackMode.SEED_DOMINANT,
+    val seedBurial: SeedBurialState = SeedBurialMapper.map(CanonicalLifeEra.SEED, 0f, SimulationMode.RELEASE_REALTIME),
+    val contourGeometry: ContourGeometryState = ContourGeometryState(
+        sampleCount = ContourSampleSet.MINIMUM,
+        smoothingPasses = 2,
+        relaxationIterations = 1,
+        splineEnabled = true,
+    ),
+    val rerouteIntegration: RerouteIntegrationState = RerouteIntegrationState(0.35f, 0.4f),
 ) {
     val stage: SeedPodGrowthStage get() = podDisplay.stage
 }
