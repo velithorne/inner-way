@@ -1,5 +1,6 @@
 package com.velithorne.vessel.morphogenesis_core
 
+import com.velithorne.vessel.genesis.GenesisGrammar
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import kotlin.random.Random
 
@@ -35,7 +36,66 @@ object StructuralGraphEngine {
         )
         val coreId = nodes.first().id
 
-        if (stage.ordinal >= SeedPodGrowthStage.GERMINATING_POD.ordinal) {
+        if (era == CanonicalLifeEra.SEED) {
+            val traits = HiddenSeedTraits.fromSpecimenId(specimenId)
+            val resNx = MorphologyGrammar.biasNodeX(MorphNodeKind.RESERVE_BASIN_LOCUS, pressure, asym)
+            val resNy = GenesisGrammar.reserveNyBias(pressure, traits)
+            nodes += StructuralNode(
+                id = nid(),
+                kind = MorphNodeKind.RESERVE_BASIN_LOCUS,
+                ontologyClass = SpeciesOntology.RESERVE_SAC_LATTICE,
+                nx = resNx,
+                ny = resNy,
+                strength = (0.35f + pressure.reserve * 0.45f + traits.reserveCompressionBias * 0.12f).coerceIn(0.2f, 0.95f),
+                active = true,
+            )
+            val crownGate = archetype.crownPotential * 0.45f + pressure.signal * 0.35f + traits.crownLiftBias * 0.15f
+            if (crownGate > 0.38f) {
+                val cnx = (0.5f + (rnd.nextFloat() - 0.5f) * asym * 0.35f).coerceIn(0.2f, 0.8f)
+                nodes += StructuralNode(
+                    id = nid(),
+                    kind = MorphNodeKind.CROWN_CHAMBER,
+                    ontologyClass = SpeciesOntology.PULSE_NODE,
+                    nx = cnx,
+                    ny = GenesisGrammar.crownNyBias(pressure, traits),
+                    strength = (archetype.crownPotential * 0.35f + pressure.signal * 0.15f).coerceIn(0.15f, 0.65f),
+                    active = true,
+                )
+            }
+            val lateralGate = pressure.signal * 0.55f + archetype.frondPotential * 0.35f + traits.signalSpreadBias * 0.2f
+            if (lateralGate > 0.42f) {
+                val side = if (specimenId.hashCode() and 1 == 0) 1f else -1f
+                nodes += StructuralNode(
+                    id = nid(),
+                    kind = MorphNodeKind.FROND_ROOT,
+                    ontologyClass = SpeciesOntology.SIGNAL_FRONDS,
+                    nx = GenesisGrammar.lateralSignalNx(pressure, traits, side),
+                    ny = MorphologyGrammar.biasNodeY(MorphNodeKind.FROND_ROOT, pressure),
+                    strength = (archetype.frondPotential * 0.4f + pressure.signal * 0.35f).coerceIn(0.18f, 0.75f),
+                    active = true,
+                )
+            }
+            nodes += StructuralNode(
+                id = nid(),
+                kind = MorphNodeKind.TRANSIENT_GROWTH_CENTER,
+                ontologyClass = SpeciesOntology.OUTER_VEIL,
+                nx = (0.5f + (rnd.nextFloat() - 0.5f) * 0.22f * (1f + asym)).coerceIn(0.2f, 0.8f),
+                ny = (0.36f + traits.densityBias * 0.08f).coerceIn(0.22f, 0.52f),
+                strength = (0.22f + hidden.growthPressure * 0.35f + traits.coherenceBias * 0.2f).coerceIn(0.15f, 0.7f),
+                active = true,
+            )
+            nodes += StructuralNode(
+                id = nid(),
+                kind = MorphNodeKind.HEAT_MANTLE_RIDGE,
+                ontologyClass = SpeciesOntology.HEAT_MANTLE,
+                nx = (0.48f + pressure.thermal * 0.06f - asym * 0.04f).coerceIn(0.15f, 0.85f),
+                ny = (0.4f + pressure.thermal * 0.1f).coerceIn(0.25f, 0.62f),
+                strength = (0.25f + pressure.thermal * 0.35f + traits.shellBias * 0.15f).coerceIn(0.18f, 0.72f),
+                active = true,
+            )
+        }
+
+        if (era != CanonicalLifeEra.SEED && stage.ordinal >= SeedPodGrowthStage.GERMINATING_POD.ordinal) {
             nodes += StructuralNode(
                 id = nid(),
                 kind = MorphNodeKind.RESERVE_BASIN_LOCUS,
@@ -46,7 +106,7 @@ object StructuralGraphEngine {
                 active = true,
             )
         }
-        if (stage.ordinal >= SeedPodGrowthStage.EARLY_BUDDING.ordinal) {
+        if (era != CanonicalLifeEra.SEED && stage.ordinal >= SeedPodGrowthStage.EARLY_BUDDING.ordinal) {
             nodes += StructuralNode(
                 id = nid(),
                 kind = MorphNodeKind.CROWN_CHAMBER,
@@ -57,7 +117,7 @@ object StructuralGraphEngine {
                 active = true,
             )
         }
-        if (stage.ordinal >= SeedPodGrowthStage.EARLY_CHAMBERING.ordinal) {
+        if (era != CanonicalLifeEra.SEED && stage.ordinal >= SeedPodGrowthStage.EARLY_CHAMBERING.ordinal) {
             nodes += StructuralNode(
                 id = nid(),
                 kind = MorphNodeKind.FROND_ROOT,

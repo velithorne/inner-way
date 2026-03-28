@@ -35,6 +35,7 @@ import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.ProgressBarModelFactory
+import com.velithorne.vessel.genesis.BirthExplainer
 import com.velithorne.vessel.juvenile_form.JuvenileExplainer
 import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.renderer_seedpod.SeedPodSceneState
@@ -246,6 +247,7 @@ class TelemetryViewModel(
         simulationMode = profile.mode,
         structuralProgress = initialPodGrowth.structural.smoothedStructuralProgress,
         growthPressure = initialPodGrowth.lastSelfAssembly?.pressure,
+        genesisSnapshot = initialPodGrowth.lastSelfAssembly?.genesis,
     )
 
     /**
@@ -285,6 +287,7 @@ class TelemetryViewModel(
             simulationMode = profile.mode,
             structuralProgress = growth.structural.smoothedStructuralProgress,
             growthPressure = snap?.pressure,
+            genesisSnapshot = snap?.genesis,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -341,8 +344,21 @@ class TelemetryViewModel(
         val debugVis = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
             val cg = scene.contourGeometry
             val sb = scene.seedBurial
-            "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%"
+            val genDbg = if (scene.genesisBirthStage) " · GENESIS_CANVAS legacyFallback=${(vm.fallbackSeedInfluence * 100f).toInt()}%" else ""
+            "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%$genDbg"
         } else null
+        val genesisSnap = scene.genesisSnapshot?.state
+        val genesisLines = if (scene.genesisBirthStage && genesisSnap != null) {
+            buildList {
+                add(BirthExplainer.minimumViableLabel(genesisSnap.minimumViableBody))
+                add(genesisSnap.birthTendencyLine)
+                if (BuildConfig.DEBUG) addAll(BirthExplainer.hiddenTraitHints(genesisSnap.traits))
+            }
+        } else emptyList()
+        val genesisDrv = if (scene.genesisBirthStage && scene.genesisVisual.genesisContourDriver.isNotEmpty()) {
+            scene.genesisVisual.genesisContourDriver
+        } else null
+        val birthChip = scene.minimumViableBody?.label
         SeedPodVesselUiState(
             structuralStageLabel = SeedPodExplainer.stageLabel(gs.structural.permanentStage),
             liveConditionLabel = scene.liveExpression.conditionLabel,
@@ -386,6 +402,9 @@ class TelemetryViewModel(
             juvenileFormLines = juvenileLines,
             juvenileTraitChips = traitChips,
             juvenileTopologyStageLine = topoStageLine,
+            genesisSummaryLines = genesisLines,
+            genesisDriverLine = genesisDrv,
+            birthStateChipLabel = birthChip,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -477,8 +496,25 @@ class TelemetryViewModel(
                     val vm = initialSeedPodScene.visibleMorphology
                     val cg = initialSeedPodScene.contourGeometry
                     val sb = initialSeedPodScene.seedBurial
-                    "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%"
+                    val genDbg = if (initialSeedPodScene.genesisBirthStage) " · GENESIS_CANVAS legacyFallback=${(vm.fallbackSeedInfluence * 100f).toInt()}%" else ""
+                    "topology ${(vm.generatedTopologyInfluence * 100f).toInt()}% · seed ${(vm.fallbackSeedInfluence * 100f).toInt()}% · asym ${(vm.visibleAsymmetryScore * 100f).toInt()}% · n=${cg.sampleCount} · smooth=${cg.smoothingPasses} · relax=${cg.relaxationIterations} · spline=${cg.splineEnabled} · ghostα=${(sb.outerShellGhostAlphaMul * 100f).toInt()}%$genDbg"
                 } else null,
+                genesisSummaryLines = run {
+                    val g = initialSeedPodScene.genesisSnapshot?.state
+                    if (initialSeedPodScene.genesisBirthStage && g != null) {
+                        buildList {
+                            add(BirthExplainer.minimumViableLabel(g.minimumViableBody))
+                            add(g.birthTendencyLine)
+                            if (BuildConfig.DEBUG) addAll(BirthExplainer.hiddenTraitHints(g.traits))
+                        }
+                    } else emptyList()
+                },
+                genesisDriverLine = run {
+                    if (initialSeedPodScene.genesisBirthStage && initialSeedPodScene.genesisVisual.genesisContourDriver.isNotEmpty()) {
+                        initialSeedPodScene.genesisVisual.genesisContourDriver
+                    } else null
+                },
+                birthStateChipLabel = initialSeedPodScene.minimumViableBody?.label,
             )
         },
     )

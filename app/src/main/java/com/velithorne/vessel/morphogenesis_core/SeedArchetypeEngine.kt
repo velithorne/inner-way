@@ -15,15 +15,15 @@ object SeedArchetypeEngine {
     ): SeedArchetype {
         val mem = (telem.memoryClassMb ?: 6).toFloat().coerceIn(2f, 24f)
         val storage = telem.storageUsedPct ?: 0.5f
-        val sym = (0.5f + (1f - device.lowThermalHeadroom) * 0.15f + traits.symmetryJitter * 0.1f).coerceIn(0.35f, 0.75f)
-        val dens = (0.45f + storage * 0.25f + device.storageDenseProfile * 0.15f + traits.densityNoise * 0.1f).coerceIn(0.3f, 0.85f)
-        val reserveComp = (0.4f + device.batteryThermalTrend * 0.1f + storage * 0.2f).coerceIn(0.25f, 0.9f)
-        val crown = (0.42f + device.highSensorRichness * 0.2f + mem / 24f * 0.15f).coerceIn(0.3f, 0.9f)
-        val frond = (0.4f + device.highSignalDependency * 0.15f + traits.frondChaos * 0.08f).coerceIn(0.3f, 0.9f)
-        val shell = (0.45f + device.lowThermalHeadroom * 0.2f + traits.shellGrain * 0.1f).coerceIn(0.3f, 0.9f)
+        val sym = (0.5f + (1f - device.lowThermalHeadroom) * 0.15f + traits.symmetryBias * 0.1f).coerceIn(0.35f, 0.75f)
+        val dens = (0.45f + storage * 0.25f + device.storageDenseProfile * 0.15f + traits.densityBias * 0.1f).coerceIn(0.3f, 0.85f)
+        val reserveComp = (0.4f + device.batteryThermalTrend * 0.1f + storage * 0.2f + traits.reserveCompressionBias * 0.08f).coerceIn(0.25f, 0.9f)
+        val crown = (0.42f + device.highSensorRichness * 0.2f + mem / 24f * 0.15f + traits.crownLiftBias * 0.06f).coerceIn(0.3f, 0.9f)
+        val frond = (0.4f + device.highSignalDependency * 0.15f + traits.signalSpreadBias * 0.08f).coerceIn(0.3f, 0.9f)
+        val shell = (0.45f + device.lowThermalHeadroom * 0.2f + traits.shellBias * 0.1f).coerceIn(0.3f, 0.9f)
         val archive = (0.38f + storage * 0.3f + device.storageDenseProfile * 0.2f).coerceIn(0.25f, 0.92f)
-        val asym = (0.25f + abs(traits.frondChaos - 0.5f) * 0.4f + device.highMotionLife * 0.15f).coerceIn(0.15f, 0.75f)
-        val coh = (0.45f + traits.coherenceDrift * 0.2f + personality.favorLateral * 0.05f).coerceIn(0.25f, 0.85f)
+        val asym = (0.25f + abs(traits.latentAsymmetryBias - 0.5f) * 0.4f + device.highMotionLife * 0.15f).coerceIn(0.15f, 0.75f)
+        val coh = (0.45f + traits.coherenceBias * 0.2f + personality.favorLateral * 0.05f).coerceIn(0.25f, 0.85f)
         val mut = (0.3f + device.nocturnalUsageBias * 0.1f + personality.mutationTolerance * 0.25f).coerceIn(0.2f, 0.8f)
         val pw = mutableListOf(
             personality.favorLateral.coerceIn(0f, 1f),
@@ -48,17 +48,7 @@ object SeedArchetypeEngine {
         )
     }
 
-    fun hiddenTraits(specimenId: String): HiddenSeedTraits {
-        val h = specimenId.hashCode()
-        fun f(seed: Int) = ((h xor seed) and 0xFFFF) / 65535f
-        return HiddenSeedTraits(
-            symmetryJitter = f(1),
-            densityNoise = f(2),
-            frondChaos = f(3),
-            shellGrain = f(4),
-            coherenceDrift = f(5),
-        )
-    }
+    fun hiddenTraits(specimenId: String): HiddenSeedTraits = HiddenSeedTraits.fromSpecimenId(specimenId)
 
     fun personalityFromAffinities(
         thermal: Float,

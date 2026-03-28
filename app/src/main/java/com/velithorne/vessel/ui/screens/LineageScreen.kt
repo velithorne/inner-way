@@ -19,7 +19,9 @@ import com.velithorne.vessel.ui.components.AmbientEcologyCard
 import com.velithorne.vessel.ui.components.BranchAffinityCard
 import com.velithorne.vessel.ui.components.BranchVariantCard
 import com.velithorne.vessel.ui.components.JuvenileFormCard
+import com.velithorne.vessel.ui.components.GenesisTraitCard
 import com.velithorne.vessel.ui.components.MorphologyTraitCard
+import com.velithorne.vessel.ui.components.BirthStateChip
 import com.velithorne.vessel.ui.components.RegionChip
 import com.velithorne.vessel.ui.components.TopologyStageChip
 import com.velithorne.vessel.ui.components.AdaptationChip
@@ -65,6 +67,20 @@ fun LineageScreen(
             SpecimenIdentityCard(lineage = l)
             BranchAffinityCard(lineage = l)
             BranchVariantCard(lineage = l)
+        }
+        if (state.genesisSummaryLines.isNotEmpty()) {
+            GenesisTraitCard(title = "Birth topology", lines = state.genesisSummaryLines)
+            state.genesisDriverLine?.let { drv ->
+                Text(
+                    text = "Genesis contour: $drv",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            state.birthStateChipLabel?.let { chip ->
+                BirthStateChip(label = chip, modifier = Modifier.padding(top = 6.dp))
+            }
         }
         if (state.juvenileFormLines.isNotEmpty()) {
             JuvenileFormCard(lines = state.juvenileFormLines)

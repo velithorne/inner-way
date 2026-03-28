@@ -45,6 +45,8 @@ import com.velithorne.vessel.ui.components.LiveConditionChip
 import com.velithorne.vessel.ui.components.StageStatusChip
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.SeedPodReturnSummarySheet
+import com.velithorne.vessel.ui.components.BirthStateChip
+import com.velithorne.vessel.ui.components.GenesisTraitCard
 import com.velithorne.vessel.ui.components.JuvenileFormCard
 import com.velithorne.vessel.ui.components.MorphologyTraitCard
 import com.velithorne.vessel.ui.components.RegionChip
@@ -196,6 +198,27 @@ fun VesselScreen(
                     color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
                     modifier = Modifier.padding(top = 4.dp),
                 )
+            }
+            if (podUi.genesisSummaryLines.isNotEmpty()) {
+                GenesisTraitCard(
+                    title = "Birth topology",
+                    lines = podUi.genesisSummaryLines,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                podUi.genesisDriverLine?.let { drv ->
+                    Text(
+                        text = "Genesis contour: $drv",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                podUi.birthStateChipLabel?.let { chip ->
+                    BirthStateChip(
+                        label = chip,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
             if (podUi.juvenileFormLines.isNotEmpty()) {
                 JuvenileFormCard(

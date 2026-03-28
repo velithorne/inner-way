@@ -2,6 +2,9 @@ package com.velithorne.vessel.morphogenesis_core
 
 import com.velithorne.vessel.branching.DeviceProfile
 import com.velithorne.vessel.config.SimulationMode
+import com.velithorne.vessel.genesis.BirthPressureState
+import com.velithorne.vessel.genesis.SeedGenesisEngine
+import com.velithorne.vessel.genesis.SeedGenesisSnapshot
 import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.lineage.AdaptationMarker
@@ -83,12 +86,23 @@ class SelfAssemblyCoordinator(
             era = era,
             growthCenters = centers,
         )
+        val birthPressure = BirthPressureState.from(phys.telemetry, pressure)
+        val genesisState = SeedGenesisEngine.build(
+            specimenId = specimenId,
+            phys = phys,
+            device = device,
+            archetype = archetype,
+            graph = graph,
+            birthPressure = birthPressure,
+            mode = mode,
+        )
         return SelfAssemblySnapshot(
             archetype = archetype,
             pressure = pressure,
             hidden = hidden,
             biography = biography,
             anatomy = anatomy,
+            genesis = SeedGenesisSnapshot(genesisState),
         )
     }
 

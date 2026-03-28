@@ -61,5 +61,30 @@ data class VisibleMorphologyState(
             shellRightWing = 0.4f,
             topologySummaryLines = emptyList(),
         )
+
+        /** Archetype-free birth: no authored pod scaffold — topology-only (used in genesis / early seed). */
+        fun genesisFieldFirst(era: CanonicalLifeEra = CanonicalLifeEra.SEED) = VisibleMorphologyState(
+            fallbackSeedInfluence = 0f,
+            generatedTopologyInfluence = 1f,
+            era = era,
+            dominantContourDriver = "genesis tissue field",
+            visibleAsymmetryScore = 0.12f,
+            crownChamberNx = 0.5f,
+            crownChamberNy = 0.28f,
+            crownChamberRadiusMul = 0.45f,
+            reserveBasinNx = 0.5f,
+            reserveBasinNy = 0.65f,
+            reserveBasinDepthMul = 0.45f,
+            frondRootLeftNx = 0.42f,
+            frondRootRightNx = 0.58f,
+            frondCurvatureMul = 0.85f,
+            frondDensityMul = 0.75f,
+            frondAsymmetryMul = 0.15f,
+            shellUpperPlate = 0.18f,
+            shellLowerPlate = 0.2f,
+            shellLeftWing = 0.16f,
+            shellRightWing = 0.16f,
+            topologySummaryLines = emptyList(),
+        )
     }
 }

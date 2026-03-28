@@ -41,4 +41,8 @@ data class SeedPodVesselUiState(
     val juvenileTraitChips: List<String> = emptyList(),
     /** One line for topology expansion chip. */
     val juvenileTopologyStageLine: String? = null,
+    /** Seed genesis / minimum viable body — empty after early growth. */
+    val genesisSummaryLines: List<String> = emptyList(),
+    val genesisDriverLine: String? = null,
+    val birthStateChipLabel: String? = null,
 )

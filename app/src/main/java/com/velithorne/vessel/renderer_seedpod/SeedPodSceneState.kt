@@ -15,12 +15,17 @@ import com.velithorne.vessel.model.GeneratedAnatomyState
 import com.velithorne.vessel.model.GeneratedTopologyState
 import com.velithorne.vessel.model.RerouteIntegrationState
 import com.velithorne.vessel.morphogenesis_core.CanonicalLifeEra
+import com.velithorne.vessel.morphogenesis_core.GrowthPressureState
 import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.SeedTraceState
 import com.velithorne.vessel.model.VisibleMorphologyState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.genesis.SeedGenesisSnapshot
 import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
 import com.velithorne.vessel.juvenile_form.JuvenileFormState
+import com.velithorne.vessel.model.BirthTraitState
+import com.velithorne.vessel.model.GenesisVisualState
+import com.velithorne.vessel.model.MinimumViableBodyState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionState
 
@@ -69,6 +74,18 @@ data class SeedPodSceneState(
     ),
     val rerouteIntegration: RerouteIntegrationState = RerouteIntegrationState(0.35f, 0.4f),
     val juvenileForm: JuvenileFormState = JuvenileArchitectureEngine.inactiveState(),
+    val genesisVisual: GenesisVisualState = GenesisVisualState(
+        genesisRenderPathActive = false,
+        legacySeedScaffoldSuppressed = false,
+        minimumViableBodyLabel = "",
+        genesisContourDriver = "",
+    ),
+    /** DORMANT / ACTIVATING — archetype-free birth canvas (no stock pod scaffold). */
+    val genesisBirthStage: Boolean = false,
+    val minimumViableBody: MinimumViableBodyState? = null,
+    val birthTraits: BirthTraitState? = null,
+    val genesisSnapshot: SeedGenesisSnapshot? = null,
+    val growthPressure: GrowthPressureState? = null,
 ) {
     val stage: SeedPodGrowthStage get() = podDisplay.stage
 }

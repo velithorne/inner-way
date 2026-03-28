@@ -25,5 +25,15 @@ data class SeedTraceState(
             traceOffsetNy = 0f,
             burialDepthPx = 0f,
         )
+
+        /** Archetype-free birth: no authored seed seam / chrysalis trace. */
+        fun genesisSuppressed() = SeedTraceState(
+            traceAlpha = 0f,
+            seamAngleRad = 0f,
+            coreKnotScaleMul = 0f,
+            traceOffsetNx = 0f,
+            traceOffsetNy = 0f,
+            burialDepthPx = 0f,
+        )
     }
 }

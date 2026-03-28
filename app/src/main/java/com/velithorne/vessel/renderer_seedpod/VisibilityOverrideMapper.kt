@@ -39,18 +39,20 @@ object VisibilityOverrideMapper {
         structuralProgress: Float,
         mode: SimulationMode,
         pressure: GrowthPressureState?,
+        genesisBirthStage: Boolean = false,
     ): VisibilityBundle {
         val p = pressure ?: GrowthPressureState()
         val era = anatomy?.era ?: CanonicalLifeEra.SEED
         val field = anatomy?.tissueCenter
         val graph = anatomy?.graph
         if (anatomy == null) {
+            val vis = if (genesisBirthStage) VisibleMorphologyState.genesisFieldFirst(era) else VisibleMorphologyState.neutral(era)
             return VisibilityBundle(
-                visible = VisibleMorphologyState.neutral(era),
-                seedTrace = SeedTraceState.default(),
+                visible = vis,
+                seedTrace = if (genesisBirthStage) SeedTraceState.genesisSuppressed() else SeedTraceState.default(),
                 topology = GeneratedTopologyState(0, 0, biography.rerouteCount, biography.scars.size, p.maxComponent().name, null),
-                fallbackMode = SeedPodFallbackMode.SEED_DOMINANT,
-                seedBurial = SeedBurialMapper.map(era, 0f, mode),
+                fallbackMode = if (genesisBirthStage) SeedPodFallbackMode.GENERATED_OVERRIDE else SeedPodFallbackMode.SEED_DOMINANT,
+                seedBurial = SeedBurialMapper.map(era, if (genesisBirthStage) 1f else 0f, mode),
                 contourGeometry = com.velithorne.vessel.model.ContourGeometryState(
                     sampleCount = ContourSampleSet.MINIMUM,
                     smoothingPasses = 2,
@@ -77,6 +79,9 @@ object VisibilityOverrideMapper {
         var genInf = (eraBase + devBoost + stageBoost + matBoost + branchBoost + bioBoost).coerceIn(0f, 1f)
         genInf = applyBranchTopologyBias(genInf, branch.leadingBranch)
         genInf = (genInf + structuralProgress.coerceIn(0f, 1f) * 0.05f).coerceIn(0f, 1f)
+        if (genesisBirthStage) {
+            genInf = 1f
+        }
 
         var fallback = (1f - genInf).coerceIn(0f, 1f)
         if (stage.ordinal >= com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage.EARLY_CHAMBERING.ordinal) {
@@ -253,10 +258,10 @@ object VisibilityOverrideMapper {
     ): List<String> {
         val out = mutableListOf<String>()
         when {
-            genInf < 0.28f -> out += "Seed trace strong — topology forming"
-            genInf < 0.52f -> out += "Generated shell emerging — seed beginning to bury"
-            genInf < 0.78f -> out += "Self-assembly contour primary — seed as inner relic"
-            else -> out += "Generated anatomy dominant — original pod seam as fossil trace"
+            genInf < 0.28f -> out += "Genesis field forming — minimum viable body cohering"
+            genInf < 0.52f -> out += "Field-driven shell emerging — no authored pod scaffold"
+            genInf < 0.78f -> out += "Self-assembly contour primary — birth trace as residual only"
+            else -> out += "Generated anatomy dominant — topology from tissue + graph"
         }
         seedBurial.burialSummaryLine?.let { out += it }
         when (branch) {

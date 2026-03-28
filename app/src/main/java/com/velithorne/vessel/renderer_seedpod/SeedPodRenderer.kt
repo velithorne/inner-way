@@ -9,8 +9,13 @@ import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionMapper
 import com.velithorne.vessel.renderer.VesselPalette
+import com.velithorne.vessel.genesis.SeedGenesisSnapshot
 import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
+import com.velithorne.vessel.model.BirthTraitState
+import com.velithorne.vessel.model.GenesisVisualState
+import com.velithorne.vessel.model.MinimumViableBodyState
 import com.velithorne.vessel.morphogenesis_core.GrowthPressureState
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 
 /**
  * Physiology + seed pod growth → [SeedPodSceneState]. Does **not** use [com.velithorne.vessel.renderer.VesselRenderer].
@@ -29,6 +34,7 @@ class SeedPodRenderer(
         simulationMode: SimulationMode = SimulationMode.RELEASE_REALTIME,
         structuralProgress: Float = 0f,
         growthPressure: GrowthPressureState? = null,
+        genesisSnapshot: SeedGenesisSnapshot? = null,
     ): SeedPodSceneState {
         val s = physiology.species
         val telem = physiology.telemetry
@@ -56,6 +62,7 @@ class SeedPodRenderer(
             0.2f + s.respiration * 0.15f + s.neuralActivity * 0.2f + s.fever * 0.12f
             ).coerceIn(0f, 1f)
 
+        val genesisBirthStage = isGenesisBirthStage(podDisplay.stage)
         val vis = VisibilityOverrideMapper.map(
             anatomy = generatedAnatomy,
             biography = biographyVisual,
@@ -64,7 +71,35 @@ class SeedPodRenderer(
             structuralProgress = structuralProgress,
             mode = simulationMode,
             pressure = growthPressure,
+            genesisBirthStage = genesisBirthStage,
         )
+
+        val gs = genesisSnapshot?.state
+        val genesisVisual = if (gs != null) {
+            GenesisVisualState(
+                genesisRenderPathActive = genesisBirthStage,
+                legacySeedScaffoldSuppressed = genesisBirthStage,
+                minimumViableBodyLabel = com.velithorne.vessel.genesis.BirthExplainer.minimumViableLabel(gs.minimumViableBody),
+                genesisContourDriver = gs.genesisContourDriver,
+            )
+        } else {
+            GenesisVisualState(
+                genesisRenderPathActive = false,
+                legacySeedScaffoldSuppressed = false,
+                minimumViableBodyLabel = "",
+                genesisContourDriver = "",
+            )
+        }
+        val mvbState = if (gs != null) {
+            MinimumViableBodyState(gs.minimumViableBody, com.velithorne.vessel.genesis.BirthExplainer.minimumViableLabel(gs.minimumViableBody))
+        } else null
+        val birthTraits = if (gs != null) {
+            BirthTraitState(
+                symmetryHint = gs.traits.symmetryBias,
+                coherenceHint = gs.traits.coherenceBias,
+                asymmetryHint = gs.traits.latentAsymmetryBias,
+            )
+        } else null
 
         val juvenileForm = JuvenileArchitectureEngine.build(
             stage = podDisplay.stage,
@@ -108,6 +143,15 @@ class SeedPodRenderer(
             contourGeometry = vis.contourGeometry,
             rerouteIntegration = vis.rerouteIntegration,
             juvenileForm = juvenileForm,
+            genesisVisual = genesisVisual,
+            genesisBirthStage = genesisBirthStage,
+            minimumViableBody = mvbState,
+            birthTraits = birthTraits,
+            genesisSnapshot = genesisSnapshot,
+            growthPressure = growthPressure,
         )
     }
+
+    private fun isGenesisBirthStage(stage: SeedPodGrowthStage): Boolean =
+        stage.ordinal <= SeedPodGrowthStage.ACTIVATING_POD.ordinal
 }

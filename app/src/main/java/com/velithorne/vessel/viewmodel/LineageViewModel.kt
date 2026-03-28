@@ -11,6 +11,8 @@ import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.model.BiographyVisualState
 import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
 import com.velithorne.vessel.renderer_seedpod.VisibilityOverrideMapper
+import com.velithorne.vessel.genesis.BirthExplainer
+import com.velithorne.vessel.growth_seedpod.SeedPodGrowthStage
 import com.velithorne.vessel.juvenile_form.JuvenileExplainer
 import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
 import com.velithorne.vessel.lineage.AdaptationMarker
@@ -41,6 +43,9 @@ data class LineageUiState(
     val juvenileFormLines: List<String> = emptyList(),
     val juvenileTraitChips: List<String> = emptyList(),
     val juvenileTopologyStageLine: String? = null,
+    val genesisSummaryLines: List<String> = emptyList(),
+    val genesisDriverLine: String? = null,
+    val birthStateChipLabel: String? = null,
 )
 
 class LineageViewModel(
@@ -100,6 +105,7 @@ class LineageViewModel(
                 profile.branching,
             )
             val bio = BiographyVisualState.fromNullable(snap?.biography)
+            val genesisBirth = gs.structural.permanentStage.ordinal <= SeedPodGrowthStage.ACTIVATING_POD.ordinal
             val vis = VisibilityOverrideMapper.map(
                 anatomy = snap?.anatomy,
                 biography = bio,
@@ -108,6 +114,7 @@ class LineageViewModel(
                 structuralProgress = gs.structural.smoothedStructuralProgress,
                 mode = profile.mode,
                 pressure = snap?.pressure,
+                genesisBirthStage = genesisBirth,
             )
             val jf = JuvenileArchitectureEngine.build(
                 stage = gs.structural.permanentStage,
@@ -142,6 +149,16 @@ class LineageViewModel(
                 jf.transition.topologyExpandedBeyondSeed -> "Topology: expanded beyond seed phase"
                 else -> "Topology: consolidating juvenile regions"
             }
+            val gState = snap?.genesis?.state
+            val gLines = if (genesisBirth && gState != null) {
+                buildList {
+                    add(BirthExplainer.minimumViableLabel(gState.minimumViableBody))
+                    add(gState.birthTendencyLine)
+                    if (com.velithorne.vessel.BuildConfig.DEBUG) {
+                        addAll(BirthExplainer.hiddenTraitHints(gState.traits))
+                    }
+                }
+            } else emptyList()
             _ui.value = LineageUiState(
                 identity = id,
                 lineage = lineage,
@@ -155,6 +172,9 @@ class LineageViewModel(
                 juvenileFormLines = jLines,
                 juvenileTraitChips = jTraitChips,
                 juvenileTopologyStageLine = jTopoStage,
+                genesisSummaryLines = gLines,
+                genesisDriverLine = if (genesisBirth && gState != null) gState.genesisContourDriver else null,
+                birthStateChipLabel = gState?.let { BirthExplainer.minimumViableLabel(it.minimumViableBody) },
             )
         }
     }
