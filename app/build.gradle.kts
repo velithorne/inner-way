@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.vessel"
         minSdk = 26
         targetSdk = 35
-        versionCode = 42
-        versionName = "2.8.0-seed-burial-contour-smoothing"
+        versionCode = 43
+        versionName = "2.9.0-juvenile-form-architecture-topology-expansion"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

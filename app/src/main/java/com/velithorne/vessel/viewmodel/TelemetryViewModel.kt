@@ -32,6 +32,7 @@ import com.velithorne.vessel.physiology.OrganType
 import com.velithorne.vessel.physiology.PhysiologyEngine
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.ProgressBarModelFactory
+import com.velithorne.vessel.juvenile_form.JuvenileExplainer
 import com.velithorne.vessel.renderer_seedpod.SeedPodRenderer
 import com.velithorne.vessel.renderer_seedpod.SeedPodSceneState
 import com.velithorne.vessel.renderer_seedpod.SeedPodTuning
@@ -258,6 +259,32 @@ class TelemetryViewModel(
         val vm = scene.visibleMorphology
         val driver = vm.dominantContourDriver
         val topoLines = vm.topologySummaryLines
+        val jf = scene.juvenileForm
+        val traitChips = if (jf.active) {
+            buildList {
+                if (jf.bodyPlan.crownMass > 0.5f) add("Crown region")
+                if (jf.bodyPlan.lateralMass > 0.5f) add("Lateral spread")
+                if (jf.bodyPlan.reserveMass > 0.5f) add("Reserve basin")
+                if (jf.bodyPlan.shellMass > 0.5f) add("Shell plates")
+                if (jf.bodyPlan.supportMass > 0.5f) add("Support braces")
+                if (jf.bodyPlan.archiveMass > 0.5f) add("Archive core")
+            }
+        } else emptyList()
+        val topoStageLine = when {
+            !jf.active -> null
+            jf.transition.topologyExpandedBeyondSeed -> "Topology: expanded beyond seed phase"
+            else -> "Topology: consolidating juvenile regions"
+        }
+        val juvenileLines = buildList {
+            val h = JuvenileExplainer.headline(jf)
+            if (h.isNotEmpty()) add(h)
+            val r = JuvenileExplainer.regionLine(jf)
+            if (r.isNotEmpty()) add(r)
+            val t = JuvenileExplainer.transitionLine(jf)
+            if (t.isNotEmpty()) add(t)
+            val b = JuvenileExplainer.branchFamilyLine(gs.structural.morphologyBranch.leadingBranch())
+            if (jf.active) add(b)
+        }
         val debugVis = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
             val cg = scene.contourGeometry
             val sb = scene.seedBurial
@@ -300,6 +327,9 @@ class TelemetryViewModel(
             visibleTopologyLines = topoLines,
             morphologyDriverLine = "Contour driver: $driver",
             visibilityDebugLine = debugVis,
+            juvenileFormLines = juvenileLines,
+            juvenileTraitChips = traitChips,
+            juvenileTopologyStageLine = topoStageLine,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -351,6 +381,39 @@ class TelemetryViewModel(
                 } else null,
                 visibleTopologyLines = initialSeedPodScene.visibleMorphology.topologySummaryLines,
                 morphologyDriverLine = "Contour driver: ${initialSeedPodScene.visibleMorphology.dominantContourDriver}",
+                juvenileFormLines = run {
+                    val jf = initialSeedPodScene.juvenileForm
+                    buildList {
+                        val h = JuvenileExplainer.headline(jf)
+                        if (h.isNotEmpty()) add(h)
+                        val r = JuvenileExplainer.regionLine(jf)
+                        if (r.isNotEmpty()) add(r)
+                        val t = JuvenileExplainer.transitionLine(jf)
+                        if (t.isNotEmpty()) add(t)
+                        val b = JuvenileExplainer.branchFamilyLine(gs.structural.morphologyBranch.leadingBranch())
+                        if (jf.active) add(b)
+                    }
+                },
+                juvenileTraitChips = run {
+                    val jf = initialSeedPodScene.juvenileForm
+                    if (!jf.active) emptyList()
+                    else buildList {
+                        if (jf.bodyPlan.crownMass > 0.5f) add("Crown region")
+                        if (jf.bodyPlan.lateralMass > 0.5f) add("Lateral spread")
+                        if (jf.bodyPlan.reserveMass > 0.5f) add("Reserve basin")
+                        if (jf.bodyPlan.shellMass > 0.5f) add("Shell plates")
+                        if (jf.bodyPlan.supportMass > 0.5f) add("Support braces")
+                        if (jf.bodyPlan.archiveMass > 0.5f) add("Archive core")
+                    }
+                },
+                juvenileTopologyStageLine = run {
+                    val jf = initialSeedPodScene.juvenileForm
+                    when {
+                        !jf.active -> null
+                        jf.transition.topologyExpandedBeyondSeed -> "Topology: expanded beyond seed phase"
+                        else -> "Topology: consolidating juvenile regions"
+                    }
+                },
                 visibilityDebugLine = if (BuildConfig.DEBUG && SeedPodTuning().showSeedPodDebug) {
                     val vm = initialSeedPodScene.visibleMorphology
                     val cg = initialSeedPodScene.contourGeometry

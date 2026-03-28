@@ -9,6 +9,7 @@ import com.velithorne.vessel.model.VesselPaletteState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionMapper
 import com.velithorne.vessel.renderer.VesselPalette
+import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
 import com.velithorne.vessel.morphogenesis_core.GrowthPressureState
 
 /**
@@ -65,6 +66,16 @@ class SeedPodRenderer(
             pressure = growthPressure,
         )
 
+        val juvenileForm = JuvenileArchitectureEngine.build(
+            stage = podDisplay.stage,
+            lead = branchVisual.leadingBranch,
+            branchReadiness = branchVisual.branchReadiness,
+            visualExpression = branchVisual.visualExpressionMagnitude,
+            visible = vis.visible,
+            biography = biographyVisual,
+            mode = simulationMode,
+        )
+
         return SeedPodSceneState(
             physiology = physiology,
             podDisplay = podDisplay,
@@ -96,6 +107,7 @@ class SeedPodRenderer(
             seedBurial = vis.seedBurial,
             contourGeometry = vis.contourGeometry,
             rerouteIntegration = vis.rerouteIntegration,
+            juvenileForm = juvenileForm,
         )
     }
 }

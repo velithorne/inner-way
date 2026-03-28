@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,7 +44,10 @@ import com.velithorne.vessel.ui.components.LiveConditionChip
 import com.velithorne.vessel.ui.components.StageStatusChip
 import com.velithorne.vessel.ui.components.ReturnGrowthSummarySheet
 import com.velithorne.vessel.ui.components.SeedPodReturnSummarySheet
+import com.velithorne.vessel.ui.components.JuvenileFormCard
 import com.velithorne.vessel.ui.components.MorphologyTraitCard
+import com.velithorne.vessel.ui.components.RegionChip
+import com.velithorne.vessel.ui.components.TopologyStageChip
 import com.velithorne.vessel.ui.components.VesselControlChip
 import com.velithorne.vessel.ui.components.VesselLegendChip
 import com.velithorne.vessel.ui.components.VesselOrganSheet
@@ -71,6 +76,7 @@ private fun Modifier.vesselDebugBorder(
  * **Layout:** Single [Column] + [verticalScroll] in strict document order — progress card, then
  * fixed-height chamber (no [LazyColumn] weight distribution), then actions and status below.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VesselScreen(
     viewModel: TelemetryViewModel,
@@ -134,7 +140,7 @@ fun VesselScreen(
                 .padding(top = 3.dp, bottom = 4.dp),
         ) {
             Text(
-                text = "Specimen 01 · seed pod · pinch · pan · tilt · tap pod for readout",
+                text = "Specimen 01 · juvenile vessel · pinch · pan · tilt · tap for readout",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
                 modifier = Modifier.fillMaxWidth(),
@@ -188,6 +194,29 @@ fun VesselScreen(
                     color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f),
                     modifier = Modifier.padding(top = 4.dp),
                 )
+            }
+            if (podUi.juvenileFormLines.isNotEmpty()) {
+                JuvenileFormCard(
+                    lines = podUi.juvenileFormLines,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                podUi.juvenileTopologyStageLine?.let { stage ->
+                    TopologyStageChip(
+                        label = stage,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                if (podUi.juvenileTraitChips.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        for (chip in podUi.juvenileTraitChips) {
+                            RegionChip(label = chip)
+                        }
+                    }
+                }
             }
             if (podUi.visibleTopologyLines.isNotEmpty() || podUi.morphologyDriverLine != null) {
                 MorphologyTraitCard(

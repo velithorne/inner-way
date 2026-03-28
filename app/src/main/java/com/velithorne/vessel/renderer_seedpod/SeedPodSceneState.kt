@@ -19,6 +19,8 @@ import com.velithorne.vessel.model.SeedThermalVisualState
 import com.velithorne.vessel.model.SeedTraceState
 import com.velithorne.vessel.model.VisibleMorphologyState
 import com.velithorne.vessel.model.VesselPaletteState
+import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
+import com.velithorne.vessel.juvenile_form.JuvenileFormState
 import com.velithorne.vessel.physiology.PhysiologySnapshot
 import com.velithorne.vessel.progression.LiveExpressionState
 
@@ -66,6 +68,7 @@ data class SeedPodSceneState(
         splineEnabled = true,
     ),
     val rerouteIntegration: RerouteIntegrationState = RerouteIntegrationState(0.35f, 0.4f),
+    val juvenileForm: JuvenileFormState = JuvenileArchitectureEngine.inactiveState(),
 ) {
     val stage: SeedPodGrowthStage get() = podDisplay.stage
 }

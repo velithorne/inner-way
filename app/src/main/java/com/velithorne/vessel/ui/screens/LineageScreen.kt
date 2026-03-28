@@ -18,7 +18,10 @@ import androidx.compose.ui.unit.dp
 import com.velithorne.vessel.ui.components.AmbientEcologyCard
 import com.velithorne.vessel.ui.components.BranchAffinityCard
 import com.velithorne.vessel.ui.components.BranchVariantCard
+import com.velithorne.vessel.ui.components.JuvenileFormCard
 import com.velithorne.vessel.ui.components.MorphologyTraitCard
+import com.velithorne.vessel.ui.components.RegionChip
+import com.velithorne.vessel.ui.components.TopologyStageChip
 import com.velithorne.vessel.ui.components.AdaptationChip
 import com.velithorne.vessel.ui.components.GrowthEventRow
 import com.velithorne.vessel.ui.components.LineageCard
@@ -62,6 +65,26 @@ fun LineageScreen(
             SpecimenIdentityCard(lineage = l)
             BranchAffinityCard(lineage = l)
             BranchVariantCard(lineage = l)
+        }
+        if (state.juvenileFormLines.isNotEmpty()) {
+            JuvenileFormCard(lines = state.juvenileFormLines)
+            state.juvenileTopologyStageLine?.let { stage ->
+                TopologyStageChip(
+                    label = stage,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (state.juvenileTraitChips.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    for (chip in state.juvenileTraitChips) {
+                        RegionChip(label = chip)
+                    }
+                }
+            }
         }
         if (state.visibleTopologyLines.isNotEmpty() || state.morphologyDriverLine != null) {
             MorphologyTraitCard(

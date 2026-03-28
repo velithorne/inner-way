@@ -33,4 +33,10 @@ data class SeedPodVesselUiState(
     val morphologyDriverLine: String? = null,
     /** Debug-only: influence split + asymmetry (default null). */
     val visibilityDebugLine: String? = null,
+    /** Juvenile body architecture phase — empty before juvenile emergence. */
+    val juvenileFormLines: List<String> = emptyList(),
+    /** Short labels for trait row (crown, lateral, etc.). */
+    val juvenileTraitChips: List<String> = emptyList(),
+    /** One line for topology expansion chip. */
+    val juvenileTopologyStageLine: String? = null,
 )

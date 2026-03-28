@@ -11,6 +11,8 @@ import com.velithorne.vessel.growth_seedpod.SeedPodGrowthCoordinator
 import com.velithorne.vessel.model.BiographyVisualState
 import com.velithorne.vessel.renderer_seedpod.SeedPodBranchMapper
 import com.velithorne.vessel.renderer_seedpod.VisibilityOverrideMapper
+import com.velithorne.vessel.juvenile_form.JuvenileExplainer
+import com.velithorne.vessel.juvenile_form.JuvenileArchitectureEngine
 import com.velithorne.vessel.lineage.AdaptationMarker
 import com.velithorne.vessel.lineage.GrowthEvent
 import com.velithorne.vessel.lineage.GrowthHistory
@@ -36,6 +38,9 @@ data class LineageUiState(
     val ambientEcology: AmbientEcologyUiState? = null,
     val visibleTopologyLines: List<String> = emptyList(),
     val morphologyDriverLine: String? = null,
+    val juvenileFormLines: List<String> = emptyList(),
+    val juvenileTraitChips: List<String> = emptyList(),
+    val juvenileTopologyStageLine: String? = null,
 )
 
 class LineageViewModel(
@@ -104,6 +109,39 @@ class LineageViewModel(
                 mode = profile.mode,
                 pressure = snap?.pressure,
             )
+            val jf = JuvenileArchitectureEngine.build(
+                stage = gs.structural.permanentStage,
+                lead = branch.leadingBranch,
+                branchReadiness = branch.branchReadiness,
+                visualExpression = branch.visualExpressionMagnitude,
+                visible = vis.visible,
+                biography = bio,
+                mode = profile.mode,
+            )
+            val jLines = buildList {
+                val h = JuvenileExplainer.headline(jf)
+                if (h.isNotEmpty()) add(h)
+                val r = JuvenileExplainer.regionLine(jf)
+                if (r.isNotEmpty()) add(r)
+                val t = JuvenileExplainer.transitionLine(jf)
+                if (t.isNotEmpty()) add(t)
+                if (jf.active) add(JuvenileExplainer.branchFamilyLine(branch.leadingBranch))
+            }
+            val jTraitChips = if (jf.active) {
+                buildList {
+                    if (jf.bodyPlan.crownMass > 0.5f) add("Crown region")
+                    if (jf.bodyPlan.lateralMass > 0.5f) add("Lateral spread")
+                    if (jf.bodyPlan.reserveMass > 0.5f) add("Reserve basin")
+                    if (jf.bodyPlan.shellMass > 0.5f) add("Shell plates")
+                    if (jf.bodyPlan.supportMass > 0.5f) add("Support braces")
+                    if (jf.bodyPlan.archiveMass > 0.5f) add("Archive core")
+                }
+            } else emptyList()
+            val jTopoStage = when {
+                !jf.active -> null
+                jf.transition.topologyExpandedBeyondSeed -> "Topology: expanded beyond seed phase"
+                else -> "Topology: consolidating juvenile regions"
+            }
             _ui.value = LineageUiState(
                 identity = id,
                 lineage = lineage,
@@ -114,6 +152,9 @@ class LineageViewModel(
                 ambientEcology = ambient,
                 visibleTopologyLines = vis.visible.topologySummaryLines,
                 morphologyDriverLine = "Contour driver: ${vis.visible.dominantContourDriver}",
+                juvenileFormLines = jLines,
+                juvenileTraitChips = jTraitChips,
+                juvenileTopologyStageLine = jTopoStage,
             )
         }
     }

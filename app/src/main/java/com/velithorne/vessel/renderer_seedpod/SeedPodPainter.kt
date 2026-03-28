@@ -63,7 +63,10 @@ object SeedPodPainter {
         )
         val coreR = SeedPodContourBuilder.nucleusRadius(minDim, tuning) *
             (0.92f + appearance.nucleusBrightnessMul * 0.06f)
-        val podDraw = pod + Offset(0f, (ga?.verticalSkew ?: 0f) * minDim * 0.06f)
+        val jForm = scene.juvenileForm
+        val podDraw = pod + Offset(0f, (ga?.verticalSkew ?: 0f) * minDim * 0.06f) +
+            JuvenileViewportMapper.bodyOffset(pod, minDim, jForm)
+        val zoomMul = 1f + JuvenileViewportMapper.zoomBias(jForm)
 
         scope.translate(vc.x, vc.y) {
             rotate(
@@ -71,8 +74,8 @@ object SeedPodPainter {
                 pivot = Offset.Zero,
             ) {
                 scale(
-                    camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom),
-                    camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom),
+                    camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom) * zoomMul,
+                    camera.zoom.coerceIn(tuning.minZoom, tuning.maxZoom) * zoomMul,
                     pivot = Offset.Zero,
                 ) {
                     translate(-vc.x + camera.panX, -vc.y + camera.panY) {
@@ -121,6 +124,15 @@ object SeedPodPainter {
                             phaseSec = phaseSec,
                         )
 
+                        JuvenileContourPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
+                            phaseSec = phaseSec,
+                        )
+
                         GeneratedShellPainter.draw(
                             scope = podScope,
                             pod = podDraw,
@@ -128,6 +140,23 @@ object SeedPodPainter {
                             palette = palette,
                             visible = vm,
                             phaseSec = phaseSec,
+                        )
+
+                        JuvenileRegionPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
+                        )
+
+                        JuvenileDepthPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            depth = depth,
+                            form = jForm,
                         )
 
                         SeedPodInnerVolumePainter.draw(
@@ -161,6 +190,14 @@ object SeedPodPainter {
                             palette = palette,
                             visible = vm,
                             phaseSec = phaseSec,
+                        )
+
+                        JuvenileBasinPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
                         )
 
                         RerouteIntegrationPainter.draw(
@@ -233,6 +270,33 @@ object SeedPodPainter {
                             radii = radii,
                             palette = palette,
                             branch = bv,
+                            phaseSec = phaseSec,
+                        )
+
+                        JuvenilePlatePainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
+                            phaseSec = phaseSec,
+                        )
+
+                        JuvenileFrondPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
+                            phaseSec = phaseSec,
+                        )
+
+                        JuvenileSupportPainter.draw(
+                            scope = podScope,
+                            pod = podDraw,
+                            radii = radii,
+                            palette = palette,
+                            form = jForm,
                             phaseSec = phaseSec,
                         )
 
