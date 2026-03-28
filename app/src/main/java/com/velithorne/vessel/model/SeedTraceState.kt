@@ -1,0 +1,39 @@
+package com.velithorne.vessel.model
+
+/**
+ * Original seed kernel / seam — visible but subordinate once [VisibleMorphologyState.generatedTopologyInfluence] rises.
+ */
+data class SeedTraceState(
+    /** 0..1 visibility of embedded core knot + seam. */
+    val traceAlpha: Float,
+    /** Radians — slight tilt of latent seam. */
+    val seamAngleRad: Float,
+    /** Scale of trace vs current body. */
+    val coreKnotScaleMul: Float,
+    /** Normalized offset of trace center from pod anchor. */
+    val traceOffsetNx: Float,
+    val traceOffsetNy: Float,
+    /** Positive Y — draw relic slightly deeper behind generated mass. */
+    val burialDepthPx: Float = 0f,
+) {
+    companion object {
+        fun default() = SeedTraceState(
+            traceAlpha = 0.55f,
+            seamAngleRad = 0f,
+            coreKnotScaleMul = 0.62f,
+            traceOffsetNx = 0f,
+            traceOffsetNy = 0f,
+            burialDepthPx = 0f,
+        )
+
+        /** Archetype-free birth: no authored seed seam / chrysalis trace. */
+        fun genesisSuppressed() = SeedTraceState(
+            traceAlpha = 0f,
+            seamAngleRad = 0f,
+            coreKnotScaleMul = 0f,
+            traceOffsetNx = 0f,
+            traceOffsetNy = 0f,
+            burialDepthPx = 0f,
+        )
+    }
+}
