@@ -11,8 +11,12 @@ import kotlin.math.roundToLong
  */
 object GrowthProfileScaler {
 
+    /** Allowed evolution speed range (dev slider + persisted prefs). */
+    const val DEV_EVOLUTION_SPEED_MIN = 0.25f
+    const val DEV_EVOLUTION_SPEED_MAX = 20f
+
     /** Clamp stored / UI values to a safe range. */
-    fun clampMultiplier(raw: Float): Float = raw.coerceIn(0.25f, 8f)
+    fun clampMultiplier(raw: Float): Float = raw.coerceIn(DEV_EVOLUTION_SPEED_MIN, DEV_EVOLUTION_SPEED_MAX)
 
     fun scale(profile: GrowthProfile, speed: Float): GrowthProfile {
         val s = clampMultiplier(speed)

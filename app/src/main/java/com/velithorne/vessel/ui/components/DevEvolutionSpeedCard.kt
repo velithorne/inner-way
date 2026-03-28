@@ -43,8 +43,9 @@ fun DevEvolutionSpeedCard(
             Slider(
                 value = clamped,
                 onValueChange = onMultiplierChange,
-                valueRange = 0.25f..8f,
-                steps = 30,
+                valueRange = GrowthProfileScaler.DEV_EVOLUTION_SPEED_MIN..GrowthProfileScaler.DEV_EVOLUTION_SPEED_MAX,
+                /** 0.25× steps from min to max (79 intervals → 80 ticks). */
+                steps = 79,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
