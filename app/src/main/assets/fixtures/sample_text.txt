@@ -1,0 +1,48 @@
+COLLIDE Phase 1 - Plain Text Fixture
+=====================================
+
+This is a plain text sample used for compression collider testing.
+
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+The quick brown fox jumps over the lazy dog.
+
+Pack my box with five dozen liquor jugs.
+Pack my box with five dozen liquor jugs.
+Pack my box with five dozen liquor jugs.
+
+Compression algorithms work best when data has structure and repetition.
+Compression algorithms work best when data has structure and repetition.
+Compression algorithms work best when data has structure and repetition.
+Compression algorithms work best when data has structure and repetition.
+
+Section A:
+  - Item one describes a property of the system
+  - Item two describes another property of the system
+  - Item three is a duplicate of item two
+  - Item three is a duplicate of item two
+  - Item three is a duplicate of item two
+
+Section B:
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+  Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+  Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+  Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+
+Section C (numbers):
+  1234567890 1234567890 1234567890 1234567890
+  1234567890 1234567890 1234567890 1234567890
+  0987654321 0987654321 0987654321 0987654321
+  AAABBBCCCDDDEEEFFFGGGHHHIIIJJJKKKLLLMMMNNN
+  AAABBBCCCDDDEEEFFFGGGHHHIIIJJJKKKLLLMMMNNN
+  AAABBBCCCDDDEEEFFFGGGHHHIIIJJJKKKLLLMMMNNN
+  AAABBBCCCDDDEEEFFFGGGHHHIIIJJJKKKLLLMMMNNN
+
+End of plain text fixture.
+End of plain text fixture.
+End of plain text fixture.

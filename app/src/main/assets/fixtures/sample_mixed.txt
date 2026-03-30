@@ -1,0 +1,62 @@
+COLLIDE MIXED STRUCTURED TEXT FIXTURE v1.0
+==========================================
+
+[HEADER]
+format=structured_text
+version=1.0
+created=2024-01-01
+source=collide_fixture_generator
+
+[SECTION:DEFINITIONS]
+key=ALPHA  value=00001  type=integer  flags=none
+key=BETA   value=00002  type=integer  flags=none
+key=GAMMA  value=00003  type=integer  flags=none
+key=DELTA  value=00004  type=integer  flags=none
+key=ALPHA  value=00001  type=integer  flags=none
+key=BETA   value=00002  type=integer  flags=none
+key=GAMMA  value=00003  type=integer  flags=none
+
+[SECTION:LOG_ENTRIES]
+2024-01-01T00:00:01Z INFO  system.init       status=OK     code=0
+2024-01-01T00:00:02Z INFO  system.init       status=OK     code=0
+2024-01-01T00:00:03Z INFO  module.load       status=OK     code=0
+2024-01-01T00:00:04Z INFO  module.load       status=OK     code=0
+2024-01-01T00:00:05Z INFO  module.start      status=OK     code=0
+2024-01-01T00:00:06Z DEBUG sensor.read       status=OK     code=0  value=22.50
+2024-01-01T00:00:07Z DEBUG sensor.read       status=OK     code=0  value=22.51
+2024-01-01T00:00:08Z DEBUG sensor.read       status=OK     code=0  value=22.51
+2024-01-01T00:00:09Z DEBUG sensor.read       status=OK     code=0  value=22.52
+2024-01-01T00:00:10Z DEBUG sensor.read       status=OK     code=0  value=22.52
+2024-01-01T00:00:11Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:12Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:13Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:14Z WARN  threshold.check   status=WARN   code=1  detail=approaching_limit
+2024-01-01T00:00:15Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:16Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:17Z INFO  aggregator.tick   status=OK     code=0
+2024-01-01T00:00:18Z INFO  aggregator.tick   status=OK     code=0
+
+[SECTION:REPEATING_PATTERNS]
+PATTERN_A PATTERN_A PATTERN_A PATTERN_A PATTERN_A
+PATTERN_B PATTERN_B PATTERN_B PATTERN_B PATTERN_B
+PATTERN_C PATTERN_C PATTERN_C PATTERN_C PATTERN_C
+PATTERN_A PATTERN_A PATTERN_A PATTERN_A PATTERN_A
+PATTERN_B PATTERN_B PATTERN_B PATTERN_B PATTERN_B
+00000000 00000000 00000000 00000000 00000000 00000000
+11111111 11111111 11111111 11111111 11111111 11111111
+00000000 00000000 00000000 00000000 00000000 00000000
+XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX
+YYYYYYYY YYYYYYYY YYYYYYYY YYYYYYYY YYYYYYYY YYYYYYYY
+XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX XXXXXXXX
+
+[SECTION:NUMERIC_SEQUENCES]
+0001 0002 0003 0004 0005 0006 0007 0008 0009 0010
+0011 0012 0013 0014 0015 0016 0017 0018 0019 0020
+0021 0022 0023 0024 0025 0026 0027 0028 0029 0030
+0001 0002 0003 0004 0005 0006 0007 0008 0009 0010
+0011 0012 0013 0014 0015 0016 0017 0018 0019 0020
+
+[FOOTER]
+end_of_fixture=true
+checksum=placeholder
+==========================================
