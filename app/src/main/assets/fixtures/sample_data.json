@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "type": "collide_fixture",
+    "description": "Sample JSON data for compression testing"
+  },
+  "measurements": [
+    {"id": 1, "sensor": "temp_01", "value": 22.5, "unit": "celsius", "timestamp": 1700000001},
+    {"id": 2, "sensor": "temp_01", "value": 22.6, "unit": "celsius", "timestamp": 1700000002},
+    {"id": 3, "sensor": "temp_01", "value": 22.7, "unit": "celsius", "timestamp": 1700000003},
+    {"id": 4, "sensor": "temp_01", "value": 22.7, "unit": "celsius", "timestamp": 1700000004},
+    {"id": 5, "sensor": "temp_01", "value": 22.8, "unit": "celsius", "timestamp": 1700000005},
+    {"id": 6, "sensor": "temp_02", "value": 18.1, "unit": "celsius", "timestamp": 1700000006},
+    {"id": 7, "sensor": "temp_02", "value": 18.1, "unit": "celsius", "timestamp": 1700000007},
+    {"id": 8, "sensor": "temp_02", "value": 18.2, "unit": "celsius", "timestamp": 1700000008},
+    {"id": 9, "sensor": "temp_02", "value": 18.3, "unit": "celsius", "timestamp": 1700000009},
+    {"id": 10, "sensor": "temp_02", "value": 18.3, "unit": "celsius", "timestamp": 1700000010},
+    {"id": 11, "sensor": "pressure_01", "value": 1013.25, "unit": "hPa", "timestamp": 1700000011},
+    {"id": 12, "sensor": "pressure_01", "value": 1013.25, "unit": "hPa", "timestamp": 1700000012},
+    {"id": 13, "sensor": "pressure_01", "value": 1013.26, "unit": "hPa", "timestamp": 1700000013},
+    {"id": 14, "sensor": "pressure_01", "value": 1013.26, "unit": "hPa", "timestamp": 1700000014},
+    {"id": 15, "sensor": "pressure_01", "value": 1013.27, "unit": "hPa", "timestamp": 1700000015},
+    {"id": 16, "sensor": "humidity_01", "value": 55.0, "unit": "percent", "timestamp": 1700000016},
+    {"id": 17, "sensor": "humidity_01", "value": 55.0, "unit": "percent", "timestamp": 1700000017},
+    {"id": 18, "sensor": "humidity_01", "value": 55.1, "unit": "percent", "timestamp": 1700000018},
+    {"id": 19, "sensor": "humidity_01", "value": 55.1, "unit": "percent", "timestamp": 1700000019},
+    {"id": 20, "sensor": "humidity_01", "value": 55.2, "unit": "percent", "timestamp": 1700000020}
+  ],
+  "events": [
+    {"type": "alert", "level": "info", "message": "System started", "ts": 1700000000},
+    {"type": "alert", "level": "info", "message": "Sensors initialized", "ts": 1700000001},
+    {"type": "alert", "level": "warning", "message": "Temp threshold approaching", "ts": 1700000010},
+    {"type": "alert", "level": "info", "message": "System nominal", "ts": 1700000020}
+  ],
+  "config": {
+    "sampleIntervalMs": 1000,
+    "alertThresholds": {
+      "temp_max": 30.0,
+      "pressure_min": 1000.0,
+      "humidity_max": 80.0
+    },
+    "enabled": true,
+    "logLevel": "info"
+  }
+}
