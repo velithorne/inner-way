@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Android build artifacts
+*.jks
+*.keystore
+*.apk
+*.aab
+android/local.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

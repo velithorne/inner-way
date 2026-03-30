@@ -376,28 +376,90 @@ html, body, #root {
   border-radius: 2px;
 }
 
-/* ─── Responsive ─────────────────────────────────────────── */
+/* ─── Responsive / Mobile ────────────────────────────────── */
 
 @media (max-width: 640px) {
   .app-header {
-    padding: 18px 20px;
+    padding: env(safe-area-inset-top, 14px) 20px 14px;
+    padding-top: max(env(safe-area-inset-top), 14px);
   }
 
   .logo-sub {
     display: none;
   }
 
+  .logo-text {
+    font-size: 14px;
+  }
+
   .bottom-panel {
-    bottom: 16px;
-    width: calc(100vw - 20px);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+    border-radius: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .submission-panel {
-    padding: 20px 18px;
+    padding: 18px 16px;
+    padding-bottom: max(env(safe-area-inset-bottom), 18px);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .emotion-grid {
+    gap: 6px;
+  }
+
+  .emotion-chip {
+    padding: 10px 12px !important;
+    font-size: 11px !important;
+    min-height: 40px;
+  }
+
+  .submit-btn {
+    padding: 14px 28px;
+    font-size: 13px;
+    min-height: 48px;
+  }
+
+  .prompt-text {
+    font-size: 12px;
+    margin-bottom: 14px;
   }
 
   .debug-anchor {
-    bottom: 16px;
+    bottom: max(env(safe-area-inset-bottom), 12px);
     right: 16px;
+    /* Push above the bottom panel */
+    bottom: calc(max(env(safe-area-inset-bottom), 0px) + 260px);
+  }
+
+  .debug-panel {
+    width: calc(100vw - 32px);
+    max-width: 280px;
+  }
+}
+
+/* ─── Touch / Pointer ───────────────────────────────────── */
+
+@media (pointer: coarse) {
+  .emotion-chip {
+    min-height: 44px;
+  }
+
+  .submit-btn {
+    min-height: 52px;
+  }
+
+  .city-btn {
+    min-height: 36px;
+    padding: 6px 12px !important;
+  }
+
+  /* Prevent tap highlight on mobile */
+  button {
+    -webkit-tap-highlight-color: transparent;
   }
 }
