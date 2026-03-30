@@ -1,36 +1,164 @@
-# COLLIDE — Phase 1: Compression Collider
+# COLLIDE — Phase 2: Honest Compression Research Upgrade
 
-COLLIDE is a native Android experimental lab that generates and tests reversible compression recipe candidates on-device.
-
----
-
-## What Phase 1 Does
-
-Phase 1 implements a single focused workflow called the **Compression Collider**:
-
-1. **Load** a small input file from device storage or a built-in fixture
-2. **Generate** candidate compression recipe chains deterministically
-3. **Encode** each candidate: run transform chain on input bytes, then apply a backend compressor
-4. **Decode** each candidate: decompress, then apply inverse transforms in reverse order
-5. **Verify** that the decoded bytes exactly match the original input (byte-for-byte)
-6. **Compare** the total encoded size (compressed bytes + all metadata overhead) against the selected baseline
-7. **Archive** only strict winning events — candidates that beat the baseline AND pass exact reconstruction
-8. **Inspect** winning events and their full recipe chains
-
-The result is an honest accounting of what worked, what failed, and by how much.
+COLLIDE is a native Android experimental compression lab. Phase 2 extends Phase 1 by tightening every aspect of result honesty: verification, size accounting, reproducibility, candidate diagnostics, corpus testing, and search depth.
 
 ---
 
-## What Phase 1 Does NOT Do
+## What Phase 2 Adds
 
-- No World-Law Collider or general invention engine
+### A. Stronger Exactness Verification (SHA-256)
+Every candidate evaluation now performs dual verification:
+1. Byte-for-byte equality between original input and reconstructed output.
+2. SHA-256 hash match between original and reconstructed.
+
+Both must pass. A candidate that fails either check is never archived as a winner.
+
+The `VerificationResult` domain object records both hashes and the failure reason if any.
+
+### B. Honest Total Encoded Size Accounting
+A formal `SizeBreakdown` model accounts for every byte required to reconstruct the original file:
+
+| Component | What it is |
+|-----------|-----------|
+| `transformedPayloadSize` | Bytes after transform chain, before backend compression |
+| `backendCompressedPayloadSize` | Bytes after Deflate backend compression |
+| `transformMetadataSize` | All per-transform metadata blobs + their 4-byte length prefixes |
+| `containerHeaderSize` | Fixed 8-byte header (num_transforms + original_size) |
+| **`totalEncodedSize`** | **The canonical comparison number** |
+
+The candidate's `totalEncodedSize` is always compared against the baseline (which is raw compressed bytes only), making the comparison deliberately conservative — the candidate must beat the baseline even after paying all per-transform metadata costs.
+
+### C. Deterministic Reproducibility and Replay
+Every winning event now stores:
+- Full recipe chain (transform IDs + backend)
+- `RunConfigSnapshot` (run mode, baseline, max candidates, chain length, enabled transforms, engine version)
+- `candidateIndex` (position in the deterministic generation order)
+- SHA-256 hashes of input and reconstruction
+
+The **Replay Event** action re-runs the exact recipe on the same input bytes and verifies:
+- Total encoded size matches the archived value
+- Exactness + SHA-256 verification passes
+- Input SHA-256 matches archived original SHA-256
+
+Replay status is tracked per event: `MATCHED`, `SIZE_MISMATCH`, `VERIFY_FAILED`, `ERROR`, `PENDING`.
+
+### D. Expanded Classification + Diagnostics
+Two new candidate classifications, plus `reason` string on every result:
+
+| Classification | Meaning |
+|----------------|---------|
+| `HASH_MISMATCH` | Bytes matched but SHA-256 hashes differ (internal consistency failure) |
+| `METADATA_ACCOUNTING_FAILURE` | Size accounting produced a non-positive total (should not occur in practice) |
+
+All classifications now carry a human-readable `reason` string. Run summaries track all classification counts.
+
+### E. Rich Event Detail Screen
+The Event Detail screen now shows:
+- Full size breakdown card
+- Original SHA-256 and reconstructed SHA-256
+- Verification method
+- Candidate index
+- Run config summary
+- Engine version
+- Replay status + replay button + replay result inline
+
+### F. Run Summary / Lab Report
+After every run the Collider shows an expandable lab report with:
+- Classification counts (winners, no-gain, exactness failures, hash mismatches, errors, not-applicable)
+- Top 5 candidates by total encoded size (color-coded for winners)
+- Baseline size and best winner size
+
+### G. Fixture Corpus Run
+A dedicated Corpus screen runs all 7 built-in fixtures through the collider and produces a corpus summary showing:
+- Wins and losses per fixture
+- Average savings percentage across winning fixtures
+- Best case and worst case fixtures
+- Per-fixture candidate counts and elapsed time
+
+### H. Expanded Search
+- **Enabled transform toggles**: any subset of transforms can be enabled/disabled via Settings
+- **Chain length 4**: opt-in setting for 4-step transform chains
+- **Consecutive deduplication**: same transform cannot appear at consecutive positions in a chain
+- All generation remains deterministic and bounded
+
+---
+
+## What Phase 1 Did
+
+Phase 1 proved the basic loop: load → generate → encode → decode → verify (byte equality only) → compare to baseline → archive strict winners.
+
+Phase 2 does not change Phase 1's core logic — it strengthens it.
+
+---
+
+## What Phase 2 Does NOT Do
+
+- No World-Law Collider, GPU compute, or native C++
+- No cloud, auth, ads, or social features
 - No neural compression or ML guidance
-- No cloud sync, accounts, or authentication
-- No GPU or native C++ (pure Kotlin/JVM)
-- No large-file benchmarking
-- No production file replacement on device
-- No root or system-level access
-- No fabricated results — if the data says no improvement, the UI says no improvement
+- No production file replacement
+- No fabricated wins
+
+---
+
+## Exactness and Hash Verification Policy
+
+A candidate passes verification if and only if:
+1. `original.size == reconstructed.size`
+2. `original.contentEquals(reconstructed)` (byte-for-byte)
+3. `SHA-256(original) == SHA-256(reconstructed)`
+
+Conditions (1) and (2) guarantee byte equality. Condition (3) provides an independent cryptographic check. In theory they cannot disagree; if they did, it would indicate an internal error in the verifier. This dual-check approach is documented in `ExactnessVerifier.verifyFull()`.
+
+---
+
+## Total Encoded Size Accounting Policy
+
+```
+totalEncodedSize = backendCompressedPayloadSize
+                 + transformMetadataSize        (sum of 4-byte prefix + metadata per transform)
+                 + containerHeaderSize          (always 8 bytes)
+```
+
+This is the number compared to the baseline. The comparison is intentionally unfavourable to the candidate — every overhead byte counts against it. A candidate only wins if its `totalEncodedSize < baseline.encodedSize`.
+
+The baseline is measured as raw Deflate output on the unmodified input bytes, with no metadata overhead, because a baseline has no transform chain to account for.
+
+---
+
+## Replay Policy
+
+Replay is a re-execution of the saved recipe on the input bytes. It is considered `MATCHED` if:
+- `replayEncodedSize == savedEvent.winningSize`
+- Exactness + SHA-256 verification passes on the re-run output
+- `SHA-256(replay_input) == savedEvent.originalSha256` (if archived)
+
+A `SIZE_MISMATCH` does not necessarily mean the event was wrong — it may indicate the input bytes used for replay were different from the original. An `ERROR` means the recipe could not be executed (e.g., the input changed, or the transform is unavailable). Events are not retroactively invalidated by a replay failure; the archived result stands as measured.
+
+---
+
+## How to Interpret Wins Honestly
+
+A "Verified Exact-Reconstruction Winner" means exactly:
+- The recipe was applied to the specific input file bytes.
+- The output was decoded step-by-step in reverse.
+- The decoded bytes are byte-for-byte identical to the input and their SHA-256 matches.
+- The total encoded size (including all metadata overhead) is strictly smaller than Deflate applied directly to the input.
+
+It does **not** mean:
+- The recipe will win on other files.
+- The recipe is better than production compressors.
+- The savings generalise beyond this specific input.
+
+---
+
+## Known Limitations
+
+1. **Baseline conservatism**: The baseline has no overhead; candidates pay full overhead. This is intentional and honest.
+2. **Small file sizes**: Phase 2 is validated for files up to ~5 MB. Large files may take many seconds.
+3. **Transform metadata cost**: Transforms with non-trivial metadata (e.g., `FixedBlockShuffleTransform` with 8 bytes) will not win on small inputs where the metadata overhead exceeds any compression savings.
+4. **Replay requires same input bytes**: Replay currently only works automatically for built-in fixture files. User-imported files require re-importing the same file before replay.
+5. **No persistence of full candidate result list**: Only the winning events are persisted to Room; the full per-run candidate list lives only in memory.
 
 ---
 
@@ -39,166 +167,52 @@ The result is an honest accounting of what worked, what failed, and by how much.
 ```
 app/
   data/
-    db/               Room database (EventEntity, RunSummaryEntity, DAOs, AppDatabase)
-    repository/       EventRepository: domain ↔ database mapping
-    settings/         DataStore settings (CollideSettingsStore)
+    db/           Room v2: EventEntity (Phase 2 fields), RunSummaryEntity (Phase 2 fields),
+                           CorpusRunSummaryEntity (new), MIGRATION_1_2
+    repository/   EventRepository with full Phase 2 field mapping + updateReplayStatus
+    settings/     CollideSettingsStore: enabledTransformIds, allowChainLength4
   domain/
-    model/            Pure data classes (InputSample, RecipeSpec, CandidateResult, RunStats, etc.)
-    engine/           CompressionColliderEngine, BackendCompressorEngine
-    transforms/       ReversibleTransform interface + 7 implementations
-    recipes/          CandidateGenerator, RecipeSerializer
-    evaluator/        CandidateEvaluator, BaselineEvaluator, ExactnessVerifier
-    detector/         EventRecorder
+    model/        + SizeBreakdown, VerificationResult, ReplayResult, RunConfigSnapshot,
+                    CorpusResult (FixtureResult + CorpusSummary)
+                    Updated: CandidateResult, CandidateClassification, RunStats, SavedEvent
+    engine/       + ReplayEngine, CorpusRunner
+                    Updated: CompressionColliderEngine (RunConfigSnapshot, candidateIndex)
+    evaluator/    Updated: ExactnessVerifier (SHA-256), CandidateEvaluator (SizeBreakdown),
+                           BaselineEvaluator, EventRecorder (Phase 2 gate)
+    recipes/      Updated: CandidateGenerator (enabled transforms, chain 4)
+    transforms/   Unchanged (all 7 transforms still valid)
   ui/
-    home/             HomeScreen + HomeViewModel
-    collider/         ColliderScreen + ColliderViewModel
-    archive/          ArchiveScreen + ArchiveViewModel
-    eventdetail/      EventDetailScreen + EventDetailViewModel
-    settings/         SettingsScreen + SettingsViewModel
-    navigation/       CollideNavGraph + Routes
-    theme/            CollideTheme, CollideColors, CollideTypography
-  util/
+    + corpus/     CorpusScreen + CorpusViewModel
+    Updated:      ColliderScreen (RunSummaryCard), ColliderViewModel (RunResult),
+                  EventDetailScreen (breakdown, replay, SHA-256), ArchiveScreen (language),
+                  HomeScreen (Corpus entry), SettingsScreen (transform toggles, chain 4)
 ```
 
-**Pattern**: MVVM with a clean domain layer. ViewModels consume domain engine classes via coroutines/Flow. The UI is pure Jetpack Compose with no business logic. Room persists events and run summaries. DataStore holds settings.
-
 ---
 
-## Transform Library
-
-All transforms are exactly reversible. Each implements `ReversibleTransform`:
-
-| ID | Name | Description |
-|----|------|-------------|
-| `identity` | Identity | Pass-through, no change |
-| `byte_run_rle` | Byte-Run RLE | Run-length encoding for arbitrary byte runs (min run 3) |
-| `zero_run_rle` | Zero-Run RLE | Specialised RLE for zero-byte runs |
-| `delta8` | Delta-8 | Replace each byte with difference from previous byte |
-| `xor_prev` | XOR-Prev-Byte | Replace each byte with XOR against previous byte |
-| `block_shuffle_4` | Block-Shuffle-4 | Interleave 4-byte block byte-planes (column-major reorder) |
-| `block_shuffle_8` | Block-Shuffle-8 | Interleave 8-byte block byte-planes |
-| `move_to_front` | Move-To-Front | MTF rank transform; groups recently-seen symbols near zero |
-
-Transforms that cannot apply to the current data (e.g. Zero-Run RLE on data with no zero bytes) return `NOT_APPLICABLE` without attempting to encode.
-
----
-
-## How Exactness Verification Works
-
-For every candidate recipe:
-
-1. The transform chain encodes the input bytes and collects metadata from each transform.
-2. The backend compressor compresses the final transform output.
-3. The backend decompresses the result.
-4. The transforms are applied **in reverse order** using the saved metadata.
-5. `ExactnessVerifier.verify()` performs a byte-for-byte comparison between the decoded bytes and the original input.
-6. If any byte differs, or the lengths differ, the candidate is classified as `EXACTNESS_FAILED` and is never saved as a winner.
-
-This check is mandatory and cannot be bypassed.
-
----
-
-## How Winners Are Classified
-
-A **strict winner** requires all of the following:
-
-- `CandidateClassification.STRICT_WINNER`
-- `reconstructionPassed == true`
-- `encodedSize < baselineSize` (strictly less than, not equal)
-
-`encodedSize` includes all overhead:
-- Backend-compressed bytes
-- Per-transform metadata (length-prefixed)
-- Header: number of transforms (4 bytes) + original size (4 bytes)
-
-Only these events are persisted to the archive.
-
----
-
-## Candidate Classification
-
-| Classification | Meaning |
-|----------------|---------|
-| `STRICT_WINNER` | Beats baseline, exact reconstruction passed |
-| `NO_STRICT_IMPROVEMENT` | Exact reconstruction passed, but no size gain |
-| `EXACTNESS_FAILED` | Decoded bytes differ from input |
-| `NOT_APPLICABLE` | One or more transforms cannot process this data |
-| `PRUNED_PRE_EVAL` | Skipped before full evaluation (future pruning logic) |
-| `ENCODE_ERROR` | An error occurred during encoding |
-| `DECODE_ERROR` | An error occurred during decoding |
-
----
-
-## Honest Accounting
-
-Every run tracks:
-- `candidates_seen` — total generated
-- `candidates_pruned_pre_eval` — skipped before evaluation
-- `candidates_evaluated` — actually run through encode/decode/verify
-- `exactness_failures` — failed reconstruction
-- `not_applicable_count` — not applicable to input
-- `no_gain_count` — correct but did not beat baseline
-- `strict_winner_count` — actual wins
-
-Failed volume is always visible in the Live Run Panel. The app never hides the failure count.
-
----
-
-## Run Modes
-
-| Mode | Max Candidates | Max Chain Length | Notes |
-|------|---------------|-----------------|-------|
-| Safe | 30 | 2 | Light, fast exploration |
-| Balanced | 80 | 3 | Default recommended mode |
-| Burst | 200 | 3 | Maximum depth for Phase 1 |
-
----
-
-## Built-in Test Fixtures
-
-| File | Type | Notes |
-|------|------|-------|
-| `fixtures/sample_text.txt` | Plain text | Repetitive sentences |
-| `fixtures/sample_data.json` | JSON | Sensor measurement data |
-| `fixtures/sample_table.csv` | CSV | Tabular structured data |
-| `fixtures/sample_binary.bin` | Binary | Zero runs, delta sequences, block patterns |
-| `fixtures/sample_mixed.txt` | Mixed | Log-format structured text |
-
----
-
-## Building
-
-Requires:
-- Android Studio Hedgehog or newer (or Gradle 8.9+ CLI)
-- JDK 17+
-- Android SDK 35
-- Min SDK 26 (Android 8.0)
+## Build
 
 ```bash
 ./gradlew assembleDebug
-./gradlew test
+./gradlew testDebugUnitTest   # 151 tests, 0 failures
 ```
+
+Min SDK: 26 (Android 8.0) | Target SDK: 35 | Engine version: 2.0.0-phase2
 
 ---
 
-## Phase 2 Recommendation
+## Recommended Phase 3
 
-After validating the Phase 1 loop, the next recommended expansion is:
+### Phase 3: Guided Search + Multi-file Generalization
 
-### Phase 2: Guided Search + Transform Composition Extension
+1. **Frequency-based candidate ordering**: After each corpus run, record which transform positions in winning chains tended to contribute positively. Use simple frequency tables (no ML) to bias the generation order in future runs — place historically productive transforms earlier in the enumeration.
 
-1. **Adaptive candidate pruning**: Use early-exit heuristics based on partial encode size estimates to prune candidates before full evaluation. This allows much larger search spaces without proportional cost.
+2. **BWT (Burrows-Wheeler Transform)**: Implement a reversible BWT with explicit permutation metadata stored as the decode key. BWT tends to cluster similar bytes together, creating long runs that RLE and MTF benefit from. It is the foundation of bzip2-class compression.
 
-2. **Transform feedback signal**: After each run, record which transform positions in winning chains tended to help. Use this as a lightweight frequency-based guide (no ML required) to bias candidate ordering in future runs.
+3. **Cross-file recipe generalization score**: After a corpus run, compute a "generalization score" for each winning recipe: `wins_across_files / total_fixtures`. Recipes with higher generalization scores are promoted in the next run's search order.
 
-3. **Extended transform library**: Add reversible transforms such as:
-   - BWT (Burrows-Wheeler Transform) — requires known block size in metadata
-   - Huffman symbol reordering (reversible)
-   - Run-length + move-to-front pipeline as a named compound step
-   - Word-level delta for structured integer sequences
+4. **Streaming evaluation**: Process candidates in a producer/consumer coroutine pipeline rather than sequentially. On multi-core devices this allows encoding/decoding to overlap with baseline computation for the next candidate.
 
-4. **Multi-file batch mode**: Accept a small directory of files and run the collider on each, accumulating a cross-file winner database to identify recipes that generalize.
+5. **Persistent recipe performance history**: Add a `RecipeHistoryEntity` table that stores the win rate of each recipe across all historical runs. Use this to show which recipes have been most consistently useful.
 
-5. **Export recipe as standalone Kotlin snippet**: Let the user export a winning recipe as a self-contained Kotlin function that can be pasted into any JVM project.
-
-Phase 2 should still remain on-device, deterministic, and honest. It extends depth of search, not the deception budget.
+Phase 3 should still require zero ML, zero cloud, and zero fabrication. It extends intelligent search based solely on honest empirical evidence.

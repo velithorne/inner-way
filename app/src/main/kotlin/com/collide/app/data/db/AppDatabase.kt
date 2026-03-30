@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [EventEntity::class, RunSummaryEntity::class],
-    version = 1,
+    entities = [EventEntity::class, RunSummaryEntity::class, CorpusRunSummaryEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun runSummaryDao(): RunSummaryDao
+    abstract fun corpusRunSummaryDao(): CorpusRunSummaryDao
 
     companion object {
         @Volatile
@@ -24,7 +25,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "collide_db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }

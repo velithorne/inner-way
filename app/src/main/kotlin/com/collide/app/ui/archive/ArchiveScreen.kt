@@ -11,16 +11,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.collide.app.domain.model.ReplayStatus
 import com.collide.app.domain.model.SavedEvent
 import com.collide.app.ui.collider.formatBytes
 import com.collide.app.ui.theme.CollideColors
@@ -40,7 +40,6 @@ fun ArchiveScreen(
             .fillMaxSize()
             .background(CollideColors.background)
     ) {
-        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -49,40 +48,29 @@ fun ArchiveScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onNavigateBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = CollideColors.accent)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = CollideColors.accent)
             }
-            Text(
-                text = "EVENT ARCHIVE",
-                color = CollideColors.accent,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
-            )
+            Column {
+                Text("LAB DISCOVERIES", color = CollideColors.accent, fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Text("Verified Exact-Reconstruction Winners Only",
+                    color = CollideColors.muted, fontSize = 9.sp, letterSpacing = 1.sp)
+            }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = "${events.size} events",
-                color = CollideColors.muted,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(end = 16.dp)
-            )
+            Text("${events.size} events", color = CollideColors.muted, fontSize = 12.sp,
+                modifier = Modifier.padding(end = 16.dp))
         }
 
         if (events.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "No events yet.",
-                        color = CollideColors.muted,
-                        fontSize = 16.sp
-                    )
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                    Text("No discoveries yet.", color = CollideColors.muted, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Run the Compression Collider to discover winning recipes.",
+                        "Run the Compression Collider to find recipes that beat the baseline " +
+                        "with verified exact reconstruction.",
                         color = CollideColors.muted.copy(alpha = 0.6f),
-                        fontSize = 13.sp
+                        fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
@@ -93,7 +81,7 @@ fun ArchiveScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(events, key = { it.id }) { event ->
-                    EventCard(event = event, onClick = { onEventClick(event.id) })
+                    DiscoveryCard(event = event, onClick = { onEventClick(event.id) })
                 }
             }
         }
@@ -101,10 +89,13 @@ fun ArchiveScreen(
 }
 
 @Composable
-private fun EventCard(event: SavedEvent, onClick: () -> Unit) {
+private fun DiscoveryCard(event: SavedEvent, onClick: () -> Unit) {
     val dateStr = remember(event.timestamp) {
-        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(event.timestamp))
+        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date(event.timestamp))
     }
+    val replayStatus = runCatching { ReplayStatus.valueOf(event.replayStatus) }
+        .getOrDefault(ReplayStatus.PENDING)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,60 +110,60 @@ private fun EventCard(event: SavedEvent, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "EVENT #${event.id}",
-                color = CollideColors.winner,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
-            )
-            if (event.verificationPassed) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = "Verified",
-                    tint = CollideColors.winner,
-                    modifier = Modifier.size(16.dp)
-                )
+            Text("DISCOVERY #${event.id}",
+                color = CollideColors.winner, fontSize = 11.sp,
+                fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ReplayBadge(replayStatus)
+                if (event.verificationPassed) {
+                    Icon(Icons.Default.CheckCircle, "Verified Exact Reconstruction",
+                        tint = CollideColors.winner, modifier = Modifier.size(16.dp))
+                }
             }
         }
+
         Spacer(Modifier.height(4.dp))
-        Text(
-            text = event.inputFileName,
-            color = CollideColors.onBackground,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = dateStr,
-            color = CollideColors.muted,
-            fontSize = 11.sp
-        )
+        Text(event.inputFileName, color = CollideColors.onBackground, fontSize = 14.sp,
+            fontWeight = FontWeight.Medium)
+        Text(dateStr, color = CollideColors.muted, fontSize = 11.sp)
+
+        if (event.hashesMatch) {
+            Spacer(Modifier.height(2.dp))
+            Text("SHA-256 Verified", color = CollideColors.winner.copy(0.8f), fontSize = 10.sp,
+                letterSpacing = 0.5.sp)
+        }
+
         Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MiniStat("Original", formatBytes(event.inputSize), modifier = Modifier.weight(1f))
             MiniStat("Baseline", formatBytes(event.baselineSize), modifier = Modifier.weight(1f))
-            MiniStat("Winning", formatBytes(event.winningSize), valueColor = CollideColors.winner, modifier = Modifier.weight(1f))
-            MiniStat("Saved", formatBytes(event.byteSavings), valueColor = CollideColors.winner, modifier = Modifier.weight(1f))
+            MiniStat("Total Encoded", formatBytes(event.winningSize),
+                valueColor = CollideColors.winner, modifier = Modifier.weight(1f))
+            MiniStat("Saved", "%.1f%%".format(event.compressionRatioPct),
+                valueColor = CollideColors.winner, modifier = Modifier.weight(1f))
         }
+
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = event.recipeSummary,
-            color = CollideColors.accentAlt,
-            fontSize = 11.sp,
-            maxLines = 2
-        )
+        Text(event.recipeSummary, color = CollideColors.accentAlt, fontSize = 11.sp, maxLines = 2)
     }
 }
 
 @Composable
+private fun ReplayBadge(status: ReplayStatus) {
+    val (label, color) = when (status) {
+        ReplayStatus.MATCHED -> "Replayed ✓" to CollideColors.winner
+        ReplayStatus.SIZE_MISMATCH -> "Replay ≠" to CollideColors.warning
+        ReplayStatus.VERIFY_FAILED -> "Replay ✗" to CollideColors.failure
+        ReplayStatus.ERROR -> "Replay ERR" to CollideColors.failure
+        ReplayStatus.PENDING -> "Replay?" to CollideColors.muted
+    }
+    Text(label, color = color, fontSize = 9.sp, letterSpacing = 0.5.sp)
+}
+
+@Composable
 private fun MiniStat(
-    label: String,
-    value: String,
-    valueColor: androidx.compose.ui.graphics.Color = CollideColors.onSurface,
+    label: String, value: String,
+    valueColor: Color = CollideColors.onSurface,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {

@@ -7,6 +7,15 @@ import com.collide.app.domain.model.BackendCompressor
 
 class BaselineEvaluator {
 
+    /**
+     * Compute baseline.
+     *
+     * Phase 2 note: baseline is measured as raw compressed bytes only (no metadata overhead),
+     * because a baseline has no transform chain to account for. The candidate's totalEncodedSize
+     * (which includes all overhead) is compared against this baseline, making the comparison
+     * deliberately conservative for the candidate — a candidate must beat the baseline even
+     * after paying all its per-transform metadata costs.
+     */
     fun evaluate(input: ByteArray, strategy: BaselineStrategy): BaselineResult {
         val start = System.currentTimeMillis()
         val backend = when (strategy) {

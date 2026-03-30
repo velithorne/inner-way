@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.collide.app.domain.model.BaselineStrategy
 import com.collide.app.domain.model.RunMode
+import com.collide.app.domain.transforms.TransformRegistry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -18,6 +19,9 @@ object CollideSettingsKeys {
     val DEFAULT_MAX_CHAIN_LENGTH = intPreferencesKey("default_max_chain_length")
     val SAVE_NEAR_MISS = booleanPreferencesKey("save_near_miss")
     val MAX_FILE_SIZE_BYTES = longPreferencesKey("max_file_size_bytes")
+    // Phase 2
+    val ENABLED_TRANSFORMS = stringPreferencesKey("enabled_transforms") // comma-separated ids; empty = all
+    val ALLOW_CHAIN_LENGTH_4 = booleanPreferencesKey("allow_chain_length_4")
 }
 
 data class CollideSettings(
@@ -26,12 +30,18 @@ data class CollideSettings(
     val defaultMaxCandidates: Int = RunMode.BALANCED.maxCandidates,
     val defaultMaxChainLength: Int = RunMode.BALANCED.maxChainLength,
     val saveNearMiss: Boolean = false,
-    val maxFileSizeBytes: Long = 2 * 1024 * 1024L // 2 MB default
+    val maxFileSizeBytes: Long = 2 * 1024 * 1024L,
+    val enabledTransformIds: Set<String> = emptySet(),   // empty = all enabled
+    val allowChainLength4: Boolean = false
 )
 
 class CollideSettingsStore(private val context: Context) {
 
     val settings: Flow<CollideSettings> = context.dataStore.data.map { prefs ->
+        val enabledRaw = prefs[CollideSettingsKeys.ENABLED_TRANSFORMS] ?: ""
+        val enabled = if (enabledRaw.isBlank()) emptySet()
+                      else enabledRaw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
         CollideSettings(
             defaultBaseline = prefs[CollideSettingsKeys.DEFAULT_BASELINE]
                 ?.let { BaselineStrategy.valueOf(it) } ?: BaselineStrategy.RAW_DEFLATE,
@@ -42,7 +52,9 @@ class CollideSettingsStore(private val context: Context) {
             defaultMaxChainLength = prefs[CollideSettingsKeys.DEFAULT_MAX_CHAIN_LENGTH]
                 ?: RunMode.BALANCED.maxChainLength,
             saveNearMiss = prefs[CollideSettingsKeys.SAVE_NEAR_MISS] ?: false,
-            maxFileSizeBytes = prefs[CollideSettingsKeys.MAX_FILE_SIZE_BYTES] ?: (2 * 1024 * 1024L)
+            maxFileSizeBytes = prefs[CollideSettingsKeys.MAX_FILE_SIZE_BYTES] ?: (2 * 1024 * 1024L),
+            enabledTransformIds = enabled,
+            allowChainLength4 = prefs[CollideSettingsKeys.ALLOW_CHAIN_LENGTH_4] ?: false
         )
     }
 
@@ -68,5 +80,15 @@ class CollideSettingsStore(private val context: Context) {
 
     suspend fun updateMaxFileSize(bytes: Long) {
         context.dataStore.edit { it[CollideSettingsKeys.MAX_FILE_SIZE_BYTES] = bytes }
+    }
+
+    suspend fun updateEnabledTransforms(ids: Set<String>) {
+        context.dataStore.edit {
+            it[CollideSettingsKeys.ENABLED_TRANSFORMS] = ids.joinToString(",")
+        }
+    }
+
+    suspend fun updateAllowChainLength4(allow: Boolean) {
+        context.dataStore.edit { it[CollideSettingsKeys.ALLOW_CHAIN_LENGTH_4] = allow }
     }
 }

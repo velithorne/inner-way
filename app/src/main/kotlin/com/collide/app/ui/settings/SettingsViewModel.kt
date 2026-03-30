@@ -19,34 +19,17 @@ class SettingsViewModel(private val store: CollideSettingsStore) : ViewModel() {
         initialValue = CollideSettings()
     )
 
-    fun setBaseline(strategy: BaselineStrategy) {
-        viewModelScope.launch { store.updateBaseline(strategy) }
-    }
-
-    fun setRunMode(mode: RunMode) {
-        viewModelScope.launch { store.updateRunMode(mode) }
-    }
-
-    fun setMaxCandidates(max: Int) {
-        viewModelScope.launch { store.updateMaxCandidates(max) }
-    }
-
-    fun setMaxChainLength(max: Int) {
-        viewModelScope.launch { store.updateMaxChainLength(max.coerceIn(1, 3)) }
-    }
-
-    fun setSaveNearMiss(save: Boolean) {
-        viewModelScope.launch { store.updateSaveNearMiss(save) }
-    }
-
-    fun setMaxFileSize(bytes: Long) {
-        viewModelScope.launch { store.updateMaxFileSize(bytes) }
-    }
+    fun setBaseline(s: BaselineStrategy) = viewModelScope.launch { store.updateBaseline(s) }
+    fun setRunMode(m: RunMode) = viewModelScope.launch { store.updateRunMode(m) }
+    fun setMaxCandidates(max: Int) = viewModelScope.launch { store.updateMaxCandidates(max) }
+    fun setMaxChainLength(max: Int) = viewModelScope.launch { store.updateMaxChainLength(max.coerceIn(1, 4)) }
+    fun setSaveNearMiss(save: Boolean) = viewModelScope.launch { store.updateSaveNearMiss(save) }
+    fun setMaxFileSize(bytes: Long) = viewModelScope.launch { store.updateMaxFileSize(bytes) }
+    fun setEnabledTransforms(ids: Set<String>) = viewModelScope.launch { store.updateEnabledTransforms(ids) }
+    fun setAllowChainLength4(allow: Boolean) = viewModelScope.launch { store.updateAllowChainLength4(allow) }
 
     class Factory(private val store: CollideSettingsStore) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SettingsViewModel(store) as T
-        }
+        override fun <T : ViewModel> create(modelClass: Class<T>) = SettingsViewModel(store) as T
     }
 }

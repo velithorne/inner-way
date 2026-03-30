@@ -16,6 +16,7 @@ data class RunProgress(
     val candidatesPruned: Int = 0,
     val candidatesEvaluated: Int = 0,
     val exactnessFailures: Int = 0,
+    val hashMismatches: Int = 0,
     val noGainResults: Int = 0,
     val winnersFound: Int = 0,
     val bestSizeSoFar: Long = Long.MAX_VALUE,
@@ -32,15 +33,18 @@ enum class RunStatus {
 data class RunResult(
     val stats: RunStats,
     val winners: List<SavedEvent>,
-    val baselineResult: BaselineResult
+    val baselineResult: BaselineResult,
+    val allResults: List<CandidateResult> = emptyList()
 )
 
 class CompressionColliderEngine(
-    private val generator: CandidateGenerator = CandidateGenerator(),
-    private val evaluator: CandidateEvaluator = CandidateEvaluator(),
-    private val baselineEvaluator: BaselineEvaluator = BaselineEvaluator(),
-    private val eventRecorder: EventRecorder = EventRecorder()
+    private val enabledTransformIds: Set<String> = emptySet()
 ) {
+    private val generator = CandidateGenerator(enabledTransformIds)
+    private val evaluator = CandidateEvaluator(enabledTransformIds)
+    private val baselineEvaluator = BaselineEvaluator()
+    private val eventRecorder = EventRecorder()
+
     private val _progress = MutableStateFlow(RunProgress())
     val progress: StateFlow<RunProgress> = _progress
 
@@ -53,30 +57,31 @@ class CompressionColliderEngine(
     ): RunResult {
         val startTime = System.currentTimeMillis()
 
-        _progress.value = RunProgress(
-            fileName = input.fileName,
-            status = RunStatus.RUNNING,
-            baselineSize = 0L
-        )
+        _progress.value = RunProgress(fileName = input.fileName, status = RunStatus.RUNNING)
 
-        // Compute baseline
         val baseline = baselineEvaluator.evaluate(input.bytes, baselineStrategy)
-
         _progress.value = _progress.value.copy(baselineSize = baseline.encodedSize)
 
-        // Generate candidates
         val candidates = generator.generate(runMode, maxCandidatesOverride, maxChainLengthOverride)
-
         _progress.value = _progress.value.copy(
             candidatesGenerated = candidates.size,
             baselineSize = baseline.encodedSize
         )
 
+        val runConfig = RunConfigSnapshot(
+            runMode = runMode.name,
+            baselineStrategy = baselineStrategy.name,
+            maxCandidates = maxCandidatesOverride ?: runMode.maxCandidates,
+            maxChainLength = maxChainLengthOverride ?: runMode.maxChainLength,
+            enabledTransformIds = enabledTransformIds.toList().sorted()
+        )
+
         var stats = RunStats(candidatesSeen = candidates.size)
         val winners = mutableListOf<SavedEvent>()
+        val allResults = mutableListOf<CandidateResult>()
         var bestSize = baseline.encodedSize
 
-        for (recipe in candidates) {
+        for ((idx, recipe) in candidates.withIndex()) {
             if (!coroutineContext.isActive) {
                 _progress.value = _progress.value.copy(
                     status = RunStatus.CANCELLED,
@@ -90,14 +95,13 @@ class CompressionColliderEngine(
                 elapsedMs = System.currentTimeMillis() - startTime
             )
 
-            val result = evaluator.evaluate(input.bytes, recipe, baseline.encodedSize)
+            val result = evaluator.evaluate(input.bytes, recipe, baseline.encodedSize, idx)
             stats = stats.withResult(result)
+            allResults.add(result)
 
             if (result.isWinner) {
-                if (result.encodedSize < bestSize) {
-                    bestSize = result.encodedSize
-                }
-                val event = eventRecorder.maybeCreateEvent(result, input, baseline)
+                if (result.encodedSize < bestSize) bestSize = result.encodedSize
+                val event = eventRecorder.maybeCreateEvent(result, input, baseline, runConfig)
                 if (event != null) winners.add(event)
             }
 
@@ -105,6 +109,7 @@ class CompressionColliderEngine(
                 candidatesPruned = stats.candidatesPrunedPreEval,
                 candidatesEvaluated = stats.candidatesEvaluated,
                 exactnessFailures = stats.exactnessFailures,
+                hashMismatches = stats.hashMismatches,
                 noGainResults = stats.noGainCount,
                 winnersFound = stats.strictWinnerCount,
                 bestSizeSoFar = bestSize,
@@ -116,13 +121,10 @@ class CompressionColliderEngine(
         val finalStats = stats.copy(elapsedMs = finalElapsed)
 
         if (_progress.value.status == RunStatus.RUNNING) {
-            _progress.value = _progress.value.copy(
-                status = RunStatus.COMPLETED,
-                elapsedMs = finalElapsed
-            )
+            _progress.value = _progress.value.copy(status = RunStatus.COMPLETED, elapsedMs = finalElapsed)
         }
 
-        return RunResult(finalStats, winners, baseline)
+        return RunResult(finalStats, winners, baseline, allResults)
     }
 
     fun resetProgress() {

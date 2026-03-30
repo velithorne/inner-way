@@ -17,5 +17,13 @@ data class RunSummaryEntity(
     val exactnessFailures: Int,
     val noGainCount: Int,
     val winnerCount: Int,
-    val elapsedMs: Long
+    val elapsedMs: Long,
+    // Phase 2 additions
+    val hashMismatches: Int = 0,
+    val encodeErrors: Int = 0,
+    val decodeErrors: Int = 0,
+    val metadataAccountingFailures: Int = 0,
+    val baselineSize: Long = 0L,
+    val bestWinnerSize: Long = 0L,
+    val engineVersion: String = "1.0.0-phase1"
 )
