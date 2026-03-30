@@ -1,0 +1,23 @@
+data class Item(val id: String, val name: String, val value: Float, val category: String)
+
+fun filterActiveItems(items: List<Item>): List<Item> {
+    return items.filter { it.value > 0f }
+}
+
+fun groupByCategory(items: List<Item>): Map<String, List<Item>> {
+    return items.groupBy { it.category }
+}
+
+fun computeTotal(items: List<Item>): Float {
+    return items.fold(0f) { acc, item -> acc + item.value }
+}
+
+fun topItems(items: List<Item>, limit: Int): List<Item> {
+    return items.sortedByDescending { it.value }.take(limit)
+}
+
+fun transformPipeline(raw: List<Item>): Map<String, Float> {
+    return filterActiveItems(raw)
+        .groupBy { it.category }
+        .mapValues { (_, grouped) -> computeTotal(grouped) }
+}

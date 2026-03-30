@@ -1,0 +1,37 @@
+ALGORITHM: ProcessOrder
+INPUT: order_id, user_id, items
+OUTPUT: confirmation_number, status
+
+BEGIN
+    STEP 1: Validate inputs
+        IF order_id is empty THEN
+            RETURN error("Missing order ID")
+        END IF
+        IF items is empty THEN
+            RETURN error("No items in order")
+        END IF
+
+    STEP 2: Calculate total
+        total = 0
+        FOR EACH item IN items
+            total = total + (item.price * item.quantity)
+        END FOR
+        
+    STEP 3: Apply discounts
+        IF total > 100 THEN
+            discount = total * 0.1
+            total = total - discount
+        END IF
+
+    STEP 4: Process payment
+        IF user.balance >= total THEN
+            user.balance = user.balance - total
+            payment_status = "success"
+        ELSE
+            RETURN error("Insufficient funds")
+        END IF
+
+    STEP 5: Generate confirmation
+        confirmation_number = generate_id()
+        RETURN confirmation_number, payment_status
+END
