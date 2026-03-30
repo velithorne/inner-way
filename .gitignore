@@ -1,0 +1,27 @@
+# Gradle
+*.iml
+.gradle
+/local.properties
+.idea/
+/.idea
+.DS_Store
+/build
+/captures
+/collide/.gradle/
+/collide/app/build/
+/collide/build/
+*.keystore
+!debug.keystore
+*.class
+*.jar
+*.aar
+*.ap_
+*.aab
+gen/
+out/
+release/
+proguard/
+retrofit2/
+.externalNativeBuild
+.cxx
+local.properties

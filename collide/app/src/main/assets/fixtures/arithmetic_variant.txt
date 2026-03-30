@@ -1,0 +1,20 @@
+// Variant of arithmetic — same logical shape, different naming
+def sum_two(x, y):
+    return x + y
+
+def difference(x, y):
+    return x - y
+
+def product(x, y):
+    return x * y
+
+def quotient(x, y):
+    if y == 0:
+        return None
+    return x / y
+
+def power_of_two(n):
+    return n * n
+
+def check_even(num):
+    return num % 2 == 0

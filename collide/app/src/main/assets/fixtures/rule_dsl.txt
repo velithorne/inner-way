@@ -1,0 +1,24 @@
+RULE: AuthorizeTransaction
+CONDITION: user.role == "admin" AND transaction.amount < 10000
+ACTION: APPROVE transaction
+PRIORITY: 1
+
+RULE: BlockSuspiciousActivity
+CONDITION: transaction.attempts > 3 AND transaction.time_diff < 60
+ACTION: BLOCK user AND LOG "suspicious_activity"
+PRIORITY: 10
+
+RULE: ApplyLoyaltyDiscount
+CONDITION: user.orders_count >= 10 AND item.category != "restricted"
+ACTION: APPLY discount(0.15) TO transaction
+PRIORITY: 5
+
+RULE: FlagHighValue
+CONDITION: transaction.amount >= 5000
+ACTION: REQUIRE second_approval FROM manager
+PRIORITY: 8
+
+RULE: DefaultApproval
+CONDITION: transaction.valid == true AND user.active == true
+ACTION: APPROVE transaction
+PRIORITY: 0

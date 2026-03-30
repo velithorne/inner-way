@@ -1,0 +1,30 @@
+struct Point {
+    int x;
+    int y;
+};
+
+struct Rectangle {
+    struct Point origin;
+    int width;
+    int height;
+};
+
+int area(struct Rectangle rect) {
+    return rect.width * rect.height;
+}
+
+int perimeter(struct Rectangle rect) {
+    return 2 * (rect.width + rect.height);
+}
+
+int contains(struct Rectangle rect, struct Point p) {
+    return p.x >= rect.origin.x &&
+           p.x <= rect.origin.x + rect.width &&
+           p.y >= rect.origin.y &&
+           p.y <= rect.origin.y + rect.height;
+}
+
+void scale(struct Rectangle* rect, float factor) {
+    rect->width = (int)(rect->width * factor);
+    rect->height = (int)(rect->height * factor);
+}

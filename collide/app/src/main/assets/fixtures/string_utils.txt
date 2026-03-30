@@ -1,0 +1,26 @@
+function reverseString(str) {
+    return str.split('').reverse().join('');
+}
+
+function countVowels(str) {
+    const vowels = 'aeiouAEIOU';
+    let count = 0;
+    for (let i = 0; i < str.length; i++) {
+        if (vowels.includes(str[i])) {
+            count++;
+        }
+    }
+    return count;
+}
+
+function isPalindrome(str) {
+    const cleaned = str.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleaned === reverseString(cleaned);
+}
+
+function truncate(str, maxLen) {
+    if (str.length <= maxLen) {
+        return str;
+    }
+    return str.substring(0, maxLen) + '...';
+}
