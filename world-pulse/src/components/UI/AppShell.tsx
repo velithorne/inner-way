@@ -17,36 +17,35 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      {/* Full-screen 3D Canvas */}
       <div className="canvas-container">
         <GlobeScene />
       </div>
 
-      {/* Top header */}
+      {/* Top header — feather-weight */}
       <motion.header
         className="app-header"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.2, delay: 0.3, ease: 'easeOut' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.6, delay: 0.4, ease: 'easeOut' }}
       >
         <div className="logo-area">
           <span className="logo-text">WORLD PULSE</span>
-          <span className="logo-sub">PLANETARY CONSCIOUSNESS INTERFACE</span>
+          <span className="logo-sub">Planetary Consciousness</span>
         </div>
         <LiveStatusBadge />
       </motion.header>
 
-      {/* Bottom panel */}
+      {/* Bottom command dock */}
       <motion.div
         className="bottom-panel"
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.0, delay: 0.6, ease: 'easeOut' }}
+        transition={{ duration: 1.0, delay: 0.7, ease: 'easeOut' }}
       >
         <SubmissionPanel />
       </motion.div>
 
-      {/* Debug panel - bottom right */}
+      {/* Debug — bottom-left icon */}
       <div className="debug-anchor">
         <DebugControls />
       </div>

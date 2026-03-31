@@ -18,33 +18,32 @@ export function EmotionSelector() {
             onClick={() => setSelectedEmotion(isSelected ? null : (emotion.key as EmotionKey))}
             animate={{
               boxShadow: isSelected
-                ? `0 0 18px 4px ${hexWithAlpha(emotion.color, 0.55)}, 0 0 6px 1px ${hexWithAlpha(emotion.color, 0.3)}`
-                : `0 0 0px 0px ${hexWithAlpha(emotion.color, 0)}`,
-              borderColor: isSelected ? emotion.color : 'rgba(255,255,255,0.1)',
+                ? `0 0 14px 3px ${hexWithAlpha(emotion.color, 0.45)}`
+                : 'none',
+              borderColor: isSelected ? emotion.color : 'rgba(255,255,255,0.08)',
               backgroundColor: isSelected
-                ? hexWithAlpha(emotion.color, 0.18)
-                : 'rgba(255,255,255,0.04)',
-              color: isSelected ? emotion.color : 'rgba(255,255,255,0.6)',
+                ? hexWithAlpha(emotion.color, 0.15)
+                : 'rgba(255,255,255,0.03)',
+              color: isSelected ? emotion.color : 'rgba(255,255,255,0.5)',
             }}
             whileHover={{
-              borderColor: hexWithAlpha(emotion.color, 0.7),
-              backgroundColor: hexWithAlpha(emotion.color, 0.1),
+              borderColor: hexWithAlpha(emotion.color, 0.55),
+              backgroundColor: hexWithAlpha(emotion.color, 0.08),
               color: emotion.color,
               scale: 1.04,
             }}
-            whileTap={{ scale: 0.96 }}
-            transition={{ duration: 0.2 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.15 }}
             style={{
               border: '1px solid',
               borderRadius: '4px',
-              padding: '8px 14px',
-              fontSize: '12px',
+              padding: '6px 11px',
+              fontSize: '10px',
               fontWeight: 500,
-              letterSpacing: '0.08em',
+              letterSpacing: '0.09em',
               textTransform: 'uppercase',
               cursor: 'pointer',
               background: 'transparent',
-              transition: 'all 0.2s',
             }}
           >
             {emotion.label}

@@ -16,24 +16,29 @@ export function DebugControls() {
   };
 
   const handleStorm = () => {
-    const burst = createBurst(12, 'urban');
-    burst.forEach(addPulse);
+    createBurst(12, 'urban').forEach(addPulse);
   };
 
   return (
     <div className="debug-container">
-      <button className="debug-toggle-btn" onClick={toggleDebug}>
-        {showDebug ? '✕ Close Debug' : '⚙ Debug'}
+      {/* Icon-only circle button */}
+      <button
+        className="debug-toggle-btn"
+        onClick={toggleDebug}
+        title="Developer controls"
+        aria-label="Toggle debug panel"
+      >
+        {showDebug ? '✕' : '⚙'}
       </button>
 
       <AnimatePresence>
         {showDebug && (
           <motion.div
             className="debug-panel glass-panel"
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.97 }}
-            transition={{ duration: 0.25 }}
+            exit={{ opacity: 0, y: 8, scale: 0.97 }}
+            transition={{ duration: 0.22 }}
           >
             <h4 className="debug-title">Mock Engine</h4>
 
@@ -41,40 +46,28 @@ export function DebugControls() {
               <label>Live Mode</label>
               <button
                 className={`debug-btn ${mockEngineSettings.enabled ? 'active' : ''}`}
-                onClick={() =>
-                  updateMockSettings({ enabled: !mockEngineSettings.enabled })
-                }
+                onClick={() => updateMockSettings({ enabled: !mockEngineSettings.enabled })}
               >
                 {mockEngineSettings.enabled ? 'ON' : 'OFF'}
               </button>
             </div>
 
             <div className="debug-row">
-              <label>Interval (ms)</label>
+              <label>Interval</label>
               <input
-                type="range"
-                min={400}
-                max={5000}
-                step={100}
+                type="range" min={400} max={5000} step={100}
                 value={mockEngineSettings.intervalMs}
-                onChange={(e) =>
-                  updateMockSettings({ intervalMs: Number(e.target.value) })
-                }
+                onChange={(e) => updateMockSettings({ intervalMs: Number(e.target.value) })}
               />
               <span>{mockEngineSettings.intervalMs}ms</span>
             </div>
 
             <div className="debug-row">
-              <label>Burst Prob.</label>
+              <label>Burst %</label>
               <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
+                type="range" min={0} max={1} step={0.05}
                 value={mockEngineSettings.burstProbability}
-                onChange={(e) =>
-                  updateMockSettings({ burstProbability: Number(e.target.value) })
-                }
+                onChange={(e) => updateMockSettings({ burstProbability: Number(e.target.value) })}
               />
               <span>{Math.round(mockEngineSettings.burstProbability * 100)}%</span>
             </div>
@@ -82,43 +75,30 @@ export function DebugControls() {
             <div className="debug-row">
               <label>Burst Size</label>
               <input
-                type="range"
-                min={1}
-                max={12}
-                step={1}
+                type="range" min={1} max={14} step={1}
                 value={mockEngineSettings.burstSize}
-                onChange={(e) =>
-                  updateMockSettings({ burstSize: Number(e.target.value) })
-                }
+                onChange={(e) => updateMockSettings({ burstSize: Number(e.target.value) })}
               />
               <span>{mockEngineSettings.burstSize}</span>
             </div>
 
             <div className="debug-row">
-              <label>Region Bias</label>
+              <label>Region</label>
               <select
                 value={mockEngineSettings.regionBias}
-                onChange={(e) =>
-                  updateMockSettings({ regionBias: e.target.value as RegionBias })
-                }
+                onChange={(e) => updateMockSettings({ regionBias: e.target.value as RegionBias })}
                 className="debug-select"
               >
                 {REGION_OPTIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
+                  <option key={r} value={r}>{r}</option>
                 ))}
               </select>
             </div>
 
-            <div className="debug-section-title">Demo Cities</div>
+            <div className="debug-section-title">Cities</div>
             <div className="city-grid">
               {DEMO_CITIES.slice(0, 8).map((city) => (
-                <button
-                  key={city.name}
-                  className="city-btn"
-                  onClick={() => handleCityPulse(city.name)}
-                >
+                <button key={city.name} className="city-btn" onClick={() => handleCityPulse(city.name)}>
                   {city.name}
                 </button>
               ))}

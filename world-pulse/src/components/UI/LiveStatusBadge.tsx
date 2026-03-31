@@ -4,31 +4,25 @@ import { useWorldPulseStore } from '../../app/store';
 export function LiveStatusBadge() {
   const { pulses, mockEngineSettings } = useWorldPulseStore();
   const isLive = mockEngineSettings.enabled;
-  const count = pulses.length;
 
   return (
     <div className="live-badge">
       <motion.div
-        className="live-dot"
         animate={{
-          opacity: isLive ? [1, 0.3, 1] : 0.3,
-          scale: isLive ? [1, 1.3, 1] : 1,
+          opacity: isLive ? [1, 0.25, 1] : 0.25,
+          scale:   isLive ? [1, 1.4, 1]  : 1,
         }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
         style={{
-          width: 6,
-          height: 6,
+          width: 5,
+          height: 5,
           borderRadius: '50%',
-          background: isLive ? '#22c55e' : '#6b7280',
+          background: isLive ? '#22c55e' : '#4b5563',
           flexShrink: 0,
         }}
       />
       <span className="live-label">
-        {isLive ? 'Simulated Live' : 'Paused'} &middot; {count} active
+        {isLive ? 'live sim' : 'paused'} · {pulses.length}
       </span>
     </div>
   );

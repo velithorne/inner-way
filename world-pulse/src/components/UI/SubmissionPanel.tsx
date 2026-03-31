@@ -12,16 +12,14 @@ export function SubmissionPanel() {
 
   const handleSubmit = () => {
     if (!selectedEmotion) return;
-
     const pulse = createUserPulse(selectedEmotion);
     addPulse(pulse);
     setSubmittedColor(emotionToHex(selectedEmotion));
     setSubmitted(true);
-
     setTimeout(() => {
       setSubmitted(false);
       setSelectedEmotion(null);
-    }, 3200);
+    }, 3000);
   };
 
   return (
@@ -30,33 +28,25 @@ export function SubmissionPanel() {
         {submitted ? (
           <motion.div
             key="confirmation"
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
             className="confirmation-state"
-            style={{
-              textAlign: 'center',
-              padding: '24px 0',
-            }}
           >
             <motion.div
-              className="pulse-dot-confirm"
-              animate={{
-                scale: [1, 1.6, 1],
-                opacity: [1, 0.5, 1],
-              }}
-              transition={{ duration: 1.4, repeat: 2 }}
+              animate={{ scale: [1, 1.7, 1], opacity: [1, 0.4, 1] }}
+              transition={{ duration: 1.3, repeat: 2 }}
               style={{
-                width: 16,
-                height: 16,
+                width: 12,
+                height: 12,
                 borderRadius: '50%',
                 background: submittedColor,
-                margin: '0 auto 16px',
-                boxShadow: `0 0 24px 8px ${submittedColor}55`,
+                margin: '0 auto 12px',
+                boxShadow: `0 0 20px 6px ${submittedColor}44`,
               }}
             />
-            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, margin: 0 }}>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, margin: 0, letterSpacing: '0.04em' }}>
               Your pulse reached the world.
             </p>
           </motion.div>
@@ -66,11 +56,9 @@ export function SubmissionPanel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
-            <p className="prompt-text">
-              One word. Right now. How does the world feel to you?
-            </p>
+            <p className="prompt-text">One word. Right now. How does the world feel?</p>
             <EmotionSelector />
             <div className="submit-row">
               <motion.button
@@ -78,18 +66,18 @@ export function SubmissionPanel() {
                 onClick={handleSubmit}
                 disabled={!selectedEmotion}
                 animate={{
-                  opacity: selectedEmotion ? 1 : 0.35,
+                  opacity: selectedEmotion ? 1 : 0.3,
                   boxShadow: selectedEmotion
-                    ? `0 0 20px 4px ${emotionToHex(selectedEmotion!)}44`
+                    ? `0 0 16px 3px ${emotionToHex(selectedEmotion!)}33`
                     : 'none',
                 }}
                 whileHover={selectedEmotion ? { scale: 1.03 } : {}}
                 whileTap={selectedEmotion ? { scale: 0.97 } : {}}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.18 }}
               >
                 Send Pulse
               </motion.button>
-              <span className="anonymous-note">Anonymous. One word. One pulse.</span>
+              <span className="anonymous-note">Anonymous · One pulse</span>
             </div>
           </motion.div>
         )}

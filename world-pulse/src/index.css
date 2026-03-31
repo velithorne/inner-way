@@ -6,13 +6,12 @@
 
 :root {
   --bg-deep: #02040a;
-  --bg-panel: rgba(6, 10, 20, 0.82);
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-glass: rgba(255, 255, 255, 0.1);
-  --text-primary: rgba(255, 255, 255, 0.9);
-  --text-secondary: rgba(255, 255, 255, 0.45);
-  --text-muted: rgba(255, 255, 255, 0.25);
-  --accent-blue: #1a6fa8;
+  --bg-panel: rgba(4, 8, 18, 0.72);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.09);
+  --text-primary: rgba(255, 255, 255, 0.88);
+  --text-secondary: rgba(255, 255, 255, 0.38);
+  --text-muted: rgba(255, 255, 255, 0.2);
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -28,7 +27,7 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Layout ─────────────────────────────────────────────── */
+/* ─── Layout ──────────────────────────────────────────────── */
 
 .app-shell {
   position: relative;
@@ -43,7 +42,7 @@ html, body, #root {
   z-index: 0;
 }
 
-/* ─── Header ─────────────────────────────────────────────── */
+/* ─── Header — minimal, feather-light ─────────────────────── */
 
 .app-header {
   position: absolute;
@@ -52,51 +51,52 @@ html, body, #root {
   right: 0;
   z-index: 10;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 28px 36px 20px;
+  padding: 22px 28px 0;
   pointer-events: none;
 }
 
 .logo-area {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  pointer-events: none;
 }
 
 .logo-text {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: rgba(255, 255, 255, 0.65);
   text-transform: uppercase;
 }
 
 .logo-sub {
-  font-size: 9px;
-  letter-spacing: 0.18em;
+  font-size: 8px;
+  letter-spacing: 0.16em;
   color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 400;
 }
 
-/* ─── Live Badge ─────────────────────────────────────────── */
+/* ─── Live Badge — small pill ─────────────────────────────── */
 
 .live-badge {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 4px 9px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-subtle);
   pointer-events: auto;
 }
 
 .live-label {
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.1em;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   text-transform: uppercase;
   font-family: var(--font-mono);
 }
@@ -106,45 +106,45 @@ html, body, #root {
 .glass-panel {
   background: var(--bg-panel);
   border: 1px solid var(--border-glass);
-  border-radius: 12px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  border-radius: 14px;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
 }
 
-/* ─── Bottom Panel ─────────────────────────────────────────── */
+/* ─── Bottom Dock — compact command strip ─────────────────── */
 
 .bottom-panel {
   position: absolute;
-  bottom: 32px;
+  bottom: 28px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  width: min(580px, calc(100vw - 40px));
+  width: min(520px, calc(100vw - 32px));
 }
 
 .submission-panel {
-  padding: 28px 30px 24px;
+  padding: 16px 20px 14px;
 }
 
-/* ─── Prompt ─────────────────────────────────────────────── */
+/* ─── Prompt ──────────────────────────────────────────────── */
 
 .prompt-text {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-secondary);
-  letter-spacing: 0.03em;
-  line-height: 1.5;
-  margin-bottom: 20px;
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  margin-bottom: 12px;
   text-align: center;
 }
 
-/* ─── Emotion Grid ─────────────────────────────────────────── */
+/* ─── Emotion Grid ────────────────────────────────────────── */
 
 .emotion-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 5px;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .emotion-chip {
@@ -152,128 +152,139 @@ html, body, #root {
   cursor: pointer;
 }
 
-/* ─── Submit Row ─────────────────────────────────────────── */
+/* ─── Submit Row ──────────────────────────────────────────── */
 
 .submit-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   justify-content: center;
-  flex-wrap: wrap;
 }
 
 .submit-btn {
-  padding: 11px 32px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--text-primary);
-  font-size: 12px;
+  padding: 8px 26px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
   font-family: var(--font-mono);
   transition: background 0.2s;
+  white-space: nowrap;
 }
 
-.submit-btn:disabled {
-  cursor: default;
-}
+.submit-btn:disabled { cursor: default; }
 
 .submit-btn:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .anonymous-note {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   font-family: var(--font-mono);
+  opacity: 0.7;
 }
 
-/* ─── Debug ─────────────────────────────────────────────── */
+/* ─── Confirmation state ──────────────────────────────────── */
+
+.confirmation-state {
+  text-align: center;
+  padding: 16px 0 12px;
+}
+
+/* ─── Debug — icon-only toggle, bottom-left ───────────────── */
 
 .debug-anchor {
   position: absolute;
   bottom: 28px;
-  right: 28px;
+  left: 28px;
   z-index: 20;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
 }
 
 .debug-container {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
 }
 
+/* Icon-only circle, 32×32 */
 .debug-toggle-btn {
-  padding: 6px 14px;
-  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   color: var(--text-muted);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s;
+  padding: 0;
 }
 
 .debug-toggle-btn:hover {
-  border-color: var(--border-glass);
+  border-color: rgba(255, 255, 255, 0.14);
   color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .debug-panel {
-  padding: 18px 20px;
-  width: 280px;
+  padding: 16px 18px;
+  width: 268px;
 }
 
 .debug-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.15em;
   color: var(--text-secondary);
   text-transform: uppercase;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   font-family: var(--font-mono);
 }
 
 .debug-section-title {
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--text-muted);
   text-transform: uppercase;
-  margin: 14px 0 8px;
+  margin: 12px 0 6px;
   font-family: var(--font-mono);
 }
 
 .debug-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 9px;
 }
 
 .debug-row label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-secondary);
-  letter-spacing: 0.08em;
-  min-width: 80px;
+  letter-spacing: 0.07em;
+  min-width: 76px;
   font-family: var(--font-mono);
 }
 
 .debug-row span {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
-  min-width: 40px;
+  min-width: 38px;
   text-align: right;
   font-family: var(--font-mono);
 }
@@ -287,49 +298,49 @@ html, body, #root {
 
 .debug-select {
   flex: 1;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-subtle);
   border-radius: 3px;
   color: var(--text-secondary);
-  font-size: 10px;
-  padding: 3px 6px;
+  font-size: 9px;
+  padding: 2px 5px;
   cursor: pointer;
   font-family: var(--font-mono);
 }
 
 .debug-btn {
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 3px;
   border: 1px solid var(--border-subtle);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 9px;
   cursor: pointer;
   font-family: var(--font-mono);
   transition: all 0.2s;
 }
 
 .debug-btn.active {
-  background: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
   color: #22c55e;
 }
 
 .city-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 12px;
+  gap: 4px;
+  margin-bottom: 10px;
 }
 
 .city-btn {
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 3px;
   border: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
   color: var(--text-muted);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
   cursor: pointer;
   font-family: var(--font-mono);
   transition: all 0.2s;
@@ -342,12 +353,12 @@ html, body, #root {
 
 .storm-btn {
   width: 100%;
-  padding: 8px;
+  padding: 7px;
   border-radius: 4px;
-  border: 1px solid rgba(251, 191, 36, 0.25);
-  background: rgba(251, 191, 36, 0.06);
-  color: rgba(251, 191, 36, 0.7);
-  font-size: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: rgba(251, 191, 36, 0.05);
+  color: rgba(251, 191, 36, 0.65);
+  font-size: 9px;
   letter-spacing: 0.12em;
   cursor: pointer;
   font-family: var(--font-mono);
@@ -356,109 +367,112 @@ html, body, #root {
 }
 
 .storm-btn:hover {
-  background: rgba(251, 191, 36, 0.12);
-  border-color: rgba(251, 191, 36, 0.4);
-  color: rgba(251, 191, 36, 0.9);
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.38);
+  color: rgba(251, 191, 36, 0.88);
 }
 
-/* ─── Scrollbar ─────────────────────────────────────────── */
+/* ─── Scrollbar ───────────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 4px;
-}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 2px; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-/* ─── Responsive / Mobile ────────────────────────────────── */
+/* ─── Mobile — compact dock layout ───────────────────────── */
 
 @media (max-width: 640px) {
   .app-header {
-    padding: env(safe-area-inset-top, 14px) 20px 14px;
-    padding-top: max(env(safe-area-inset-top), 14px);
+    padding: max(env(safe-area-inset-top), 16px) 18px 0;
+  }
+
+  .logo-text {
+    font-size: 11px;
+    letter-spacing: 0.22em;
   }
 
   .logo-sub {
     display: none;
   }
 
-  .logo-text {
-    font-size: 14px;
-  }
-
+  /* Dock anchors to the bottom edge, full-width, borderless top corners */
   .bottom-panel {
     bottom: 0;
     left: 0;
     right: 0;
     transform: none;
     width: 100%;
-    border-radius: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .submission-panel {
-    padding: 18px 16px;
-    padding-bottom: max(env(safe-area-inset-bottom), 18px);
-    border-radius: 16px 16px 0 0;
-  }
-
-  .emotion-grid {
-    gap: 6px;
-  }
-
-  .emotion-chip {
-    padding: 10px 12px !important;
-    font-size: 11px !important;
-    min-height: 40px;
-  }
-
-  .submit-btn {
-    padding: 14px 28px;
-    font-size: 13px;
-    min-height: 48px;
+    padding: 14px 16px max(env(safe-area-inset-bottom), 16px);
+    border-radius: 14px 14px 0 0;
   }
 
   .prompt-text {
-    font-size: 12px;
-    margin-bottom: 14px;
+    font-size: 10.5px;
+    margin-bottom: 10px;
   }
 
+  .emotion-grid {
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .emotion-chip {
+    padding: 7px 10px !important;
+    font-size: 10px !important;
+    min-height: 36px;
+  }
+
+  .submit-row {
+    gap: 10px;
+  }
+
+  .submit-btn {
+    padding: 9px 22px;
+    font-size: 10px;
+    min-height: 40px;
+  }
+
+  .anonymous-note {
+    font-size: 8.5px;
+  }
+
+  /* Debug anchor — above the bottom dock */
   .debug-anchor {
-    bottom: max(env(safe-area-inset-bottom), 12px);
-    right: 16px;
-    /* Push above the bottom panel */
-    bottom: calc(max(env(safe-area-inset-bottom), 0px) + 260px);
+    bottom: calc(max(env(safe-area-inset-bottom), 0px) + 180px);
+    left: 16px;
   }
 
   .debug-panel {
     width: calc(100vw - 32px);
-    max-width: 280px;
+    max-width: 268px;
+    max-height: 55vh;
+    overflow-y: auto;
   }
 }
 
-/* ─── Touch / Pointer ───────────────────────────────────── */
+/* ─── Touch pointer — 44px minimum targets ───────────────── */
 
 @media (pointer: coarse) {
   .emotion-chip {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .submit-btn {
-    min-height: 52px;
+    min-height: 44px;
   }
 
   .city-btn {
-    min-height: 36px;
-    padding: 6px 12px !important;
+    min-height: 34px;
+    padding: 5px 10px !important;
   }
 
-  /* Prevent tap highlight on mobile */
+  .debug-toggle-btn {
+    width: 40px;
+    height: 40px;
+  }
+
   button {
     -webkit-tap-highlight-color: transparent;
   }
