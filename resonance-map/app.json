@@ -2,7 +2,7 @@
   "expo": {
     "name": "The Resonance Map",
     "slug": "resonance-map",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,8 +15,11 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.resonancemap.app",
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Location is used to record GPS coordinates when magnetic anomalies are detected.",
+        "NSLocationWhenInUseUsageDescription": "Location is used to show your position on the field map and record GPS coordinates when anomalies are detected.",
         "NSMotionUsageDescription": "Motion sensor data is used for magnetometer readings and field visualization.",
         "NSCameraUsageDescription": "The camera is used as a live viewfinder for AR electromagnetic field overlay."
       }
@@ -28,6 +31,11 @@
       },
       "edgeToEdgeEnabled": false,
       "package": "com.resonancemap.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      },
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -43,7 +51,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Location is used to record GPS coordinates when magnetic anomalies are detected."
+          "locationWhenInUsePermission": "Location is used to show your position on the field map and record GPS coordinates when anomalies are detected."
         }
       ],
       [

@@ -16,6 +16,7 @@ import Animated, {
 
 import FieldScreen from './src/screens/FieldScreen';
 import ARFieldScreen from './src/screens/ARFieldScreen';
+import MapScreen from './src/screens/MapScreen';
 import CalibrationScreen from './src/screens/CalibrationScreen';
 import AnomalyLogScreen from './src/screens/AnomalyLogScreen';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from './src/constants/theme';
@@ -47,7 +48,7 @@ function TabBar({ state, descriptors, navigation }: any) {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
         const label = options.tabBarLabel ?? route.name;
-        const icon = route.name === 'Field' ? '◈' : '◉';
+        const icon = route.name === 'Field' ? '◈' : route.name === 'AR' ? '◉' : '◆';
 
         const opacity = useSharedValue(isFocused ? 1 : 0.45);
         useEffect(() => {
@@ -143,6 +144,11 @@ function MainTabs() {
         name="AR"
         component={ARFieldScreen}
         options={{ tabBarLabel: 'AR' }}
+      />
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{ tabBarLabel: 'MAP' }}
       />
     </Tab.Navigator>
   );
