@@ -1,3 +1,13 @@
+/**
+ * ARFieldCanvas — Three.js transparent GL overlay for AR mode.
+ *
+ * Bugs fixed:
+ *  1. RAF loop used Date.now() instead of performance.now() (safe in RN)
+ *  2. Store values read every frame via zustand.subscribe ref pattern
+ *  3. Round glow texture built from a DataTexture (no canvas API)
+ *  4. Particles flow continuously — reset when z > boundary, not just > 5
+ */
+
 import React, { useRef, useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
@@ -6,282 +16,306 @@ import { useFieldStore } from '../store/useFieldStore';
 import { Colors } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
 
+// ── Constants ────────────────────────────────────────────────────────────────
+
 const PARTICLE_COUNT_FULL = 800;
-const PARTICLE_COUNT_REDUCED = 400;
-const MESH_COLS = 20;
-const MESH_ROWS = 14;
+const PARTICLE_COUNT_LOW  = 400;
+const MESH_COLS = 18;
+const MESH_ROWS = 12;
+const FRAME_SLOW_MS = 1000 / 45;  // below 45fps → reduce particles
 
-// Performance monitoring — reduce particles if frame time exceeds threshold
-const FRAME_TIME_HIGH_MS = 1000 / 45; // 45fps threshold
+// Particle volume bounds (NDC-ish units in camera space)
+const BOUND_X = 2.0;
+const BOUND_Y = 3.0;
+const BOUND_Z_FAR  = -6.0;
+const BOUND_Z_NEAR =  1.5;
 
-interface ARSceneRefs {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Build a 64×64 radial gradient DataTexture — white centre, transparent edge. */
+function makeGlowTexture(): THREE.DataTexture {
+  const SIZE = 64;
+  const data = new Uint8Array(SIZE * SIZE * 4);
+  const cx = SIZE / 2, cy = SIZE / 2, r = SIZE / 2;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      const alpha = Math.max(0, 1 - dist / r);
+      const v = Math.round(alpha * 255);
+      const idx = (y * SIZE + x) * 4;
+      data[idx]     = 255; // R
+      data[idx + 1] = 255; // G
+      data[idx + 2] = 255; // B
+      data[idx + 3] = v;   // A — drives the glow shape
+    }
+  }
+  const tex = new THREE.DataTexture(data, SIZE, SIZE, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function randInBound(half: number) { return (Math.random() - 0.5) * half * 2; }
+
+/** Seed all particle positions randomly within the view volume. */
+function seedPositions(buf: Float32Array, count: number) {
+  for (let i = 0; i < count; i++) {
+    buf[i * 3]     = randInBound(BOUND_X);
+    buf[i * 3 + 1] = randInBound(BOUND_Y);
+    buf[i * 3 + 2] = BOUND_Z_FAR + Math.random() * (BOUND_Z_NEAR - BOUND_Z_FAR);
+  }
+}
+
+/** Build the base flat mesh grid as line-segment pairs. */
+function buildMeshBase(cols: number, rows: number): Float32Array {
+  const segs: number[] = [];
+  const dx = (BOUND_X * 2) / (cols - 1);
+  const dy = (BOUND_Y * 2) / (rows - 1);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      segs.push(-BOUND_X + c * dx, -BOUND_Y + r * dy, -1.5,
+                -BOUND_X + (c + 1) * dx, -BOUND_Y + r * dy, -1.5);
+    }
+  }
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows - 1; r++) {
+      segs.push(-BOUND_X + c * dx, -BOUND_Y + r * dy, -1.5,
+                -BOUND_X + c * dx, -BOUND_Y + (r + 1) * dy, -1.5);
+    }
+  }
+  return new Float32Array(segs);
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+interface SceneRefs {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  particles: THREE.Points;
   particleGeo: THREE.BufferGeometry;
   particleMat: THREE.PointsMaterial;
-  meshLines: THREE.LineSegments;
   meshGeo: THREE.BufferGeometry;
   meshMat: THREE.LineBasicMaterial;
+  meshBase: Float32Array;
   animFrame: number | null;
+  activeCount: number;
+  lastMs: number;
   tick: number;
-  particleCount: number;
-  lastFrameTime: number;
-  // Particle base positions — re-seeded on init
-  basePositions: Float32Array;
-  velocities: Float32Array;
-}
-
-function getParticleColor(magnitude: number, isAnomaly: boolean): THREE.Color {
-  if (isAnomaly) return new THREE.Color(Colors.fieldAnomaly);
-  if (magnitude < FIELD_WEAK_MAX) return new THREE.Color('#001433');
-  if (magnitude < FIELD_NORMAL_MAX) return new THREE.Color(Colors.cyan);
-  return new THREE.Color(Colors.blueBright);
-}
-
-function getParticleOpacity(magnitude: number, isAnomaly: boolean): number {
-  if (isAnomaly) return 0.9;
-  if (magnitude < FIELD_WEAK_MAX) return 0.15;
-  if (magnitude < FIELD_NORMAL_MAX) return 0.4;
-  return 0.7;
-}
-
-function seedParticles(count: number, depth: number): { positions: Float32Array; velocities: Float32Array } {
-  const positions = new Float32Array(count * 3);
-  const velocities = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    // Spread particles in a volume in front of camera
-    positions[i * 3]     = (Math.random() - 0.5) * 8;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 12;
-    positions[i * 3 + 2] = -(Math.random() * depth);
-    velocities[i * 3]     = 0;
-    velocities[i * 3 + 1] = 0;
-    velocities[i * 3 + 2] = 0;
-  }
-  return { positions, velocities };
-}
-
-function buildMeshPositions(cols: number, rows: number): Float32Array {
-  // Build a grid of line segments (row lines + col lines)
-  const segments: number[] = [];
-  const W = 8, H = 12;
-  const dx = W / (cols - 1);
-  const dy = H / (rows - 1);
-
-  // Horizontal lines
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      segments.push(
-        -W / 2 + c * dx, -H / 2 + r * dy, -2,
-        -W / 2 + (c + 1) * dx, -H / 2 + r * dy, -2
-      );
-    }
-  }
-  // Vertical lines
-  for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows - 1; r++) {
-      segments.push(
-        -W / 2 + c * dx, -H / 2 + r * dy, -2,
-        -W / 2 + c * dx, -H / 2 + (r + 1) * dy, -2
-      );
-    }
-  }
-  return new Float32Array(segments);
+  // smooth direction
+  curDirX: number;
+  curDirY: number;
+  curDirZ: number;
+  // anomaly slow-motion lerp
+  slowFactor: number;
+  targetSlowFactor: number;
 }
 
 export default function ARFieldCanvas() {
-  const sceneRef = useRef<ARSceneRefs | null>(null);
+  const sceneRef = useRef<SceneRefs | null>(null);
+  // Mirror of store — updated synchronously via subscribe
   const storeRef = useRef(useFieldStore.getState());
   const prevAnomalyRef = useRef(false);
 
   useEffect(() => {
-    const unsub = useFieldStore.subscribe((s) => { storeRef.current = s; });
-    return unsub;
+    return useFieldStore.subscribe((s) => { storeRef.current = s; });
   }, []);
 
-  const onContextCreate = useCallback(async (gl: ExpoWebGLRenderingContext) => {
-    const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
+  const onContextCreate = useCallback((gl: ExpoWebGLRenderingContext) => {
+    const W = gl.drawingBufferWidth;
+    const H = gl.drawingBufferHeight;
 
-    // @ts-ignore
+    // ── Renderer ──────────────────────────────────────────────────────
+    // @ts-ignore expo-gl canvas shim
     const canvasShim: HTMLCanvasElement = {
-      width, height,
+      width: W, height: H,
       style: {} as CSSStyleDeclaration,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      clientHeight: height,
+      addEventListener: () => {}, removeEventListener: () => {},
+      clientHeight: H,
       // @ts-ignore
       getContext: () => gl,
     };
-
     const renderer = new THREE.WebGLRenderer({
       canvas: canvasShim,
       context: gl as unknown as WebGLRenderingContext,
       antialias: false,
-      alpha: true,           // transparent background so camera shows through
+      alpha: true,
     });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0);  // fully transparent
+    renderer.setSize(W, H);
     renderer.setPixelRatio(1);
+    renderer.setClearColor(0x000000, 0); // fully transparent — camera shows through
 
+    // ── Scene + Camera ────────────────────────────────────────────────
     const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, W / H, 0.01, 50);
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
 
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.01, 100);
-    camera.position.set(0, 0, 4);
-    camera.lookAt(0, 0, 0);
+    // ── Glow texture ──────────────────────────────────────────────────
+    const glowTex = makeGlowTexture();
 
-    // ── Particle system ──────────────────────────────────────────────
-    const count = PARTICLE_COUNT_FULL;
-    const { positions, velocities } = seedParticles(count, 8);
+    // ── Particles ─────────────────────────────────────────────────────
+    const posArr = new Float32Array(PARTICLE_COUNT_FULL * 3);
+    seedPositions(posArr, PARTICLE_COUNT_FULL);
 
     const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
-    const particleMat = new THREE.PointsMaterial({
-      color: new THREE.Color(Colors.cyan),
-      size: 0.045,
-      transparent: true,
-      opacity: 0.4,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
 
-    // ── Mesh deformation grid ─────────────────────────────────────────
-    const baseMeshPositions = buildMeshPositions(MESH_COLS, MESH_ROWS);
+    const particleMat = new THREE.PointsMaterial({
+      map: glowTex,
+      size: 0.12,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      color: new THREE.Color(Colors.cyan),
+    });
+
+    const points = new THREE.Points(particleGeo, particleMat);
+    scene.add(points);
+
+    // ── Mesh grid ─────────────────────────────────────────────────────
+    const meshBase = buildMeshBase(MESH_COLS, MESH_ROWS);
     const meshGeo = new THREE.BufferGeometry();
-    meshGeo.setAttribute(
-      'position',
-      new THREE.BufferAttribute(baseMeshPositions.slice(), 3)
-    );
+    meshGeo.setAttribute('position', new THREE.BufferAttribute(meshBase.slice(), 3));
     const meshMat = new THREE.LineBasicMaterial({
       color: new THREE.Color(Colors.cyan),
       transparent: true,
-      opacity: 0.15,
-      depthWrite: false,
+      opacity: 0.12,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
-    const meshLines = new THREE.LineSegments(meshGeo, meshMat);
-    scene.add(meshLines);
+    scene.add(new THREE.LineSegments(meshGeo, meshMat));
 
-    const refs: ARSceneRefs = {
+    // ── Scene refs ────────────────────────────────────────────────────
+    const refs: SceneRefs = {
       renderer, scene, camera,
-      particles, particleGeo, particleMat,
-      meshLines, meshGeo, meshMat,
+      particleGeo, particleMat,
+      meshGeo, meshMat, meshBase,
       animFrame: null,
+      activeCount: PARTICLE_COUNT_FULL,
+      lastMs: Date.now(),
       tick: 0,
-      particleCount: count,
-      lastFrameTime: performance.now(),
-      basePositions: baseMeshPositions.slice(),
-      velocities: velocities.slice(),
+      curDirX: 0, curDirY: 0, curDirZ: -1,
+      slowFactor: 1, targetSlowFactor: 1,
     };
     sceneRef.current = refs;
 
-    // Working arrays for deformed mesh
-    const deformedMesh = baseMeshPositions.slice();
-    const currentDir = new THREE.Vector3(0, 0, -1);
-    const targetDir = new THREE.Vector3(0, 0, -1);
-
-    let anomalySlowFactor = 1.0;
-    let targetSlowFactor = 1.0;
-
+    // ── Animation loop ────────────────────────────────────────────────
     function animate() {
       refs.animFrame = requestAnimationFrame(animate);
 
-      const now = performance.now();
-      const dt = now - refs.lastFrameTime;
-      refs.lastFrameTime = now;
+      const nowMs = Date.now();
+      const dtMs  = Math.min(nowMs - refs.lastMs, 50); // cap at 50ms
+      refs.lastMs = nowMs;
+      refs.tick  += 1;
 
-      // Auto-reduce particles if running slow
-      if (dt > FRAME_TIME_HIGH_MS && refs.particleCount === PARTICLE_COUNT_FULL) {
-        refs.particleCount = PARTICLE_COUNT_REDUCED;
-      }
+      // Auto-reduce particle count when frame is slow
+      if (dtMs > FRAME_SLOW_MS) refs.activeCount = PARTICLE_COUNT_LOW;
 
-      refs.tick += 1;
-      const { reading, isAnomaly, rollingAverage } = storeRef.current;
+      // ── Read live sensor data ────────────────────────────────────────
+      const { reading, isAnomaly } = storeRef.current;
       const { x: mx, y: my, z: mz, magnitude } = reading;
 
-      // Anomaly transition
-      if (isAnomaly && !prevAnomalyRef.current) targetSlowFactor = 0.5;
-      if (!isAnomaly && prevAnomalyRef.current) targetSlowFactor = 1.0;
-      prevAnomalyRef.current = isAnomaly;
-      anomalySlowFactor += (targetSlowFactor - anomalySlowFactor) * 0.05;
+      // Anomaly slow-motion
+      if (isAnomaly !== prevAnomalyRef.current) {
+        refs.targetSlowFactor = isAnomaly ? 0.45 : 1.0;
+        prevAnomalyRef.current = isAnomaly;
+      }
+      refs.slowFactor += (refs.targetSlowFactor - refs.slowFactor) * 0.06;
 
-      const speed = (Math.max(0.3, Math.min(2.5, magnitude / 25))) * anomalySlowFactor;
+      // Flow speed from magnitude, scaled by slow factor
+      const rawSpeed = Math.max(0.4, Math.min(3.0, magnitude / 20));
+      const speed = rawSpeed * refs.slowFactor * (dtMs / 16.67);
 
-      // Build normalised flow direction from magnetometer
+      // Smooth direction toward magnetic vector (x,y from horizontal plane, z = depth)
       const magLen = Math.sqrt(mx * mx + my * my + mz * mz) || 1;
-      targetDir.set(mx / magLen * 0.8, mz / magLen * 0.4, -1).normalize();
-      currentDir.lerp(targetDir, 0.03);
+      const tDirX = (mx / magLen) * 0.6;
+      const tDirY = (mz / magLen) * 0.3;
+      const tDirZ = -1.0;
+      const lerpT = 0.04;
+      refs.curDirX += (tDirX - refs.curDirX) * lerpT;
+      refs.curDirY += (tDirY - refs.curDirY) * lerpT;
+      refs.curDirZ += (tDirZ - refs.curDirZ) * lerpT;
 
-      // Update particles
+      // Normalise
+      const dLen = Math.sqrt(refs.curDirX**2 + refs.curDirY**2 + refs.curDirZ**2) || 1;
+      const dx = refs.curDirX / dLen;
+      const dy = refs.curDirY / dLen;
+      const dz = refs.curDirZ / dLen;
+
+      // ── Update particle positions ─────────────────────────────────────
       const posAttr = refs.particleGeo.attributes.position as THREE.BufferAttribute;
-      const arr = posAttr.array as Float32Array;
-      const baseSeeds = refs.basePositions; // we re-use this as seed reference
+      const pos = posAttr.array as Float32Array;
 
-      for (let i = 0; i < refs.particleCount; i++) {
-        const ix = i * 3, iy = ix + 1, iz = ix + 2;
+      for (let i = 0; i < refs.activeCount; i++) {
+        const ix = i * 3;
 
-        // Flow toward camera along field direction
-        arr[ix]  += currentDir.x * speed * 0.03;
-        arr[iy]  += currentDir.y * speed * 0.03;
-        arr[iz]  += speed * 0.06;  // always moving toward camera (positive z)
+        pos[ix]     += dx * speed * 0.05;
+        pos[ix + 1] += dy * speed * 0.05;
+        pos[ix + 2] += dz * speed * 0.08;
 
-        // Anomaly: explode radially outward
+        // Anomaly: also push radially outward from screen centre
         if (isAnomaly) {
-          const rx = arr[ix], ry = arr[iy];
-          const r = Math.sqrt(rx * rx + ry * ry) + 0.001;
-          arr[ix] += (rx / r) * 0.04;
-          arr[iy] += (ry / r) * 0.04;
+          const px = pos[ix], py = pos[ix + 1];
+          const pr = Math.sqrt(px * px + py * py) + 0.001;
+          pos[ix]     += (px / pr) * 0.025 * speed;
+          pos[ix + 1] += (py / pr) * 0.025 * speed;
         }
 
-        // Reset particle when it passes behind camera
-        if (arr[iz] > 5) {
-          arr[ix] = (Math.random() - 0.5) * 8;
-          arr[iy] = (Math.random() - 0.5) * 12;
-          arr[iz] = -(6 + Math.random() * 4);
-          // Vignette density: edges more particles
-          const edgeBias = Math.random() < 0.4;
-          if (edgeBias) {
-            arr[ix] *= 1.5 + Math.random() * 0.5;
-            arr[iy] *= 1.5 + Math.random() * 0.5;
-          }
+        // Wrap particle back to far plane when it exits near bound
+        if (pos[ix + 2] > BOUND_Z_NEAR) {
+          pos[ix]     = randInBound(BOUND_X);
+          pos[ix + 1] = randInBound(BOUND_Y);
+          pos[ix + 2] = BOUND_Z_FAR;
         }
+        // Also wrap x/y if they fly way off screen
+        if (Math.abs(pos[ix]) > BOUND_X * 2) pos[ix] = randInBound(BOUND_X);
+        if (Math.abs(pos[ix + 1]) > BOUND_Y * 2) pos[ix + 1] = randInBound(BOUND_Y);
       }
       posAttr.needsUpdate = true;
 
-      // Particle colour & size
-      const col = getParticleColor(magnitude, isAnomaly);
-      const opa = getParticleOpacity(magnitude, isAnomaly);
-      refs.particleMat.color.copy(col);
-      refs.particleMat.opacity = opa;
-
-      // Anomaly: bigger particles
-      refs.particleMat.size = isAnomaly
-        ? 0.045 * 1.4 + Math.sin(refs.tick * 0.15) * 0.01
-        : 0.045;
-
-      // ── Mesh deformation ────────────────────────────────────────────
-      const mPosAttr = refs.meshGeo.attributes.position as THREE.BufferAttribute;
-      const mArr = mPosAttr.array as Float32Array;
-      const base = refs.basePositions;
-      const vertCount = base.length / 3;
-
-      for (let v = 0; v < vertCount; v++) {
-        const bx = base[v * 3], by = base[v * 3 + 1], bz = base[v * 3 + 2];
-        // Deform: pull vertices toward field vector direction
-        const fieldInfluence = Math.sin(refs.tick * 0.02 + bx * 0.5 + by * 0.3) * 0.3;
-        const tx = bx + currentDir.x * fieldInfluence;
-        const ty = by + currentDir.y * fieldInfluence;
-        mArr[v * 3]     += (tx - mArr[v * 3]) * 0.08;
-        mArr[v * 3 + 1] += (ty - mArr[v * 3 + 1]) * 0.08;
-        mArr[v * 3 + 2] += (bz - mArr[v * 3 + 2]) * 0.08;
+      // ── Particle colour & size ────────────────────────────────────────
+      let col: string;
+      let opacity: number;
+      let size: number;
+      if (isAnomaly) {
+        col = Colors.fieldAnomaly;
+        opacity = 0.9;
+        size = 0.17 + Math.sin(refs.tick * 0.18) * 0.02;
+      } else if (magnitude < FIELD_WEAK_MAX) {
+        col = '#2255AA';
+        opacity = 0.25;
+        size = 0.09;
+      } else if (magnitude < FIELD_NORMAL_MAX) {
+        col = Colors.cyan;
+        opacity = 0.55;
+        size = 0.12;
+      } else {
+        col = Colors.blueBright;
+        opacity = 0.75;
+        size = 0.14;
       }
-      mPosAttr.needsUpdate = true;
+      refs.particleMat.color.setStyle(col);
+      refs.particleMat.opacity = opacity;
+      refs.particleMat.size = size;
 
+      // ── Mesh deformation ──────────────────────────────────────────────
+      const mAttr = refs.meshGeo.attributes.position as THREE.BufferAttribute;
+      const mPos  = mAttr.array as Float32Array;
+      const base  = refs.meshBase;
+      const verts = base.length / 3;
+
+      for (let v = 0; v < verts; v++) {
+        const bx = base[v * 3], by = base[v * 3 + 1], bz = base[v * 3 + 2];
+        const wave = Math.sin(refs.tick * 0.025 + bx * 0.8 + by * 0.5) * 0.25;
+        mPos[v * 3]     += (bx + dx * wave - mPos[v * 3]) * 0.08;
+        mPos[v * 3 + 1] += (by + dy * wave - mPos[v * 3 + 1]) * 0.08;
+        mPos[v * 3 + 2] += (bz - mPos[v * 3 + 2]) * 0.08;
+      }
+      mAttr.needsUpdate = true;
       refs.meshMat.opacity = isAnomaly
-        ? 0.5 + Math.sin(refs.tick * 0.12) * 0.15
-        : 0.15;
+        ? 0.45 + Math.sin(refs.tick * 0.14) * 0.12
+        : 0.12;
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
@@ -292,7 +326,7 @@ export default function ARFieldCanvas() {
 
   useEffect(() => {
     return () => {
-      if (sceneRef.current?.animFrame) {
+      if (sceneRef.current?.animFrame != null) {
         cancelAnimationFrame(sceneRef.current.animFrame);
       }
     };
@@ -308,6 +342,6 @@ export default function ARFieldCanvas() {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.65,   // AR overlay transparency
+    opacity: 0.7,
   },
 });

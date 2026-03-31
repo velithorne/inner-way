@@ -25,6 +25,10 @@ let simulationTick = 0;
 let lastAnomalyTime = 0;
 const ANOMALY_DEBOUNCE_MS = 2000;
 
+// Minimum samples before anomaly detection activates (~5s at 60hz)
+const BASELINE_MIN_SAMPLES = 300;
+let sampleCount = 0;
+
 export function calculateMagnitude(x: number, y: number, z: number): number {
   return Math.sqrt(x * x + y * y + z * z);
 }
@@ -98,7 +102,7 @@ export async function startCalibration(): Promise<CalibrationOffset> {
 }
 
 function processReading(rawX: number, rawY: number, rawZ: number) {
-  const { calibrationOffset, rollingAverage, pushHistory, setReading, setAnomaly } =
+  const { calibrationOffset, rollingAverage, pushHistory, setReading, setAnomaly, setBaselineReady } =
     useFieldStore.getState();
 
   const { x, y, z } = applyCalibration(rawX, rawY, rawZ, calibrationOffset);
@@ -107,6 +111,19 @@ function processReading(rawX: number, rawY: number, rawZ: number) {
 
   setReading({ x, y, z, magnitude, heading, timestamp: Date.now() });
   pushHistory(magnitude);
+
+  sampleCount += 1;
+
+  // Gate anomaly detection until 300 samples (~5s) have been collected
+  if (sampleCount < BASELINE_MIN_SAMPLES) {
+    setAnomaly(false, 0);
+    return;
+  }
+
+  // Mark baseline as ready once on the transition sample
+  if (sampleCount === BASELINE_MIN_SAMPLES) {
+    setBaselineReady(true);
+  }
 
   // Anomaly detection — only after rolling average has enough data
   if (rollingAverage > 0) {
@@ -147,6 +164,10 @@ function startSimulation() {
 export async function startMagnetometer(): Promise<void> {
   if (subscription) return;
 
+  sampleCount = 0;
+  useFieldStore.getState().setBaselineReady(false);
+  useFieldStore.getState().setAnomaly(false, 0);
+
   const offset = await loadCalibration();
   useFieldStore.getState().setCalibrated(offset);
 
@@ -154,6 +175,7 @@ export async function startMagnetometer(): Promise<void> {
 
   if (!available) {
     useFieldStore.getState().setSimulationMode(true);
+    simulationTick = 0;
     startSimulation();
     return;
   }
@@ -175,4 +197,7 @@ export function stopMagnetometer(): void {
     clearInterval(simulationInterval);
     simulationInterval = null;
   }
+  sampleCount = 0;
+  useFieldStore.getState().setBaselineReady(false);
+  useFieldStore.getState().setAnomaly(false, 0);
 }

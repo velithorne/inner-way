@@ -25,6 +25,7 @@ export interface FieldState {
   // Anomaly state
   isAnomaly: boolean;
   anomalyDelta: number;         // deviation from baseline (signed)
+  isBaselineReady: boolean;     // true once 300 samples collected (~5s at 60hz)
 
   // Calibration
   isCalibrated: boolean;
@@ -36,6 +37,7 @@ export interface FieldState {
   setSimulationMode: (sim: boolean) => void;
   pushHistory: (magnitude: number) => void;
   setAnomaly: (isAnomaly: boolean, delta: number) => void;
+  setBaselineReady: (ready: boolean) => void;
   setCalibrated: (offset: { x: number; y: number; z: number }) => void;
   setCalibrating: (val: boolean) => void;
 
@@ -60,6 +62,7 @@ export const useFieldStore = create<FieldState>((set) => ({
   rollingAverage: 0,
   isAnomaly: false,
   anomalyDelta: 0,
+  isBaselineReady: false,
   isCalibrated: false,
   calibrationOffset: { x: 0, y: 0, z: 0 },
   isCalibrating: false,
@@ -80,6 +83,8 @@ export const useFieldStore = create<FieldState>((set) => ({
     }),
 
   setAnomaly: (isAnomaly, anomalyDelta) => set({ isAnomaly, anomalyDelta }),
+
+  setBaselineReady: (isBaselineReady) => set({ isBaselineReady }),
 
   setCalibrated: (calibrationOffset) =>
     set({ calibrationOffset, isCalibrated: true }),

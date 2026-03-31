@@ -158,6 +158,7 @@ export default function ARFieldScreen() {
 
   const reading = useFieldStore((s) => s.reading);
   const isAnomaly = useFieldStore((s) => s.isAnomaly);
+  const isBaselineReady = useFieldStore((s) => s.isBaselineReady);
   const isSimulationMode = useFieldStore((s) => s.isSimulationMode);
 
   const [nearbySites, setNearbySites] = useState<Nearbysite[]>([]);
@@ -250,6 +251,9 @@ export default function ARFieldScreen() {
         {isSimulationMode && (
           <Text style={styles.simLabel}>SIMULATION</Text>
         )}
+        {!isBaselineReady && (
+          <Text style={styles.calibratingLabel}>CALIBRATING...</Text>
+        )}
       </View>
 
       {/* Top-right: magnitude + anomaly badge */}
@@ -258,7 +262,10 @@ export default function ARFieldScreen() {
           {reading.magnitude.toFixed(1)}
         </Text>
         <Text style={styles.magnitudeUnit}>µT</Text>
-        <AnomalyBadge visible={isAnomaly} />
+        {isBaselineReady
+          ? <AnomalyBadge visible={isAnomaly} />
+          : <Text style={styles.warmupLabel}>WARMUP</Text>
+        }
       </View>
 
       {/* Nearby sacred site indicators */}
@@ -323,6 +330,22 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     letterSpacing: 1.5,
     marginTop: 2,
+  },
+  calibratingLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    color: Colors.greyLight,
+    opacity: 0.7,
+    letterSpacing: 1.5,
+    marginTop: 2,
+  },
+  warmupLabel: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    color: Colors.greyLight,
+    opacity: 0.6,
+    letterSpacing: 1.5,
+    marginTop: 3,
   },
 
   // HUD top-right
