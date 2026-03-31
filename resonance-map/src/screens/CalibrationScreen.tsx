@@ -174,7 +174,7 @@ export default function CalibrationScreen() {
           onPress={() =>
             navigation.canGoBack()
               ? navigation.goBack()
-              : navigation.reset({ index: 0, routes: [{ name: 'Field' as never }] })
+              : navigation.reset({ index: 0, routes: [{ name: 'Main' as never }] })
           }
           style={styles.backBtn}
         >
@@ -239,7 +239,7 @@ export default function CalibrationScreen() {
             <TouchableOpacity
               style={styles.startButton}
               onPress={() =>
-                navigation.reset({ index: 0, routes: [{ name: 'Field' as never }] })
+                navigation.reset({ index: 0, routes: [{ name: 'Main' as never }] })
               }
             >
               <Text style={styles.startButtonText}>RETURN TO FIELD</Text>
