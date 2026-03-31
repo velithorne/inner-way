@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.resonancemap.app",
       "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": "AIzaSyAa3F6MTRskKspbBTtMgDYNRWoQ8PRgbRE"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Location is used to show your position on the field map and record GPS coordinates when anomalies are detected.",
@@ -33,7 +33,7 @@
       "package": "com.resonancemap.app",
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+          "apiKey": "AIzaSyAa3F6MTRskKspbBTtMgDYNRWoQ8PRgbRE"
         }
       },
       "permissions": [
