@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "The Resonance Map",
+    "slug": "resonance-map",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#00000A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.resonancemap.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Location is used to record GPS coordinates when magnetic anomalies are detected.",
+        "NSMotionUsageDescription": "Motion sensor data is used for magnetometer readings and field visualization."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00000A"
+      },
+      "edgeToEdgeEnabled": false,
+      "package": "com.resonancemap.app",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-keep-awake",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Location is used to record GPS coordinates when magnetic anomalies are detected."
+        }
+      ]
+    ]
+  }
+}
