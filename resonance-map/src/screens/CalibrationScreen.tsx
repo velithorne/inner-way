@@ -170,7 +170,14 @@ export default function CalibrationScreen() {
       <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.canGoBack()
+              ? navigation.goBack()
+              : navigation.reset({ index: 0, routes: [{ name: 'Field' as never }] })
+          }
+          style={styles.backBtn}
+        >
           <Text style={styles.backText}>← BACK</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>CALIBRATION</Text>
@@ -231,7 +238,9 @@ export default function CalibrationScreen() {
             </Text>
             <TouchableOpacity
               style={styles.startButton}
-              onPress={() => navigation.goBack()}
+              onPress={() =>
+                navigation.reset({ index: 0, routes: [{ name: 'Field' as never }] })
+              }
             >
               <Text style={styles.startButtonText}>RETURN TO FIELD</Text>
             </TouchableOpacity>
