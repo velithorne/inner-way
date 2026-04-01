@@ -25,6 +25,7 @@ import ARFieldCanvas from '../components/ARFieldCanvas';
 import Waveform from '../components/Waveform';
 import { useFieldStore } from '../store/useFieldStore';
 import { startMagnetometer, stopMagnetometer } from '../services/magnetometer';
+import { logAnomaly } from '../services/anomalyLog';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
 import { getNearbysSites, Nearbysite, haversineKm } from '../constants/sacredSites';
@@ -262,25 +263,41 @@ export default function ARFieldScreen() {
     }, [])
   );
 
-  // Anomaly haptics
+  // Anomaly: real-time subscribe (not throttled) for haptics + logging
   useEffect(() => {
-    if (isAnomaly && !prevAnomalyRef.current) {
-      // Heavy impact + 3 rapid lights
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-      const pulse = (n: number) => {
-        if (n <= 0) return;
-        anomalyTripleRef.current = setTimeout(() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-          pulse(n - 1);
-        }, 200);
-      };
-      pulse(3);
-    }
-    if (!isAnomaly && prevAnomalyRef.current) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
-    }
-    prevAnomalyRef.current = isAnomaly;
-  }, [isAnomaly]);
+    return useFieldStore.subscribe((s) => {
+      const nowAnomaly = s.isAnomaly;
+
+      if (nowAnomaly && !prevAnomalyRef.current) {
+        // Log to AsyncStorage
+        logAnomaly({
+          magnitude: s.reading.magnitude,
+          delta: s.anomalyDelta,
+          x: s.reading.x,
+          y: s.reading.y,
+          z: s.reading.z,
+          heading: s.reading.heading,
+        }).catch(() => {});
+
+        // Haptics: heavy + triple-pulse
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+        const pulse = (n: number) => {
+          if (n <= 0) return;
+          anomalyTripleRef.current = setTimeout(() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            pulse(n - 1);
+          }, 200);
+        };
+        pulse(3);
+      }
+
+      if (!nowAnomaly && prevAnomalyRef.current) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
+      }
+
+      prevAnomalyRef.current = nowAnomaly;
+    });
+  }, []);
 
   const magnitudeColor = getMagnitudeColor(hudData.magnitude, isAnomaly);
 
