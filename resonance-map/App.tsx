@@ -14,9 +14,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { AppState, AppStateStatus } from 'react-native';
 import MapScreen      from './src/screens/MapScreen';
 import ARFieldScreen  from './src/screens/ARFieldScreen';
 import CalibrationScreen from './src/screens/CalibrationScreen';
+import { startMagnetometer, stopMagnetometer, resetMagnetometerBaseline } from './src/services/magnetometer';
 // FieldScreen kept in codebase — removed from nav as per Phase 3 restructure
 // import FieldScreen from './src/screens/FieldScreen';
 
@@ -149,6 +151,23 @@ export default function App() {
         setInitialRoute('Main');
       }
     })();
+  }, []);
+
+  // Start magnetometer once globally — never stop/start on tab switch
+  useEffect(() => {
+    startMagnetometer();
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'background' || state === 'inactive') {
+        stopMagnetometer();
+        resetMagnetometerBaseline();
+      } else if (state === 'active') {
+        startMagnetometer();
+      }
+    });
+    return () => {
+      sub.remove();
+      stopMagnetometer();
+    };
   }, []);
 
   if (!fontsLoaded || !initialRoute) {

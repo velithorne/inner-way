@@ -30,7 +30,7 @@ import {
   buildChronologicalLines,
   buildProximityLines,
 } from '../services/connectionLines';
-import { startMagnetometer, stopMagnetometer } from '../services/magnetometer';
+// Magnetometer lifecycle managed globally in App.tsx
 import { useFieldStore } from '../store/useFieldStore';
 import { bearing, midpoint } from '../utils/geo';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from '../constants/theme';
@@ -134,7 +134,6 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       activateKeepAwakeAsync();
-      startMagnetometer();
       reload();
 
       (async () => {
@@ -149,7 +148,6 @@ export default function MapScreen() {
 
       return () => {
         deactivateKeepAwake();
-        stopMagnetometer();
       };
     }, [])
   );

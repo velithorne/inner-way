@@ -163,7 +163,7 @@ function startSimulation() {
 
 export async function startMagnetometer(): Promise<void> {
   if (subscription) return;
-
+  // Fresh start — reset baseline so warmup runs correctly
   sampleCount = 0;
   useFieldStore.getState().setBaselineReady(false);
   useFieldStore.getState().setAnomaly(false, 0);
@@ -197,6 +197,13 @@ export function stopMagnetometer(): void {
     clearInterval(simulationInterval);
     simulationInterval = null;
   }
+  // Do NOT reset sampleCount or baseline here — tab switches call stop/start
+  // and resetting would restart the 5-second warmup every time.
+  // Only startMagnetometer() resets when starting fresh (subscription was null).
+}
+
+/** Hard reset — call this only when the app fully backgrounds or user re-calibrates */
+export function resetMagnetometerBaseline(): void {
   sampleCount = 0;
   useFieldStore.getState().setBaselineReady(false);
   useFieldStore.getState().setAnomaly(false, 0);

@@ -24,7 +24,7 @@ import Animated, {
 import ARFieldCanvas from '../components/ARFieldCanvas';
 import Waveform from '../components/Waveform';
 import { useFieldStore } from '../store/useFieldStore';
-import { startMagnetometer, stopMagnetometer } from '../services/magnetometer';
+// Magnetometer lifecycle managed globally in App.tsx
 import { logAnomaly } from '../services/anomalyLog';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
@@ -239,11 +239,8 @@ export default function ARFieldScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Entering AR mode — medium haptic
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      startMagnetometer();
 
-      // Fetch location for nearby sites + target overlay
       (async () => {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -257,7 +254,6 @@ export default function ARFieldScreen() {
       })();
 
       return () => {
-        stopMagnetometer();
         if (anomalyTripleRef.current) clearTimeout(anomalyTripleRef.current);
       };
     }, [])
