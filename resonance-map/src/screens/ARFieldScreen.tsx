@@ -8,7 +8,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -27,7 +27,8 @@ import { useFieldStore } from '../store/useFieldStore';
 import { startMagnetometer, stopMagnetometer } from '../services/magnetometer';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
-import { getNearbysSites, Nearbysite } from '../constants/sacredSites';
+import { getNearbysSites, Nearbysite, haversineKm } from '../constants/sacredSites';
+import { bearing } from '../utils/geo';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -152,9 +153,57 @@ const permStyles = StyleSheet.create({
 });
 
 // ── Main AR screen ────────────────────────────────────────────────────────────
+// ── AR target directional overlay ────────────────────────────────────────
+function TargetOverlay({ targetLat, targetLng, userLat, userLng, heading }: {
+  targetLat: number; targetLng: number;
+  userLat: number; userLng: number;
+  heading: number;
+}) {
+  const targetBearing = bearing(
+    { latitude: userLat, longitude: userLng },
+    { latitude: targetLat, longitude: targetLng }
+  );
+  const relAngle = ((targetBearing - heading) + 360) % 360;
+  const distKm = haversineKm(userLat, userLng, targetLat, targetLng);
+  const arrowLabel = relAngle < 22.5 || relAngle > 337.5 ? '▲' :
+                     relAngle < 67.5  ? '↗' :
+                     relAngle < 112.5 ? '▶' :
+                     relAngle < 157.5 ? '↘' :
+                     relAngle < 202.5 ? '▼' :
+                     relAngle < 247.5 ? '↙' :
+                     relAngle < 292.5 ? '◀' : '↖';
+  return (
+    <View style={tgt.container} pointerEvents="none">
+      <Text style={tgt.arrow}>{arrowLabel}</Text>
+      <Text style={tgt.label}>TARGET NODE</Text>
+      <Text style={tgt.dist}>{distKm < 1 ? `${Math.round(distKm * 1000)}m` : `${distKm.toFixed(1)}km`}</Text>
+      <Text style={tgt.bearing}>{Math.round(targetBearing)}° / {Math.round(relAngle)}° rel</Text>
+    </View>
+  );
+}
+
+const tgt = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: '35%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,10,0.7)',
+    borderWidth: 1,
+    borderColor: Colors.gold,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  arrow: { fontSize: 32, color: Colors.gold },
+  label: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.gold, letterSpacing: 2, marginTop: 2 },
+  dist: { fontFamily: Fonts.header, fontSize: FontSizes.xl, color: Colors.gold, marginTop: 2 },
+  bearing: { fontFamily: Fonts.mono, fontSize: 9, color: Colors.greyLight, marginTop: 2 },
+});
+
 export default function ARFieldScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
+  const route = useRoute<any>();
 
   const reading = useFieldStore((s) => s.reading);
   const isAnomaly = useFieldStore((s) => s.isAnomaly);
@@ -162,6 +211,8 @@ export default function ARFieldScreen() {
   const isSimulationMode = useFieldStore((s) => s.isSimulationMode);
 
   const [nearbySites, setNearbySites] = useState<Nearbysite[]>([]);
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
   const prevAnomalyRef = useRef(false);
   const anomalyTripleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -176,12 +227,14 @@ export default function ARFieldScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       startMagnetometer();
 
-      // Fetch location for nearby sites
+      // Fetch location for nearby sites + target overlay
       (async () => {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === 'granted') {
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            setUserLat(loc.coords.latitude);
+            setUserLng(loc.coords.longitude);
             setNearbySites(getNearbysSites(loc.coords.latitude, loc.coords.longitude));
           }
         } catch {}
@@ -242,6 +295,17 @@ export default function ARFieldScreen() {
 
       {/* Layer 1: AR field canvas — transparent Three.js overlay */}
       <ARFieldCanvas />
+
+      {/* Target node directional overlay (from MAP tab "OPEN IN AR") */}
+      {route.params?.targetLat != null && userLat !== null && userLng !== null && (
+        <TargetOverlay
+          targetLat={route.params.targetLat as number}
+          targetLng={route.params.targetLng as number}
+          userLat={userLat}
+          userLng={userLng}
+          heading={reading.heading}
+        />
+      )}
 
       {/* Layer 2: HUD */}
 
