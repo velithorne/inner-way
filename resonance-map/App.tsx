@@ -19,6 +19,7 @@ import MapScreen      from './src/screens/MapScreen';
 import ARFieldScreen  from './src/screens/ARFieldScreen';
 import CalibrationScreen from './src/screens/CalibrationScreen';
 import { startMagnetometer, stopMagnetometer, resetMagnetometerBaseline } from './src/services/magnetometer';
+import { startLocationWatcher, stopLocationWatcher } from './src/services/anomalyLog';
 // FieldScreen kept in codebase — removed from nav as per Phase 3 restructure
 // import FieldScreen from './src/screens/FieldScreen';
 
@@ -153,20 +154,25 @@ export default function App() {
     })();
   }, []);
 
-  // Start magnetometer once globally — never stop/start on tab switch
+  // Start magnetometer + GPS watcher once globally
   useEffect(() => {
     startMagnetometer();
+    startLocationWatcher(); // keeps lastKnownLat/Lng fresh so logAnomaly never blocks
+
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
       if (state === 'background' || state === 'inactive') {
         stopMagnetometer();
         resetMagnetometerBaseline();
+        stopLocationWatcher();
       } else if (state === 'active') {
         startMagnetometer();
+        startLocationWatcher();
       }
     });
     return () => {
       sub.remove();
       stopMagnetometer();
+      stopLocationWatcher();
     };
   }, []);
 

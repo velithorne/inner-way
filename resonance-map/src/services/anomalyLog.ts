@@ -7,7 +7,7 @@ const MAX_LOG_ENTRIES = 500;
 
 export interface AnomalyEntry {
   id: string;
-  timestamp: string;           // ISO 8601
+  timestamp: string;
   coordinates: {
     lat: number | null;
     lng: number | null;
@@ -18,37 +18,51 @@ export interface AnomalyEntry {
   y: number;
   z: number;
   heading: number;
-  // Phase 3 server sync
   synced?: boolean;
-  // Node verification
   verified?: boolean;
   verifiedAt?: string;
   verificationMagnitude?: number;
-  // Proximity intelligence
-  proximityLinks?: string[];   // sacred site IDs within 50km
+  proximityLinks?: string[];
 }
 
 let locationPermissionGranted: boolean | null = null;
 
-async function requestLocationIfNeeded(): Promise<void> {
-  if (locationPermissionGranted !== null) return;
+// Cache last known GPS so we never block on a slow fix
+let lastKnownLat: number | null = null;
+let lastKnownLng: number | null = null;
+
+// Start a background GPS watcher that always keeps lastKnown fresh
+let locationWatcher: Location.LocationSubscription | null = null;
+
+export async function startLocationWatcher(): Promise<void> {
+  if (locationWatcher) return;
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     locationPermissionGranted = status === 'granted';
-  } catch {
-    locationPermissionGranted = false;
-  }
+    if (!locationPermissionGranted) return;
+
+    // Seed immediately with a fast low-accuracy fix
+    const quick = await Location.getLastKnownPositionAsync();
+    if (quick) {
+      lastKnownLat = quick.coords.latitude;
+      lastKnownLng = quick.coords.longitude;
+    }
+
+    // Keep updating in the background
+    locationWatcher = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Balanced, timeInterval: 10000, distanceInterval: 50 },
+      (loc) => {
+        lastKnownLat = loc.coords.latitude;
+        lastKnownLng = loc.coords.longitude;
+      }
+    );
+  } catch {}
 }
 
-async function getCurrentCoordinates(): Promise<{ lat: number | null; lng: number | null }> {
-  if (!locationPermissionGranted) return { lat: null, lng: null };
-  try {
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    return { lat: location.coords.latitude, lng: location.coords.longitude };
-  } catch {
-    return { lat: null, lng: null };
+export function stopLocationWatcher(): void {
+  if (locationWatcher) {
+    locationWatcher.remove();
+    locationWatcher = null;
   }
 }
 
@@ -61,9 +75,18 @@ export async function loadAnomalyLog(): Promise<AnomalyEntry[]> {
 }
 
 async function saveAnomalyLog(entries: AnomalyEntry[]): Promise<void> {
-  await AsyncStorage.setItem(ANOMALY_LOG_KEY, JSON.stringify(entries));
+  try {
+    await AsyncStorage.setItem(ANOMALY_LOG_KEY, JSON.stringify(entries));
+  } catch (e) {
+    console.warn('[AnomalyLog] Failed to save:', e);
+  }
 }
 
+/**
+ * Log an anomaly immediately — does NOT wait for GPS.
+ * Uses the last known GPS position (updated by background watcher).
+ * If no GPS fix exists, saves with null coordinates.
+ */
 export async function logAnomaly(params: {
   magnitude: number;
   delta: number;
@@ -72,14 +95,19 @@ export async function logAnomaly(params: {
   z: number;
   heading: number;
 }): Promise<AnomalyEntry> {
-  await requestLocationIfNeeded();
-  const coordinates = await getCurrentCoordinates();
+  // Use cached GPS — never block on a live fix
+  const coordinates = {
+    lat: lastKnownLat,
+    lng: lastKnownLng,
+  };
 
-  // Calculate proximity links at log time
+  // Proximity links from cached position
   const proximityLinks: string[] = [];
   if (coordinates.lat !== null && coordinates.lng !== null) {
-    const links = getProximityLinksForAnomaly(coordinates.lat, coordinates.lng);
-    links.forEach((l) => proximityLinks.push(l.site.id));
+    try {
+      const links = getProximityLinksForAnomaly(coordinates.lat, coordinates.lng);
+      links.forEach((l) => proximityLinks.push(l.site.id));
+    } catch {}
   }
 
   const entry: AnomalyEntry = {
@@ -95,7 +123,6 @@ export async function logAnomaly(params: {
     synced: false,
     verified: false,
     proximityLinks,
-    // Phase 3: server sync will set synced = true once uploaded
   };
 
   const existing = await loadAnomalyLog();
@@ -122,21 +149,17 @@ export async function verifyNode(
   if (idx === -1) return { success: false, reason: 'not_found' };
 
   const entry = entries[idx];
-
   if (entry.coordinates.lat === null || entry.coordinates.lng === null) {
     return { success: false, reason: 'no_gps' };
   }
 
-  await requestLocationIfNeeded();
-  const current = await getCurrentCoordinates();
-  if (current.lat === null || current.lng === null) {
+  const currentLat = lastKnownLat;
+  const currentLng = lastKnownLng;
+  if (currentLat === null || currentLng === null) {
     return { success: false, reason: 'no_gps' };
   }
 
-  const distanceKm = haversineKm(
-    current.lat, current.lng,
-    entry.coordinates.lat, entry.coordinates.lng
-  );
+  const distanceKm = haversineKm(currentLat, currentLng, entry.coordinates.lat, entry.coordinates.lng);
   const distanceM = distanceKm * 1000;
 
   if (distanceM > VERIFY_RADIUS_M) {
@@ -156,7 +179,6 @@ export async function verifyNode(
   };
   entries[idx] = verified;
   await saveAnomalyLog(entries);
-
   return { success: true, entry: verified };
 }
 
@@ -173,9 +195,7 @@ export async function clearAnomalyLog(): Promise<void> {
   await AsyncStorage.removeItem(ANOMALY_LOG_KEY);
 }
 
-// Phase 4 server sync stub
+// Phase 4: server sync stub
 export async function syncAnomalyLog(): Promise<void> {
-  // TODO Phase 4: POST unsynced entries to server, mark synced = true
-  // const unsyncedEntries = (await loadAnomalyLog()).filter(e => !e.synced);
-  // await fetch(PHASE3_SYNC_ENDPOINT!, { method: 'POST', body: JSON.stringify(unsyncedEntries) });
+  // TODO Phase 4: POST unsynced entries to server
 }
