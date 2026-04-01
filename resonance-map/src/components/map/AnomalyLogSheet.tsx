@@ -296,7 +296,10 @@ export default function AnomalyLogSheet({ visible, onClose, onShowOnMap, onOpenA
   };
 
   return (
-    <Animated.View style={[styles.sheet, sheetStyle]}>
+    <Animated.View
+      style={[styles.sheet, sheetStyle]}
+      pointerEvents={visible ? 'auto' : 'none'}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>ANOMALY LOG</Text>

@@ -105,8 +105,17 @@ export default function MapScreen() {
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [showBackToLog, setShowBackToLog] = useState(false);
 
-  const magnitude = useFieldStore((s) => s.reading.magnitude);
-  const magneticHeading = useFieldStore((s) => s.reading.heading);
+  // Read at 4Hz via interval — not 60Hz store subscription — to keep map render cheap
+  const [hudMag, setHudMag] = useState(0);
+  const [hudHeading, setHudHeading] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const s = useFieldStore.getState();
+      setHudMag(s.reading.magnitude);
+      setHudHeading(s.reading.heading);
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
 
   const anomaliesNearSite = useCallback((site: SacredSite) =>
     entries.filter((e) => {
@@ -157,6 +166,8 @@ export default function MapScreen() {
     : entries;
 
   const nearestSite = userLocation ? getNearestSite(userLocation.lat, userLocation.lng) : null;
+  const magnitude = hudMag;
+  const magneticHeading = hudHeading;
 
   // ── Show-on-map handler (from log sheet) ─────────────────────────────────
   const handleShowOnMap = (entry: AnomalyEntry) => {
@@ -313,7 +324,7 @@ export default function MapScreen() {
       </MapView>
 
       {/* ── Sensor HUD (top) ─────────────────────────────────────────── */}
-      <SensorHUD anomalyCount={entries.length} />
+      <SensorHUD anomalyCount={entries.length} key="sensor-hud" />
 
       {/* ── Top-right controls ───────────────────────────────────────── */}
       <View style={styles.topRight} pointerEvents="box-none">

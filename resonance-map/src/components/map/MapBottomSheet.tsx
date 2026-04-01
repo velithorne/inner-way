@@ -214,7 +214,10 @@ export default function MapBottomSheet({ content, onClose, onNavigateToAR, onVer
   }));
 
   return (
-    <Animated.View style={[styles.sheet, animStyle]}>
+    <Animated.View
+      style={[styles.sheet, animStyle]}
+      pointerEvents={content ? 'auto' : 'none'}
+    >
       {/* Handle */}
       <View style={styles.handleRow}>
         <View style={styles.handle} />

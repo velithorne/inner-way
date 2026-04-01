@@ -205,10 +205,25 @@ export default function ARFieldScreen() {
   const device = useCameraDevice('back');
   const route = useRoute<any>();
 
-  const reading = useFieldStore((s) => s.reading);
-  const isAnomaly = useFieldStore((s) => s.isAnomaly);
-  const isBaselineReady = useFieldStore((s) => s.isBaselineReady);
-  const isSimulationMode = useFieldStore((s) => s.isSimulationMode);
+  // Throttled to 4Hz for the HUD display layer — ARFieldCanvas reads store directly
+  const [hudData, setHudData] = useState({
+    magnitude: 0, heading: 0, isAnomaly: false, isBaselineReady: false, isSimulationMode: false,
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const s = useFieldStore.getState();
+      setHudData({
+        magnitude: s.reading.magnitude,
+        heading: s.reading.heading,
+        isAnomaly: s.isAnomaly,
+        isBaselineReady: s.isBaselineReady,
+        isSimulationMode: s.isSimulationMode,
+      });
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
+  const reading = useFieldStore.getState().reading; // for static reads only
+  const { isAnomaly, isBaselineReady, isSimulationMode } = hudData;
 
   const [nearbySites, setNearbySites] = useState<Nearbysite[]>([]);
   const [userLat, setUserLat] = useState<number | null>(null);
@@ -267,7 +282,7 @@ export default function ARFieldScreen() {
     prevAnomalyRef.current = isAnomaly;
   }, [isAnomaly]);
 
-  const magnitudeColor = getMagnitudeColor(reading.magnitude, isAnomaly);
+  const magnitudeColor = getMagnitudeColor(hudData.magnitude, isAnomaly);
 
   if (!hasPermission) {
     return <CameraPermissionDenied />;
@@ -303,7 +318,7 @@ export default function ARFieldScreen() {
           targetLng={route.params.targetLng as number}
           userLat={userLat}
           userLng={userLng}
-          heading={reading.heading}
+          heading={hudData.heading}
         />
       )}
 
@@ -323,7 +338,7 @@ export default function ARFieldScreen() {
       {/* Top-right: magnitude + anomaly badge */}
       <View style={styles.topRight} pointerEvents="none">
         <Text style={[styles.magnitudeValue, { color: magnitudeColor }]}>
-          {reading.magnitude.toFixed(1)}
+          {hudData.magnitude.toFixed(1)}
         </Text>
         <Text style={styles.magnitudeUnit}>µT</Text>
         {isBaselineReady
@@ -334,7 +349,7 @@ export default function ARFieldScreen() {
 
       {/* Nearby sacred site indicators */}
       {nearbySites.map((entry) => (
-        <SiteIndicator key={entry.site.id} entry={entry} heading={reading.heading} />
+        <SiteIndicator key={entry.site.id} entry={entry} heading={hudData.heading} />
       ))}
 
       {/* Bottom bar: gradient + waveform + heading */}
@@ -345,7 +360,7 @@ export default function ARFieldScreen() {
         <View style={styles.bottomStats}>
           <Text style={styles.headingLabel}>HDG</Text>
           <Text style={[styles.headingValue, { color: magnitudeColor }]}>
-            {reading.heading.toFixed(0)}°
+            {hudData.heading.toFixed(0)}°
           </Text>
           <Text style={styles.baselineLabel}>
             BASE  {useFieldStore.getState().rollingAverage.toFixed(1)} µT
