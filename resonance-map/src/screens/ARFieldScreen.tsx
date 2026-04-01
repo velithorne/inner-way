@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,11 +21,12 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-import ARFieldCanvas from '../components/ARFieldCanvas';
+import ARFieldCanvas, { ARFieldCanvasHandle } from '../components/ARFieldCanvas';
 import Waveform from '../components/Waveform';
 import { useFieldStore } from '../store/useFieldStore';
 // Magnetometer lifecycle managed globally in App.tsx
 import { logAnomaly } from '../services/anomalyLog';
+import { startRFScanner, stopRFScanner, subscribeRF, RFScanState } from '../services/rfScanner';
 import { Colors, Fonts, FontSizes, Spacing, BorderWidth } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
 import { getNearbysSites, Nearbysite, haversineKm } from '../constants/sacredSites';
@@ -206,7 +207,7 @@ export default function ARFieldScreen() {
   const device = useCameraDevice('back');
   const route = useRoute<any>();
 
-  // Throttled to 4Hz for the HUD display layer — ARFieldCanvas reads store directly
+  // Throttled to 4Hz for the HUD display layer
   const [hudData, setHudData] = useState({
     magnitude: 0, heading: 0, isAnomaly: false, isBaselineReady: false, isSimulationMode: false,
   });
@@ -223,7 +224,6 @@ export default function ARFieldScreen() {
     }, 250);
     return () => clearInterval(id);
   }, []);
-  const reading = useFieldStore.getState().reading; // for static reads only
   const { isAnomaly, isBaselineReady, isSimulationMode } = hudData;
 
   const [nearbySites, setNearbySites] = useState<Nearbysite[]>([]);
@@ -231,6 +231,31 @@ export default function ARFieldScreen() {
   const [userLng, setUserLng] = useState<number | null>(null);
   const prevAnomalyRef = useRef(false);
   const anomalyTripleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Field layer toggles
+  const [layerMag, setLayerMag] = useState(true);
+  const [layerRF, setLayerRF] = useState(true);
+  const [layerGrav, setLayerGrav] = useState(true);
+  const canvasLayerRef = useRef<ARFieldCanvasHandle | null>(null);
+
+  // RF scan state (for HUD readout)
+  const [rfState, setRfState] = useState<RFScanState>({ networks: [], isScanning: false, isIOS: false, lastScanMs: 0 });
+
+  // First-launch calibration overlay
+  const [showCalibOverlay, setShowCalibOverlay] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowCalibOverlay(false), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Layer toggle handler — tells canvas which fields to show
+  const setLayer = useCallback((field: 'mag' | 'rf' | 'grav' | 'all', val: boolean) => {
+    const newMag  = field === 'all' ? val : field === 'mag'  ? val : layerMag;
+    const newRF   = field === 'all' ? val : field === 'rf'   ? val : layerRF;
+    const newGrav = field === 'all' ? val : field === 'grav' ? val : layerGrav;
+    setLayerMag(newMag); setLayerRF(newRF); setLayerGrav(newGrav);
+    canvasLayerRef.current?.setLayers(newMag, newRF, newGrav);
+  }, [layerMag, layerRF, layerGrav]);
 
   // Request camera permission
   useEffect(() => {
@@ -240,6 +265,7 @@ export default function ARFieldScreen() {
   useFocusEffect(
     useCallback(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      startRFScanner();
 
       (async () => {
         try {
@@ -253,7 +279,10 @@ export default function ARFieldScreen() {
         } catch {}
       })();
 
+      const unsubRF = subscribeRF(setRfState);
       return () => {
+        stopRFScanner();
+        unsubRF();
         if (anomalyTripleRef.current) clearTimeout(anomalyTripleRef.current);
       };
     }, [])
@@ -321,8 +350,8 @@ export default function ARFieldScreen() {
         audio={false}
       />
 
-      {/* Layer 1: AR field canvas — transparent Three.js overlay */}
-      <ARFieldCanvas />
+      {/* Layer 1: Multi-field canvas — magnetic dipole + RF + gravity */}
+      <ARFieldCanvas layerRef={canvasLayerRef} />
 
       {/* Target node directional overlay (from MAP tab "OPEN IN AR") */}
       {route.params?.targetLat != null && userLat !== null && userLng !== null && (
@@ -337,9 +366,16 @@ export default function ARFieldScreen() {
 
       {/* Layer 2: HUD */}
 
-      {/* Top-left: app label */}
+      {/* Top-left: app label + active fields */}
       <View style={styles.topLeft} pointerEvents="none">
-        <Text style={styles.appLabel}>◈ RESONANCE MAP  AR MODE</Text>
+        <Text style={styles.appLabel}>◈ RESONANCE MAP  FIELD SCANNER</Text>
+        <View style={styles.activeFields}>
+          {layerMag  && <Text style={[styles.fieldTag, { color: Colors.cyan }]}>MAG</Text>}
+          {layerMag  && layerRF  && <Text style={styles.fieldDot}> · </Text>}
+          {layerRF   && <Text style={[styles.fieldTag, { color: Colors.gold }]}>RF</Text>}
+          {(layerRF || layerMag) && layerGrav && <Text style={styles.fieldDot}> · </Text>}
+          {layerGrav && <Text style={[styles.fieldTag, { color: '#1a4a8a' }]}>GRAV</Text>}
+        </View>
         {isSimulationMode && (
           <Text style={styles.simLabel}>SIMULATION</Text>
         )}
@@ -348,16 +384,47 @@ export default function ARFieldScreen() {
         )}
       </View>
 
-      {/* Top-right: magnitude + anomaly badge */}
+      {/* Top-right: multi-field readout */}
       <View style={styles.topRight} pointerEvents="none">
         <Text style={[styles.magnitudeValue, { color: magnitudeColor }]}>
           {hudData.magnitude.toFixed(1)}
         </Text>
-        <Text style={styles.magnitudeUnit}>µT</Text>
+        <Text style={styles.magnitudeUnit}>µT MAG</Text>
+        {rfState.networks.length > 0 && (
+          <Text style={styles.rfReadout}>
+            {rfState.networks[0].rssi} dBm RF
+          </Text>
+        )}
         {isBaselineReady
           ? <AnomalyBadge visible={isAnomaly} />
           : <Text style={styles.warmupLabel}>WARMUP</Text>
         }
+      </View>
+
+      {/* Right-side field layer controls */}
+      <View style={styles.layerControls}>
+        {[
+          { key: 'mag',  icon: '🔵', label: 'MAG',  active: layerMag,  color: Colors.cyan },
+          { key: 'rf',   icon: '🟡', label: 'RF',   active: layerRF,   color: Colors.gold },
+          { key: 'grav', icon: '🔷', label: 'GRAV', active: layerGrav, color: '#1a4a8a' },
+        ].map(({ key, icon, label, active, color }) => (
+          <TouchableOpacity
+            key={key}
+            style={[styles.layerBtn, active && { borderColor: color }]}
+            onPress={() => setLayer(key as any, !active)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.layerDot, { backgroundColor: active ? color : Colors.grey }]} />
+            <Text style={[styles.layerBtnText, { color: active ? color : Colors.grey }]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={styles.layerBtn}
+          onPress={() => setLayer('all', !(layerMag && layerRF && layerGrav))}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.layerBtnText}>ALL</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Nearby sacred site indicators */}
@@ -365,7 +432,7 @@ export default function ARFieldScreen() {
         <SiteIndicator key={entry.site.id} entry={entry} heading={hudData.heading} />
       ))}
 
-      {/* Bottom bar: gradient + waveform + heading */}
+      {/* Bottom bar: waveform + heading */}
       <View style={styles.bottomBar} pointerEvents="none">
         <View style={styles.waveformWrapper}>
           <Waveform />
@@ -378,8 +445,30 @@ export default function ARFieldScreen() {
           <Text style={styles.baselineLabel}>
             BASE  {useFieldStore.getState().rollingAverage.toFixed(1)} µT
           </Text>
+          {rfState.isIOS && (
+            <Text style={styles.iosNote}>iOS: cellular RF only</Text>
+          )}
         </View>
       </View>
+
+      {/* First-launch calibration overlay */}
+      {showCalibOverlay && (
+        <View style={styles.calibOverlay} pointerEvents="none">
+          <Text style={styles.calibTitle}>FIELD SCANNER ACTIVE</Text>
+          <Text style={styles.calibBody}>
+            Visualising real electromagnetic fields{'\n'}
+            invisible to the human eye.
+          </Text>
+          <View style={styles.calibLegend}>
+            <Text style={[styles.calibLegendLine, { color: Colors.cyan }]}>CYAN  — Earth's magnetic field</Text>
+            <Text style={[styles.calibLegendLine, { color: Colors.gold }]}>GOLD  — RF radiation (WiFi / cellular)</Text>
+            <Text style={[styles.calibLegendLine, { color: '#4488cc' }]}>BLUE  — Gravitational force</Text>
+          </View>
+          <Text style={styles.calibFooter}>
+            Everything you see is physically real.
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -504,5 +593,112 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     letterSpacing: 1,
     marginLeft: 'auto',
+  },
+  iosNote: {
+    fontFamily: Fonts.mono,
+    fontSize: 8,
+    color: Colors.grey,
+    opacity: 0.6,
+    marginLeft: Spacing.sm,
+  },
+
+  // Active field tags
+  activeFields: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  fieldTag: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+  fieldDot: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    color: Colors.grey,
+  },
+
+  // RF readout
+  rfReadout: {
+    fontFamily: Fonts.mono,
+    fontSize: 10,
+    color: Colors.gold,
+    opacity: 0.8,
+    marginTop: 2,
+  },
+
+  // Right-side layer controls
+  layerControls: {
+    position: 'absolute',
+    right: Spacing.sm,
+    top: '35%',
+    gap: Spacing.xs,
+    alignItems: 'flex-end',
+  },
+  layerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,10,0.72)',
+    borderWidth: BorderWidth.thin,
+    borderColor: Colors.grey,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  layerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  layerBtnText: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    letterSpacing: 1.5,
+  },
+
+  // Calibration overlay
+  calibOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,10,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+    zIndex: 100,
+  },
+  calibTitle: {
+    fontFamily: Fonts.header,
+    fontSize: FontSizes.lg,
+    color: Colors.cyan,
+    letterSpacing: 3,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  calibBody: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.sm,
+    color: Colors.greyLight,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: Spacing.lg,
+  },
+  calibLegend: {
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+    alignItems: 'flex-start',
+  },
+  calibLegendLine: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.sm,
+    letterSpacing: 1,
+  },
+  calibFooter: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.greyLight,
+    opacity: 0.5,
+    letterSpacing: 1,
+    fontStyle: 'italic',
   },
 });
