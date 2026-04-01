@@ -27,9 +27,9 @@ export interface AnomalyEntry {
 
 let locationPermissionGranted: boolean | null = null;
 
-// Cache last known GPS so we never block on a slow fix
-let lastKnownLat: number | null = null;
-let lastKnownLng: number | null = null;
+// Cache last known GPS — exported so other modules can read without blocking
+export let lastKnownLat: number | null = null;
+export let lastKnownLng: number | null = null;
 
 // Start a background GPS watcher that always keeps lastKnown fresh
 let locationWatcher: Location.LocationSubscription | null = null;

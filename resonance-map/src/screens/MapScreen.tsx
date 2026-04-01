@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import MapView, { Polyline, Region, LatLng as MapsLatLng } from 'react-native-maps';
-import * as Location from 'expo-location';
+
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
@@ -21,6 +21,7 @@ import {
   getNearestSite,
   getProximityLinksForAnomaly,
 } from '../constants/sacredSites';
+import * as anomalyLogModule from '../services/anomalyLog';
 import { AnomalyEntry, loadAnomalyLog } from '../services/anomalyLog';
 import {
   ConnectionLine,
@@ -136,21 +137,33 @@ export default function MapScreen() {
       activateKeepAwakeAsync();
       reload();
 
-      (async () => {
-        try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === 'granted') {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-          }
-        } catch {}
-      })();
+      // Use cached GPS from background watcher — never block on a live fix
+      const lat = anomalyLogModule.lastKnownLat;
+      const lng = anomalyLogModule.lastKnownLng;
+      if (lat !== null && lng !== null) {
+        setUserLocation({ lat, lng });
+      }
 
       return () => {
         deactivateKeepAwake();
       };
     }, [])
   );
+
+  // Keep user location fresh from cached watcher without blocking
+  useEffect(() => {
+    const id = setInterval(() => {
+      const lat = anomalyLogModule.lastKnownLat;
+      const lng = anomalyLogModule.lastKnownLng;
+      if (lat !== null && lng !== null) {
+        setUserLocation((prev) => {
+          if (prev?.lat === lat && prev?.lng === lng) return prev;
+          return { lat, lng };
+        });
+      }
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const visibleEntries = visibleRegion
     ? entries.filter((e) => {
@@ -168,21 +181,25 @@ export default function MapScreen() {
   const magneticHeading = hudHeading;
 
   // ── Show-on-map handler (from log sheet) ─────────────────────────────────
-  const handleShowOnMap = (entry: AnomalyEntry) => {
+  const handleShowOnMap = useCallback((entry: AnomalyEntry) => {
     if (entry.coordinates.lat == null) return;
+    // Close log sheet first, wait for its 320ms animation, then fly
+    setShowLogSheet(false);
     setShowBackToLog(true);
     setSpotlightId(entry.id);
-    mapRef.current?.animateToRegion({
-      latitude: entry.coordinates.lat,
-      longitude: entry.coordinates.lng!,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 800);
+    setTimeout(() => {
+      mapRef.current?.animateToRegion({
+        latitude: entry.coordinates.lat!,
+        longitude: entry.coordinates.lng!,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 600);
+    }, 350); // after sheet close animation
     setTimeout(() => {
       setSheetContent({ type: 'anomaly', entry });
-    }, 900);
+    }, 1000);
     setTimeout(() => setSpotlightId(null), 4000);
-  };
+  }, []);
 
   // ── AR target overlay (passed to AR screen via navigation param) ──────────
   const handleOpenAR = (entry: AnomalyEntry) => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -57,7 +57,7 @@ interface EntryCardProps {
   onVerified: () => void;
 }
 
-function EntryCard({ entry, index, onShowOnMap, onOpenAR, onVerified }: EntryCardProps) {
+const EntryCard = memo(function EntryCard({ entry, index, onShowOnMap, onOpenAR, onVerified }: EntryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const magnitude = useFieldStore.getState().reading.magnitude;
 
@@ -202,7 +202,7 @@ function EntryCard({ entry, index, onShowOnMap, onOpenAR, onVerified }: EntryCar
       )}
     </View>
   );
-}
+});
 
 function headingLabel(deg: number) {
   return ['N','NE','E','SE','S','SW','W','NW'][Math.round(deg / 45) % 8];
@@ -274,12 +274,12 @@ export default function AnomalyLogSheet({ visible, onClose, onShowOnMap, onOpenA
     loadAnomalyLog().then(setEntries);
   }, []);
 
-  const filtered = entries.filter((e) => {
+  const filtered = useMemo(() => entries.filter((e) => {
     if (filter === 'UNVERIFIED') return !e.verified;
     if (filter === 'VERIFIED')   return !!e.verified;
     if (filter === 'HIGH_MAG')   return e.magnitude > 60;
     return true;
-  });
+  }), [entries, filter]);
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -337,13 +337,17 @@ export default function AnomalyLogSheet({ visible, onClose, onShowOnMap, onOpenA
           <EntryCard
             entry={item}
             index={index}
-            onShowOnMap={(e) => { onClose(); onShowOnMap(e); }}
+            onShowOnMap={onShowOnMap}
             onOpenAR={(e) => { onClose(); onOpenAR(e); }}
             onVerified={reload}
           />
         )}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        initialNumToRender={10}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>◈</Text>
