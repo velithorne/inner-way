@@ -1,0 +1,93 @@
+# Same pattern as other Cursor mobile projects: EAS cloud build → download APK → GitHub Release.
+#
+# Prerequisites (once per repo):
+# 1. Link EAS: npx eas-cli login && npx eas-cli init --non-interactive  (commit app.json projectId)
+# 2. Repo secret EXPO_TOKEN: https://expo.dev/settings/access-tokens
+#
+# Triggers: manual, or push tag v* (e.g. v1.0.0)
+
+name: Android APK release (EAS + GitHub)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: EAS build (APK, preview profile)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::Missing repo secret EXPO_TOKEN. Add an Expo access token in GitHub → Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          npx eas-cli build -p android --profile preview --non-interactive --wait --json > eas-build.json
+          APK_URL="$(jq -r 'if type == "array" then .[0] else . end | .artifacts.applicationArchiveUrl // empty' eas-build.json)"
+          BUILD_PAGE="$(jq -r 'if type == "array" then .[0] else . end | .url // empty' eas-build.json)"
+          if [ -z "$APK_URL" ] || [ "$APK_URL" = "null" ]; then
+            echo "::error::Could not read applicationArchiveUrl from EAS JSON output:"
+            cat eas-build.json
+            exit 1
+          fi
+          {
+            echo "EAS_APK_URL=$APK_URL"
+            echo "EAS_BUILD_PAGE=$BUILD_PAGE"
+          } >> "$GITHUB_ENV"
+
+      - name: Download APK from EAS
+        run: |
+          set -euo pipefail
+          curl -fsSL -L -o biofield-scanner.apk "$EAS_APK_URL"
+          ls -la biofield-scanner.apk
+
+      - name: Release tag name
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_TAG=android-${{ github.run_number }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Biofield Scanner ${{ env.RELEASE_TAG }}
+          body: |
+            Android APK built with [EAS](https://expo.dev).
+
+            **Download:** attach `biofield-scanner.apk` below and install on your device (sideload).
+
+            Expo build page (logs): ${{ env.EAS_BUILD_PAGE }}
+          files: biofield-scanner.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### GitHub release (APK download)"
+            echo "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.RELEASE_TAG }}"
+          } >> "$GITHUB_STEP_SUMMARY"
