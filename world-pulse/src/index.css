@@ -1,0 +1,479 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-deep: #02040a;
+  --bg-panel: rgba(4, 8, 18, 0.72);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-glass: rgba(255, 255, 255, 0.09);
+  --text-primary: rgba(255, 255, 255, 0.88);
+  --text-secondary: rgba(255, 255, 255, 0.38);
+  --text-muted: rgba(255, 255, 255, 0.2);
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Layout ──────────────────────────────────────────────── */
+
+.app-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.canvas-container {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* ─── Header — minimal, feather-light ─────────────────────── */
+
+.app-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22px 28px 0;
+  pointer-events: none;
+}
+
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.logo-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+}
+
+.logo-sub {
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+/* ─── Live Badge — small pill ─────────────────────────────── */
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  pointer-events: auto;
+}
+
+.live-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+/* ─── Glass Panel ─────────────────────────────────────────── */
+
+.glass-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+/* ─── Bottom Dock — compact command strip ─────────────────── */
+
+.bottom-panel {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(520px, calc(100vw - 32px));
+}
+
+.submission-panel {
+  padding: 16px 20px 14px;
+}
+
+/* ─── Prompt ──────────────────────────────────────────────── */
+
+.prompt-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  line-height: 1.45;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* ─── Emotion Grid ────────────────────────────────────────── */
+
+.emotion-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.emotion-chip {
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+/* ─── Submit Row ──────────────────────────────────────────── */
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+}
+
+.submit-btn {
+  padding: 8px 26px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.submit-btn:disabled { cursor: default; }
+
+.submit-btn:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.anonymous-note {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  font-family: var(--font-mono);
+  opacity: 0.7;
+}
+
+/* ─── Confirmation state ──────────────────────────────────── */
+
+.confirmation-state {
+  text-align: center;
+  padding: 16px 0 12px;
+}
+
+/* ─── Debug — icon-only toggle, bottom-left ───────────────── */
+
+.debug-anchor {
+  position: absolute;
+  bottom: 28px;
+  left: 28px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.debug-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Icon-only circle, 32×32 */
+.debug-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.debug-toggle-btn:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.debug-panel {
+  padding: 16px 18px;
+  width: 268px;
+}
+
+.debug-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+}
+
+.debug-section-title {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin: 12px 0 6px;
+  font-family: var(--font-mono);
+}
+
+.debug-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.debug-row label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  letter-spacing: 0.07em;
+  min-width: 76px;
+  font-family: var(--font-mono);
+}
+
+.debug-row span {
+  font-size: 9px;
+  color: var(--text-muted);
+  min-width: 38px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.debug-row input[type="range"] {
+  flex: 1;
+  accent-color: #1a6fa8;
+  height: 2px;
+  cursor: pointer;
+}
+
+.debug-select {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  padding: 2px 5px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.debug-btn {
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 9px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+
+.debug-btn.active {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #22c55e;
+}
+
+.city-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.city-btn {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-muted);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+
+.city-btn:hover {
+  border-color: var(--border-glass);
+  color: var(--text-secondary);
+}
+
+.storm-btn {
+  width: 100%;
+  padding: 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: rgba(251, 191, 36, 0.05);
+  color: rgba(251, 191, 36, 0.65);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.storm-btn:hover {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.38);
+  color: rgba(251, 191, 36, 0.88);
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 2px; }
+
+/* ─── Mobile — compact dock layout ───────────────────────── */
+
+@media (max-width: 640px) {
+  .app-header {
+    padding: max(env(safe-area-inset-top), 16px) 18px 0;
+  }
+
+  .logo-text {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+  }
+
+  .logo-sub {
+    display: none;
+  }
+
+  /* Dock anchors to the bottom edge, full-width, borderless top corners */
+  .bottom-panel {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+  }
+
+  .submission-panel {
+    padding: 14px 16px max(env(safe-area-inset-bottom), 16px);
+    border-radius: 14px 14px 0 0;
+  }
+
+  .prompt-text {
+    font-size: 10.5px;
+    margin-bottom: 10px;
+  }
+
+  .emotion-grid {
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+
+  .emotion-chip {
+    padding: 7px 10px !important;
+    font-size: 10px !important;
+    min-height: 36px;
+  }
+
+  .submit-row {
+    gap: 10px;
+  }
+
+  .submit-btn {
+    padding: 9px 22px;
+    font-size: 10px;
+    min-height: 40px;
+  }
+
+  .anonymous-note {
+    font-size: 8.5px;
+  }
+
+  /* Debug anchor — above the bottom dock */
+  .debug-anchor {
+    bottom: calc(max(env(safe-area-inset-bottom), 0px) + 180px);
+    left: 16px;
+  }
+
+  .debug-panel {
+    width: calc(100vw - 32px);
+    max-width: 268px;
+    max-height: 55vh;
+    overflow-y: auto;
+  }
+}
+
+/* ─── Touch pointer — 44px minimum targets ───────────────── */
+
+@media (pointer: coarse) {
+  .emotion-chip {
+    min-height: 40px;
+  }
+
+  .submit-btn {
+    min-height: 44px;
+  }
+
+  .city-btn {
+    min-height: 34px;
+    padding: 5px 10px !important;
+  }
+
+  .debug-toggle-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
