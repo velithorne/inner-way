@@ -39,7 +39,7 @@ The previous minimal README and HTML helper files are preserved under `_legacy/`
 
 ## Android APK (same as Resonance Map — no Expo token)
 
-**Default release path** matches your other **`velithorne/inner-way`** projects: push a **`v*`** tag → GitHub Actions runs **`expo prebuild`** + **Gradle `assembleDebug`** → uploads **`BiofieldScanner-<tag>-debug.apk`** to a **GitHub Release**. **No `EXPO_TOKEN`** required (only the automatic `GITHUB_TOKEN`).
+**Default release path:** push a **`v*`** tag → GitHub Actions runs **`expo prebuild`** + **Gradle `assembleRelease`** (embeds the JS bundle — **no Metro required** on the phone) → uploads **`BiofieldScanner-<tag>-release.apk`**. **No `EXPO_TOKEN`** required.
 
 ```bash
 git tag v1.0.0-biofield

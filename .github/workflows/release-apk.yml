@@ -1,4 +1,4 @@
-# Same pattern as Resonance Map / AuraShell: Gradle debug APK → GitHub Release on version tags.
+# Gradle release APK (JS bundle embedded). Debug APK would require Metro — we use assembleRelease.
 # No EXPO_TOKEN — only GITHUB_TOKEN (automatic).
 #
 # Release:
@@ -58,19 +58,19 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Build release APK (embeds JavaScript bundle)
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Prepare release asset
         run: |
-          cp "android/app/build/outputs/apk/debug/app-debug.apk" \
-            "BiofieldScanner-${{ github.ref_name }}-debug.apk"
+          cp "android/app/build/outputs/apk/release/app-release.apk" \
+            "BiofieldScanner-${{ github.ref_name }}-release.apk"
 
       - name: Create GitHub Release and upload APK
         uses: softprops/action-gh-release@v2
         with:
-          files: BiofieldScanner-${{ github.ref_name }}-debug.apk
+          files: BiofieldScanner-${{ github.ref_name }}-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
