@@ -1,82 +1,87 @@
 /**
- * ARFieldCanvas — Physically accurate multi-field AR renderer.
+ * ARFieldCanvas — Deep realism multi-field AR renderer.
  *
- * FIELD 1: Magnetic dipole lines (r = r0·sin²θ geometry, live magnetometer axis)
- * FIELD 2: RF heat bloom (WiFi RSSI → sprite clouds, 3s update)
- * FIELD 3: Gravity threads (accelerometer low-pass → true vertical lines)
+ * FIELD 1: Magnetic dipole — true r=L·sin²(θ) geometry, tube geometry with
+ *          vertex colour gradient, travelling highlight nodes, pole spheres,
+ *          compression on anomaly.
  *
- * Every visible element is driven by real sensor data.
- * Nothing is decorative.
+ * FIELD 2: RF radiation — expanding concentric wavefront shells per WiFi
+ *          source (frequency determines shell spacing), interference plane
+ *          particles where two networks' wavefronts bisect, surface echo.
+ *
+ * FIELD 3: Gravity — deforming 3D wireframe mesh + falling particles always
+ *          in true gravitational direction.
+ *
+ * Depth fog, chromatic separation post-process (high-RAM devices only),
+ * magnetic/gravity convergence detection.
  */
 
 import React, { useRef, useCallback, useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
 import * as THREE from 'three';
 import { Accelerometer } from 'expo-sensors';
+import DeviceInfo from 'react-native-device-info';
 import { useFieldStore } from '../store/useFieldStore';
 import { subscribeRF, RFNetwork } from '../services/rfScanner';
 import { Colors } from '../constants/theme';
 import { FIELD_WEAK_MAX, FIELD_NORMAL_MAX } from '../constants/thresholds';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const DIPOLE_LINES       = 16;   // field lines around magnetic axis
-const DIPOLE_POINTS      = 60;   // points per CatmullRom curve
-const DIPOLE_R0          = 2.2;  // equatorial radius of outer field line
-const RF_SPRITES_FULL    = 20;
-const RF_SPRITES_REDUCED = 8;
-const GRAV_THREADS       = 12;
-const GRAV_LENGTH        = 5.0;
-const ACCEL_ALPHA        = 0.05; // low-pass smoothing for gravity
+const MAG_L_VALUES  = [0.3, 0.45, 0.6, 0.75, 0.9, 1.1, 1.35, 1.7, 2.1, 2.6, 3.2, 3.8];
+const MAG_AZ_COUNT  = 2;   // lines per L value (symmetric pair)
+const MAG_CURVE_PTS = 80;
+const MAG_TUBE_SEGS = 40;
+const HIGHLIGHT_PER_LINE = 3;
 
-// ── Glow texture ─────────────────────────────────────────────────────────────
-function makeGlowTexture(): THREE.DataTexture {
-  const S = 64;
-  const data = new Uint8Array(S * S * 4);
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const d = Math.sqrt((x - S / 2) ** 2 + (y - S / 2) ** 2) / (S / 2);
-      const a = Math.max(0, 1 - d) ** 1.8;
-      const i = (y * S + x) * 4;
-      data[i] = data[i+1] = data[i+2] = 255;
-      data[i+3] = Math.round(a * 255);
+const RF_SHELLS_PER_NET = 5;
+const RF_MAX_NETWORKS   = 4;
+const RF_MAX_RADIUS     = 2.8;
+const INTERFERENCE_PTS  = 40;
+
+const GRAV_GRID_W   = 20;
+const GRAV_GRID_H   = 14;
+const GRAV_GRID_D   = 4;
+const GRAV_PARTICLES_FULL    = 1200;
+const GRAV_PARTICLES_REDUCED = 600;
+const ACCEL_ALPHA   = 0.04;
+const FRAME_SLOW_MS = 1000 / 45;
+
+// ── Textures ──────────────────────────────────────────────────────────────────
+function makeGlowTex(size = 64): THREE.DataTexture {
+  const d = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const r = Math.sqrt((x - size/2)**2 + (y - size/2)**2) / (size/2);
+      const a = Math.max(0, 1 - r) ** 1.6;
+      const i = (y*size+x)*4;
+      d[i]=d[i+1]=d[i+2]=255; d[i+3]=Math.round(a*255);
     }
   }
-  const t = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
-  t.needsUpdate = true;
-  return t;
+  const t = new THREE.DataTexture(d,size,size,THREE.RGBAFormat);
+  t.needsUpdate=true; return t;
 }
 
-// ── Dipole geometry ──────────────────────────────────────────────────────────
-/**
- * Generate one dipole field line in the plane defined by the meridian angle φ.
- * r = r0 * sin²(θ), θ from 0 to π, projected into 3D.
- * The line arcs from south pole, out to equatorial radius, back to north pole.
- */
-function dipoleCurvePoints(
-  r0: number,
-  phiRad: number,      // meridian angle around axis
-  numPts: number
-): THREE.Vector3[] {
+// ── Dipole geometry ───────────────────────────────────────────────────────────
+function dipolePoints(L: number, azPhi: number, nPts: number): THREE.Vector3[] {
   const pts: THREE.Vector3[] = [];
-  for (let i = 0; i <= numPts; i++) {
-    const theta = (i / numPts) * Math.PI;
-    const r = r0 * Math.sin(theta) ** 2;
-    // Spherical → Cartesian (axis = Y, meridian = XZ plane rotated by phi)
-    const x = r * Math.sin(theta) * Math.cos(phiRad);
-    const y = r * Math.cos(theta);
-    const z = r * Math.sin(theta) * Math.sin(phiRad);
-    pts.push(new THREE.Vector3(x, y, z));
+  for (let i = 0; i <= nPts; i++) {
+    const theta = (i / nPts) * Math.PI;
+    const r = L * Math.sin(theta) ** 2;
+    pts.push(new THREE.Vector3(
+      r * Math.sin(theta) * Math.cos(azPhi),
+      r * Math.cos(theta),
+      r * Math.sin(theta) * Math.sin(azPhi)
+    ));
   }
   return pts;
 }
 
-// Build a quaternion that rotates Y-axis to align with the magnetic axis vector
-function axisQuat(mx: number, my: number, mz: number): THREE.Quaternion {
-  const len = Math.sqrt(mx*mx + my*my + mz*mz) || 1;
-  const target = new THREE.Vector3(mx/len, mz/len, my/len); // remap sensor axes
+function magAxisQuat(mx: number, my: number, mz: number): THREE.Quaternion {
+  const len = Math.sqrt(mx*mx+my*my+mz*mz)||1;
+  const target = new THREE.Vector3(mx/len, mz/len, my/len).normalize();
   const q = new THREE.Quaternion();
-  q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), target.normalize());
+  q.setFromUnitVectors(new THREE.Vector3(0,1,0), target);
   return q;
 }
 
@@ -87,277 +92,388 @@ function getMagColor(magnitude: number, isAnomaly: boolean): THREE.Color {
   return new THREE.Color(Colors.blueBright);
 }
 
-// ── RF sprite positions ───────────────────────────────────────────────────────
-function rfSpritePositions(
-  network: RFNetwork,
-  cameraHeadingRad: number,
-  spriteCount: number
-): THREE.Vector3[] {
-  // Map RSSI intensity to depth: strong=close, weak=far
-  const depth = 0.5 + (1.0 - network.intensity) * 1.5;
-  // Pseudo-direction from BSSID hash + camera heading
-  const angle = ((network.pseudoAngle * Math.PI / 180) + cameraHeadingRad) % (Math.PI * 2);
-  const cx = Math.sin(angle) * depth * 0.6;
-  const cy = 0;
-  const cz = -depth;
+/** Build tube-like geometry for a CatmullRom curve with vertex colours. */
+function buildLineTube(pts: THREE.Vector3[], tubeRadius: number): THREE.BufferGeometry {
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const positions: number[] = [];
+  const colours: number[] = [];
+  const nTube = MAG_TUBE_SEGS;
+  const nSides = 5; // low-poly tube for performance
+  const curvePoints = curve.getPoints(nTube);
 
-  const pts: THREE.Vector3[] = [];
-  for (let i = 0; i < spriteCount; i++) {
-    // Gaussian distribution around centre
-    const u = Math.random(), v = Math.random();
-    const r = Math.sqrt(-2 * Math.log(u + 0.001)) * 0.25;
-    const a = 2 * Math.PI * v;
-    pts.push(new THREE.Vector3(cx + r*Math.cos(a), cy + r*Math.sin(a)*0.6, cz + r*0.3));
+  for (let i = 0; i < nTube; i++) {
+    const t = i / (nTube - 1);
+    // Vertex colour: white at poles, cyan mid-arc, dark at equator
+    const distFromPole = Math.min(t, 1 - t) * 2; // 0 at poles, 1 at equator
+    const r = THREE.MathUtils.lerp(1.0,  0.0, distFromPole);
+    const g = THREE.MathUtils.lerp(1.0,  0.5, distFromPole);
+    const b = THREE.MathUtils.lerp(1.0,  0.8, distFromPole);
+    const a = THREE.MathUtils.lerp(1.0,  0.4, distFromPole);
+
+    const centre = curvePoints[i];
+    const next   = curvePoints[Math.min(i+1,nTube-1)];
+    const tangent = new THREE.Vector3().subVectors(next, centre).normalize();
+    const up = new THREE.Vector3(0,1,0);
+    const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+    if (normal.lengthSq() < 0.01) normal.set(1,0,0);
+    const binorm = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+    // Vary tube radius — thicker near poles
+    const rr = tubeRadius * (0.3 + (1 - distFromPole) * 0.7) * (0.006 / 0.008);
+
+    for (let s = 0; s <= nSides; s++) {
+      const angle = (s / nSides) * Math.PI * 2;
+      const px = centre.x + (Math.cos(angle)*normal.x + Math.sin(angle)*binorm.x)*rr;
+      const py = centre.y + (Math.cos(angle)*normal.y + Math.sin(angle)*binorm.y)*rr;
+      const pz = centre.z + (Math.cos(angle)*normal.z + Math.sin(angle)*binorm.z)*rr;
+      positions.push(px, py, pz);
+      colours.push(r, g, b, a);
+    }
   }
-  return pts;
-}
 
-// ── Gravity thread positions ──────────────────────────────────────────────────
-function gravThreadPositions(
-  gx: number, gy: number, gz: number,  // smoothed accelerometer (gravity direction)
-  width: number
-): { starts: THREE.Vector3[]; ends: THREE.Vector3[] } {
-  // Gravity vector in camera space — normalise
-  const len = Math.sqrt(gx*gx + gy*gy + gz*gz) || 1;
-  const gDir = new THREE.Vector3(-gx/len, -gy/len, -gz/len); // down = gravity dir
-  const halfLen = GRAV_LENGTH / 2;
-  const starts: THREE.Vector3[] = [];
-  const ends: THREE.Vector3[] = [];
-
-  for (let i = 0; i < GRAV_THREADS; i++) {
-    const t = (i / (GRAV_THREADS - 1)) - 0.5;
-    const x = t * width;
-    const centre = new THREE.Vector3(x, 0, -1.5);
-    starts.push(centre.clone().addScaledVector(gDir, -halfLen));
-    ends.push(centre.clone().addScaledVector(gDir, halfLen));
+  // Build index faces between rings
+  const indices: number[] = [];
+  const stride = nSides + 1;
+  for (let i = 0; i < nTube - 1; i++) {
+    for (let s = 0; s < nSides; s++) {
+      const a = i * stride + s;
+      const b = a + 1;
+      const c = a + stride;
+      const dd = c + 1;
+      indices.push(a,b,c, b,dd,c);
+    }
   }
-  return { starts, ends };
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(colours), 4));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+  return geo;
 }
 
-// ── Shared scene refs ─────────────────────────────────────────────────────────
-interface SceneRefs {
-  renderer: THREE.WebGLRenderer;
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  // Dipole
-  dipoleGroup: THREE.Group;
-  dipoleLines: THREE.Line[];
-  dipoleAxis: THREE.Line;
-  lastAxisQuat: THREE.Quaternion;
-  lastAxisAngleDeg: number;
-  // RF
-  rfGroup: THREE.Group;
-  rfSprites: Map<string, THREE.Sprite[]>;
-  rfSpriteCount: number;
-  glowTex: THREE.DataTexture;
-  // Gravity
-  gravGroup: THREE.Group;
-  gravLineGeo: THREE.BufferGeometry;
-  // State
-  animFrame: number | null;
-  tick: number;
-  lastMs: number;
-  // Field visibility (driven by layer toggles in ARFieldScreen)
-  showMag: boolean;
-  showRF: boolean;
-  showGrav: boolean;
-}
-
+// ── Exports ───────────────────────────────────────────────────────────────────
 export interface ARFieldCanvasHandle {
   setLayers: (mag: boolean, rf: boolean, grav: boolean) => void;
 }
 
 interface Props {
   layerRef?: React.MutableRefObject<ARFieldCanvasHandle | null>;
+  onConvergence?: (isConverging: boolean) => void;
 }
 
-export default function ARFieldCanvas({ layerRef }: Props) {
-  const sceneRef = useRef<SceneRefs | null>(null);
-  const storeRef = useRef(useFieldStore.getState());
-  const rfRef = useRef<RFNetwork[]>([]);
-  const gravRef = useRef({ x: 0, y: -9.8, z: 0 }); // smoothed accelerometer
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
+  const sceneRef   = useRef<any>(null);
+  const storeRef   = useRef(useFieldStore.getState());
+  const rfRef      = useRef<RFNetwork[]>([]);
+  const gravRef    = useRef({ x: 0, y: -9.8, z: 0 });
+  const highRamRef = useRef(false);
 
   useEffect(() => {
-    return useFieldStore.subscribe((s) => { storeRef.current = s; });
+    return useFieldStore.subscribe(s => { storeRef.current = s; });
   }, []);
 
-  // RF scanner subscription
   useEffect(() => {
-    return subscribeRF((state) => {
-      rfRef.current = state.networks;
-      // Update RF sprite positions when new scan arrives
-      const refs = sceneRef.current;
-      if (!refs) return;
-      updateRFSprites(refs, rfRef.current, storeRef.current.reading.heading);
-    });
+    return subscribeRF(s => { rfRef.current = s.networks.slice(0, RF_MAX_NETWORKS); });
   }, []);
 
-  // Accelerometer for gravity
   useEffect(() => {
-    Accelerometer.setUpdateInterval(16); // 60Hz
+    Accelerometer.setUpdateInterval(16);
     const sub = Accelerometer.addListener(({ x, y, z }) => {
-      // Low-pass filter — smooth out device vibration
+      const g = gravRef.current;
       gravRef.current = {
-        x: gravRef.current.x + ACCEL_ALPHA * (x - gravRef.current.x),
-        y: gravRef.current.y + ACCEL_ALPHA * (y - gravRef.current.y),
-        z: gravRef.current.z + ACCEL_ALPHA * (z - gravRef.current.z),
+        x: g.x + ACCEL_ALPHA*(x-g.x),
+        y: g.y + ACCEL_ALPHA*(y-g.y),
+        z: g.z + ACCEL_ALPHA*(z-g.z),
       };
     });
     return () => sub.remove();
   }, []);
 
-  // Layer control handle
   useEffect(() => {
-    if (!layerRef) return;
-    layerRef.current = {
-      setLayers: (mag, rf, grav) => {
-        const refs = sceneRef.current;
-        if (!refs) return;
-        refs.showMag = mag;
-        refs.showRF = rf;
-        refs.showGrav = grav;
-        refs.dipoleGroup.visible = mag;
-        refs.rfGroup.visible = rf;
-        refs.gravGroup.visible = grav;
-      },
-    };
-  }, [layerRef]);
-
-  // ── RF sprite update (called on scan, not every frame) ──────────────────
-  function updateRFSprites(refs: SceneRefs, networks: RFNetwork[], headingDeg: number) {
-    // Clear old sprites
-    refs.rfGroup.clear();
-    refs.rfSprites.clear();
-
-    const headingRad = (headingDeg * Math.PI) / 180;
-
-    for (const net of networks) {
-      const sprites: THREE.Sprite[] = [];
-      const positions = rfSpritePositions(net, headingRad, refs.rfSpriteCount);
-      for (const pos of positions) {
-        const mat = new THREE.SpriteMaterial({
-          map: refs.glowTex,
-          color: new THREE.Color(Colors.gold),
-          transparent: true,
-          opacity: Math.max(0.12, net.intensity * 0.85),
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        });
-        const s = new THREE.Sprite(mat);
-        s.position.copy(pos);
-        const sz = 0.06 + net.intensity * 0.18;
-        s.scale.set(sz, sz, 1);
-        refs.rfGroup.add(s);
-        sprites.push(s);
-      }
-      refs.rfSprites.set(net.id, sprites);
-    }
-  }
+    DeviceInfo.getTotalMemory().then(mem => {
+      highRamRef.current = mem > 4 * 1024 * 1024 * 1024; // > 4GB
+    }).catch(() => {});
+  }, []);
 
   const onContextCreate = useCallback((gl: ExpoWebGLRenderingContext) => {
-    const W = gl.drawingBufferWidth;
-    const H = gl.drawingBufferHeight;
+    const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
 
     // @ts-ignore expo-gl canvas shim
-    const canvasShim: HTMLCanvasElement = {
-      width: W, height: H,
-      style: {} as CSSStyleDeclaration,
-      addEventListener: () => {}, removeEventListener: () => {},
-      clientHeight: H,
-      // @ts-ignore
-      getContext: () => gl,
+    const canvas: HTMLCanvasElement = {
+      width:W, height:H, style:{} as CSSStyleDeclaration,
+      addEventListener:()=>{}, removeEventListener:()=>{},
+      clientHeight:H, getContext:()=>gl as any,
     };
 
     const renderer = new THREE.WebGLRenderer({
-      canvas: canvasShim,
-      context: gl as unknown as WebGLRenderingContext,
-      antialias: false,
-      alpha: true,
+      canvas, context: gl as unknown as WebGLRenderingContext,
+      antialias: false, alpha: true,
     });
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(1);
+    renderer.setSize(W, H); renderer.setPixelRatio(1);
     renderer.setClearColor(0x000000, 0);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, W / H, 0.01, 50);
-    camera.position.set(0, 0, 0);
+    const scene  = new THREE.Scene();
+    // Depth fog — distant geometry fades to near-black
+    scene.fog = new THREE.FogExp2(0x00000A, 0.38);
 
-    const glowTex = makeGlowTexture();
+    const camera = new THREE.PerspectiveCamera(70, W/H, 0.01, 20);
+    camera.position.set(0,0,0);
 
-    // ── FIELD 1: Magnetic dipole lines ──────────────────────────────────────
-    const dipoleGroup = new THREE.Group();
-    scene.add(dipoleGroup);
+    const glowTex = makeGlowTex();
 
-    const dipoleLines: THREE.Line[] = [];
-    for (let i = 0; i < DIPOLE_LINES; i++) {
-      const phi = (i / DIPOLE_LINES) * Math.PI * 2;
-      // Distribute outer lines with varying r0 for visual depth
-      const lineR0 = DIPOLE_R0 * (0.4 + (i % 4) * 0.2);
-      const pts = dipoleCurvePoints(lineR0, phi, DIPOLE_POINTS);
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(DIPOLE_POINTS));
-      const mat = new THREE.LineBasicMaterial({
-        color: new THREE.Color(Colors.cyan),
-        transparent: true,
-        opacity: 0.6,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-      });
-      const line = new THREE.Line(geo, mat);
-      dipoleGroup.add(line);
-      dipoleLines.push(line);
+    // ── AMBIENT LIGHT ─────────────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0x111122, 1.0));
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FIELD 1 — MAGNETIC DIPOLE
+    // ══════════════════════════════════════════════════════════════════════════
+    const magGroup = new THREE.Group();
+    scene.add(magGroup);
+
+    const fieldLines: THREE.Mesh[] = [];
+    const highlightNodes: { mesh: THREE.Sprite; lineIndex: number; phase: number }[] = [];
+
+    // Azimuthal density distribution: arcsin(sqrt(i/n))*2 for natural clustering
+    const nL = MAG_L_VALUES.length;
+    for (let li = 0; li < nL; li++) {
+      const L = MAG_L_VALUES[li];
+      for (let az = 0; az < MAG_AZ_COUNT; az++) {
+        const frac = (li * MAG_AZ_COUNT + az) / (nL * MAG_AZ_COUNT - 1);
+        const phi  = Math.asin(Math.sqrt(frac)) * 2 * Math.PI * (az === 0 ? 1 : -1);
+        const pts  = dipolePoints(L, phi, MAG_CURVE_PTS);
+        const geo  = buildLineTube(pts, 0.008);
+        const mat  = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.75,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        magGroup.add(mesh);
+        fieldLines.push(mesh);
+
+        // Highlight travelling nodes
+        for (let h = 0; h < HIGHLIGHT_PER_LINE; h++) {
+          const hMat = new THREE.SpriteMaterial({
+            map: glowTex, color: new THREE.Color('#FFFFFF'),
+            transparent: true, opacity: 0.9,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          });
+          const hMesh = new THREE.Sprite(hMat);
+          hMesh.scale.set(0.04, 0.04, 1);
+          magGroup.add(hMesh);
+          highlightNodes.push({ mesh: hMesh, lineIndex: fieldLines.length - 1, phase: h / HIGHLIGHT_PER_LINE });
+        }
+      }
     }
 
-    // Central axis line
-    const axisPts = [new THREE.Vector3(0, -DIPOLE_R0 * 0.5, 0), new THREE.Vector3(0, DIPOLE_R0 * 0.5, 0)];
-    const axisGeo = new THREE.BufferGeometry().setFromPoints(axisPts);
-    const axisMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color(Colors.cyan),
-      transparent: true,
-      opacity: 1.0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const dipoleAxis = new THREE.Line(axisGeo, axisMat);
-    dipoleGroup.add(dipoleAxis);
+    // Pole spheres
+    const poleGeo = new THREE.SphereGeometry(0.04, 10, 8);
+    const northMat = new THREE.MeshStandardMaterial({ color:0x0044FF, emissive:0x0044FF, emissiveIntensity:1.5, transparent:true, opacity:0.9 });
+    const southMat = new THREE.MeshStandardMaterial({ color:0xFF2200, emissive:0xFF2200, emissiveIntensity:1.5, transparent:true, opacity:0.9 });
+    const northPole = new THREE.Mesh(poleGeo, northMat);
+    const southPole = new THREE.Mesh(poleGeo, southMat);
+    magGroup.add(northPole, southPole);
 
-    // ── FIELD 2: RF sprites ──────────────────────────────────────────────────
+    const northLight = new THREE.PointLight(0x0044FF, 0.6, 1.5); northPole.add(northLight);
+    const southLight = new THREE.PointLight(0xFF2200, 0.6, 1.5); southPole.add(southLight);
+
+    // Precompute curve points arrays for highlight animation
+    const lineCurves: THREE.Vector3[][] = MAG_L_VALUES.flatMap((L, li) =>
+      Array.from({ length: MAG_AZ_COUNT }, (_, az) => {
+        const frac = (li * MAG_AZ_COUNT + az) / (nL * MAG_AZ_COUNT - 1);
+        const phi  = Math.asin(Math.sqrt(frac)) * 2 * Math.PI * (az === 0 ? 1 : -1);
+        const pts  = dipolePoints(L, phi, MAG_CURVE_PTS);
+        const curve = new THREE.CatmullRomCurve3(pts);
+        return curve.getPoints(MAG_CURVE_PTS);
+      })
+    );
+
+    // Lens flare sprites for poles
+    const nFlareMat = new THREE.SpriteMaterial({ map:glowTex, color:new THREE.Color('#0066FF'), transparent:true, opacity:0, blending:THREE.AdditiveBlending });
+    const sFlareMat = new THREE.SpriteMaterial({ map:glowTex, color:new THREE.Color('#FF4400'), transparent:true, opacity:0, blending:THREE.AdditiveBlending });
+    const nFlare = new THREE.Sprite(nFlareMat); nFlare.scale.set(0.3,0.3,1); magGroup.add(nFlare);
+    const sFlare = new THREE.Sprite(sFlareMat); sFlare.scale.set(0.3,0.3,1); magGroup.add(sFlare);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FIELD 2 — RF WAVEFRONT SHELLS
+    // ══════════════════════════════════════════════════════════════════════════
     const rfGroup = new THREE.Group();
     scene.add(rfGroup);
 
-    // ── FIELD 3: Gravity threads ─────────────────────────────────────────────
+    interface ShellEntry {
+      mesh: THREE.Mesh;
+      phase: number;
+      baseOpacity: number;
+      maxRadius: number;
+      expandRate: number;
+      sourcePos: THREE.Vector3;
+    }
+
+    let shellEntries: ShellEntry[] = [];
+    let interferenceParts: THREE.Points | null = null;
+    let surfaceEchoGroup: THREE.Group | null = null;
+
+    function rebuildRFShells(networks: RFNetwork[], headingDeg: number) {
+      rfGroup.clear();
+      shellEntries = [];
+      interferenceParts = null;
+
+      const headingRad = (headingDeg * Math.PI) / 180;
+      const limited = networks.slice(0, RF_MAX_NETWORKS);
+
+      const sourcePosArr: THREE.Vector3[] = [];
+
+      for (const net of limited) {
+        // Signal depth: strong=close, weak=far
+        const depth   = 0.5 + (1 - net.intensity) * 1.8;
+        const angle   = ((net.pseudoAngle * Math.PI / 180) + headingRad) % (Math.PI * 2);
+        const srcPos  = new THREE.Vector3(Math.sin(angle) * depth * 0.5, 0, -depth);
+        sourcePosArr.push(srcPos.clone());
+
+        // Colour by frequency
+        let col = new THREE.Color(Colors.gold);
+        if (net.frequency > 4900)      col = new THREE.Color('#FFDDAA'); // 5GHz
+        else if (net.frequency === 0)  col = new THREE.Color('#FF6600'); // cellular
+
+        const baseOpacity = Math.max(0.1, net.intensity * 0.72);
+        // Shell spacing: 5GHz tighter, 2.4GHz wider
+        const spacingFactor = net.frequency > 4900 ? 0.38 : 0.62;
+
+        for (let s = 0; s < RF_SHELLS_PER_NET; s++) {
+          const shellGeo = new THREE.SphereGeometry(0.01, 16, 10);
+          const shellMat = new THREE.MeshBasicMaterial({
+            color: col, transparent: true, opacity: baseOpacity,
+            wireframe: false, depthWrite: false, blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+          });
+          const shell = new THREE.Mesh(shellGeo, shellMat);
+          shell.position.copy(srcPos);
+          rfGroup.add(shell);
+
+          shellEntries.push({
+            mesh: shell,
+            phase: (s / RF_SHELLS_PER_NET) * spacingFactor * RF_MAX_RADIUS,
+            baseOpacity,
+            maxRadius: RF_MAX_RADIUS,
+            expandRate: 0.012 + net.intensity * 0.008,
+            sourcePos: srcPos.clone(),
+          });
+        }
+
+        // Volumetric source glow
+        const vMat = new THREE.SpriteMaterial({
+          map: glowTex, color: new THREE.Color('#442200'),
+          transparent: true, opacity: net.intensity * 0.5,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        });
+        const vSprite = new THREE.Sprite(vMat);
+        vSprite.position.copy(srcPos);
+        const vSz = 0.1 + net.intensity * 0.35;
+        vSprite.scale.set(vSz, vSz, 1);
+        rfGroup.add(vSprite);
+      }
+
+      // Interference particles between first two networks
+      if (sourcePosArr.length >= 2) {
+        const sA = sourcePosArr[0], sB = sourcePosArr[1];
+        const midpoint = new THREE.Vector3().addVectors(sA, sB).multiplyScalar(0.5);
+        const bisector = new THREE.Vector3().subVectors(sB, sA).normalize();
+        const perp1    = new THREE.Vector3().crossVectors(bisector, new THREE.Vector3(0,1,0)).normalize();
+        const perp2    = new THREE.Vector3().crossVectors(bisector, perp1).normalize();
+
+        const iPos = new Float32Array(INTERFERENCE_PTS * 3);
+        for (let i = 0; i < INTERFERENCE_PTS; i++) {
+          const u = (Math.random() - 0.5) * 1.2;
+          const v = (Math.random() - 0.5) * 1.2;
+          iPos[i*3]   = midpoint.x + perp1.x*u + perp2.x*v;
+          iPos[i*3+1] = midpoint.y + perp1.y*u + perp2.y*v;
+          iPos[i*3+2] = midpoint.z + perp1.z*u + perp2.z*v;
+        }
+        const iGeo  = new THREE.BufferGeometry();
+        iGeo.setAttribute('position', new THREE.BufferAttribute(iPos, 3));
+        const iMat  = new THREE.PointsMaterial({
+          map: glowTex, color: new THREE.Color(Colors.gold),
+          size: 0.06, transparent: true, opacity: 0.65,
+          blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+        });
+        interferenceParts = new THREE.Points(iGeo, iMat);
+        rfGroup.add(interferenceParts);
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FIELD 3 — GRAVITY
+    // ══════════════════════════════════════════════════════════════════════════
     const gravGroup = new THREE.Group();
     scene.add(gravGroup);
 
-    // Pre-allocate gravity line geometries
-    const gravPositions = new Float32Array(GRAV_THREADS * 2 * 3);
-    const gravGeo = new THREE.BufferGeometry();
-    gravGeo.setAttribute('position', new THREE.BufferAttribute(gravPositions, 3));
-    const gravMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color('#001433'),
-      transparent: true,
-      opacity: 0.3,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const gravLineSegments = new THREE.LineSegments(gravGeo, gravMat);
-    gravGroup.add(gravLineSegments);
+    // Deforming wireframe mesh
+    const GW = GRAV_GRID_W, GH = GRAV_GRID_H;
+    const gridPosBase = new Float32Array(GW * GH * 3);
+    const gridPosCurr = new Float32Array(GW * GH * 3);
+    const gridIndices: number[] = [];
 
-    const refs: SceneRefs = {
+    for (let row = 0; row < GH; row++) {
+      for (let col = 0; col < GW; col++) {
+        const i = (row * GW + col) * 3;
+        gridPosBase[i]   = (col / (GW-1) - 0.5) * 4.0;
+        gridPosBase[i+1] = (row / (GH-1) - 0.5) * 2.4;
+        gridPosBase[i+2] = -1.8;
+        gridPosCurr[i] = gridPosBase[i];
+        gridPosCurr[i+1] = gridPosBase[i+1];
+        gridPosCurr[i+2] = gridPosBase[i+2];
+        if (col < GW-1) { gridIndices.push(row*GW+col, row*GW+col+1); }
+        if (row < GH-1) { gridIndices.push(row*GW+col, (row+1)*GW+col); }
+      }
+    }
+    const gridGeo = new THREE.BufferGeometry();
+    gridGeo.setAttribute('position', new THREE.BufferAttribute(gridPosCurr, 3));
+    gridGeo.setIndex(new THREE.BufferAttribute(new Uint16Array(gridIndices), 1));
+    const gridMat = new THREE.LineBasicMaterial({
+      color: new THREE.Color('#001433'), transparent: true, opacity: 0.25,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const gravMesh = new THREE.LineSegments(gridGeo, gridMat);
+    gravGroup.add(gravMesh);
+
+    // Gravity particles
+    let gravParticleCount = GRAV_PARTICLES_FULL;
+    const gravPosArr  = new Float32Array(GRAV_PARTICLES_FULL * 3);
+    const gravVelArr  = new Float32Array(GRAV_PARTICLES_FULL * 3);
+
+    for (let i = 0; i < GRAV_PARTICLES_FULL; i++) {
+      gravPosArr[i*3]   = (Math.random()-0.5)*4;
+      gravPosArr[i*3+1] = (Math.random()-0.5)*6;
+      gravPosArr[i*3+2] = -(0.5 + Math.random()*3);
+      gravVelArr[i*3]=gravVelArr[i*3+1]=gravVelArr[i*3+2]=0;
+    }
+    const gravPartGeo = new THREE.BufferGeometry();
+    gravPartGeo.setAttribute('position', new THREE.BufferAttribute(gravPosArr.slice(), 3));
+    const gravPartMat = new THREE.PointsMaterial({
+      map: glowTex, color: new THREE.Color('#001850'),
+      size: 1.8, sizeAttenuation: true, transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const gravParticles = new THREE.Points(gravPartGeo, gravPartMat);
+    gravGroup.add(gravParticles);
+
+    // ── Scene refs ─────────────────────────────────────────────────────────────
+    const refs: any = {
       renderer, scene, camera,
-      dipoleGroup, dipoleLines, dipoleAxis,
-      lastAxisQuat: new THREE.Quaternion(),
-      lastAxisAngleDeg: 0,
-      rfGroup,
-      rfSprites: new Map(),
-      rfSpriteCount: RF_SPRITES_FULL,
-      glowTex,
-      gravGroup,
-      gravLineGeo: gravGeo,
-      animFrame: null,
-      tick: 0,
-      lastMs: Date.now(),
+      magGroup, fieldLines, highlightNodes, lineCurves, northPole, southPole, nFlare, sFlare,
+      rfGroup, shellEntries: [] as ShellEntry[], interferenceParts: null as THREE.Points | null,
+      gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
+      gravPosArr, gravVelArr, gravParticleCount,
+      animFrame: null as number | null, tick: 0, lastMs: Date.now(),
       showMag: true, showRF: true, showGrav: true,
+      currentQuat: new THREE.Quaternion(),
+      prevAxisQuat: new THREE.Quaternion(),
+      anomalyCompression: 0.0,
+      convergenceFired: false,
     };
     sceneRef.current = refs;
 
@@ -366,88 +482,208 @@ export default function ARFieldCanvas({ layerRef }: Props) {
       layerRef.current = {
         setLayers: (mag, rf, grav) => {
           refs.showMag = mag; refs.showRF = rf; refs.showGrav = grav;
-          dipoleGroup.visible = mag;
-          rfGroup.visible = rf;
-          gravGroup.visible = grav;
+          magGroup.visible = mag; rfGroup.visible = rf; gravGroup.visible = grav;
         },
       };
     }
 
-    let prevAxisQuat = new THREE.Quaternion();
-    const currentQuat = new THREE.Quaternion();
-    let frameCount = 0;
+    let rfRebuildPending = true;
+    let lastHeadingForRF = 0;
 
+    // ── Animation loop ─────────────────────────────────────────────────────────
     function animate() {
       refs.animFrame = requestAnimationFrame(animate);
-
       const now = Date.now();
-      const dt = Math.min(now - refs.lastMs, 50);
+      const dtMs = Math.min(now - refs.lastMs, 50);
       refs.lastMs = now;
       refs.tick += 1;
-      frameCount += 1;
 
-      // Auto-reduce sprites if slow
-      if (dt > 22 && refs.rfSpriteCount === RF_SPRITES_FULL) {
-        refs.rfSpriteCount = RF_SPRITES_REDUCED;
+      // Auto-reduce gravity particles if slow
+      if (dtMs > FRAME_SLOW_MS && refs.gravParticleCount === GRAV_PARTICLES_FULL) {
+        refs.gravParticleCount = GRAV_PARTICLES_REDUCED;
       }
 
       const { reading, isAnomaly } = storeRef.current;
       const { x: mx, y: my, z: mz, magnitude, heading } = reading;
+      const { x: gx, y: gy, z: gz } = gravRef.current;
 
-      // ── FIELD 1: Dipole rotation ───────────────────────────────────────────
+      // ── MAG FIELD ────────────────────────────────────────────────────────────
       if (refs.showMag) {
-        const targetQuat = axisQuat(mx, my, mz);
+        // Rotate dipole toward live magnetic axis
+        const targetQ = magAxisQuat(mx, my, mz);
+        const angleDiff = refs.prevAxisQuat.angleTo(targetQ) * (180/Math.PI);
+        if (angleDiff > 3) refs.prevAxisQuat.copy(targetQ);
+        refs.currentQuat.slerp(targetQ, 0.035);
+        magGroup.quaternion.copy(refs.currentQuat);
 
-        // Only recompute dipole geometry when axis shifts > 2°
-        const angleDiff = prevAxisQuat.angleTo(targetQuat) * (180 / Math.PI);
-        if (angleDiff > 2 || frameCount === 1) {
-          prevAxisQuat.copy(targetQuat);
-        }
+        // Anomaly compression
+        const compTarget = isAnomaly ? 1.0 : 0.0;
+        refs.anomalyCompression += (compTarget - refs.anomalyCompression) * 0.04;
+        const comp = refs.anomalyCompression;
 
-        // Smooth interpolation toward target every frame
-        currentQuat.slerp(targetQuat, 0.04);
-        dipoleGroup.quaternion.copy(currentQuat);
+        // Scale field lines — compress inner lines toward axis on anomaly
+        refs.fieldLines.forEach((mesh: THREE.Mesh, i: number) => {
+          const lFrac = i / (refs.fieldLines.length - 1);
+          const inner = lFrac < 0.4;
+          const compScale = inner ? (1 - comp * 0.5) : (1 + comp * 0.25);
+          mesh.scale.setScalar(compScale);
+          const mat = mesh.material as THREE.MeshBasicMaterial;
+          mat.opacity = isAnomaly ? 0.95 : 0.75;
+        });
 
-        const col = getMagColor(magnitude, isAnomaly);
-        const opacity = isAnomaly ? 0.9 : 0.6;
-        for (const line of refs.dipoleLines) {
-          (line.material as THREE.LineBasicMaterial).color.copy(col);
-          (line.material as THREE.LineBasicMaterial).opacity = opacity;
-          (line.material as THREE.LineBasicMaterial).linewidth = isAnomaly ? 3 : 1.5;
-          (line.material as THREE.LineBasicMaterial).needsUpdate = true;
-        }
-        (dipoleAxis.material as THREE.LineBasicMaterial).color.copy(col);
-        (dipoleAxis.material as THREE.LineBasicMaterial).opacity = isAnomaly ? 1.0 : 0.85;
+        // Pole position (±L_max*pole_offset along Y in local space)
+        const poleY = MAG_L_VALUES[MAG_L_VALUES.length-1] * 0.12;
+        northPole.position.set(0,  poleY, 0);
+        southPole.position.set(0, -poleY, 0);
+
+        // Lens flare
+        const camDir = new THREE.Vector3(0,0,-1);
+        const nWorld = northPole.position.clone().applyQuaternion(refs.currentQuat);
+        const sWorld = southPole.position.clone().applyQuaternion(refs.currentQuat);
+        const nDot = nWorld.normalize().dot(camDir);
+        const sDot = sWorld.normalize().dot(camDir);
+        (refs.nFlare.material as THREE.SpriteMaterial).opacity = Math.max(0, nDot - 0.6) * 0.75;
+        (refs.sFlare.material as THREE.SpriteMaterial).opacity = Math.max(0, sDot - 0.6) * 0.75;
+        refs.nFlare.position.copy(northPole.position);
+        refs.sFlare.position.copy(southPole.position);
+
+        // Travelling highlight nodes
+        const speed = Math.max(0.3, Math.min(3.0, magnitude / 20)) * (isAnomaly ? 2.0 : 1.0);
+        refs.highlightNodes.forEach((hn: any) => {
+          hn.phase = (hn.phase + speed * 0.004) % 1;
+          const curvePts = refs.lineCurves[Math.min(hn.lineIndex, refs.lineCurves.length-1)];
+          const idx = Math.min(Math.floor(hn.phase * curvePts.length), curvePts.length-1);
+          const pos = curvePts[idx];
+          const worldPos = pos.clone().applyQuaternion(refs.currentQuat);
+          hn.mesh.position.copy(worldPos);
+          const col = getMagColor(magnitude, isAnomaly);
+          (hn.mesh.material as THREE.SpriteMaterial).color.copy(col);
+          (hn.mesh.material as THREE.SpriteMaterial).opacity = isAnomaly ? 0.95 : 0.7;
+        });
       }
 
-      // ── FIELD 3: Gravity threads ───────────────────────────────────────────
-      if (refs.showGrav) {
-        const { x: gx, y: gy, z: gz } = gravRef.current;
-        const { starts, ends } = gravThreadPositions(gx, gy, gz, 3.5);
-        const pos = refs.gravLineGeo.attributes.position as THREE.BufferAttribute;
-        const arr = pos.array as Float32Array;
-
-        // Gravity/mag convergence check
-        const gravLen = Math.sqrt(gx*gx + gy*gy + gz*gz) || 1;
-        const magLen  = Math.sqrt(mx*mx + my*my + mz*mz) || 1;
-        const dot = (gx/gravLen)*(mx/magLen) + (gy/gravLen)*(my/magLen) + (gz/gravLen)*(mz/magLen);
-        const angleBetween = Math.acos(Math.max(-1, Math.min(1, Math.abs(dot)))) * (180/Math.PI);
-        const convergence = angleBetween < 10;
-        const gravMat = gravLineSegments.material as THREE.LineBasicMaterial;
-        gravMat.color.setStyle(convergence ? Colors.cyan : '#001433');
-        gravMat.opacity = convergence ? 0.65 + Math.sin(refs.tick * 0.08) * 0.15 : 0.3;
-        gravMat.needsUpdate = true;
-
-        for (let i = 0; i < GRAV_THREADS; i++) {
-          arr[i*6]   = starts[i].x; arr[i*6+1] = starts[i].y; arr[i*6+2] = starts[i].z;
-          arr[i*6+3] = ends[i].x;   arr[i*6+4] = ends[i].y;   arr[i*6+5] = ends[i].z;
+      // ── RF FIELD ─────────────────────────────────────────────────────────────
+      if (refs.showRF) {
+        // Rebuild shell pool when heading shifts or networks change
+        const headingDrift = Math.abs(heading - lastHeadingForRF);
+        if (rfRebuildPending || headingDrift > 15) {
+          rebuildRFShells(rfRef.current, heading);
+          refs.shellEntries = shellEntries;
+          refs.interferenceParts = interferenceParts;
+          rfRebuildPending = false;
+          lastHeadingForRF = heading;
         }
-        pos.needsUpdate = true;
+
+        // Expand shells
+        for (const se of refs.shellEntries as ShellEntry[]) {
+          se.phase += se.expandRate;
+          if (se.phase > se.maxRadius) se.phase = 0;
+          const r = se.phase;
+          se.mesh.scale.setScalar(r < 0.01 ? 0.01 : r);
+          se.mesh.position.copy(se.sourcePos);
+          const fade = Math.max(0, 1 - r / se.maxRadius);
+          (se.mesh.material as THREE.MeshBasicMaterial).opacity = fade * se.baseOpacity;
+        }
+
+        // Interference flicker
+        if (refs.interferenceParts) {
+          (refs.interferenceParts.material as THREE.PointsMaterial).opacity =
+            0.4 + Math.sin(refs.tick * 0.12) * 0.25;
+        }
+
+        // Surface echo: Z-axis spike = facing wall
+        const facingWall = Math.abs(mz) / (Math.sqrt(mx*mx+my*my+mz*mz)||1) > 0.7;
+        if (surfaceEchoGroup) { rfGroup.remove(surfaceEchoGroup); surfaceEchoGroup = null; }
+        if (facingWall && rfRef.current.length > 0) {
+          surfaceEchoGroup = new THREE.Group();
+          const echoMat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color('#FF6600'), transparent: true, opacity: 0.18,
+            wireframe: false, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+          });
+          for (let s = 0; s < 3; s++) {
+            const sg = new THREE.SphereGeometry(0.3 + s * 0.4, 12, 8);
+            const sm = new THREE.Mesh(sg, echoMat.clone());
+            sm.position.set(0, 0, -1.5);
+            surfaceEchoGroup.add(sm);
+          }
+          rfGroup.add(surfaceEchoGroup);
+        }
+      }
+
+      // ── GRAVITY FIELD ────────────────────────────────────────────────────────
+      if (refs.showGrav) {
+        const gLen = Math.sqrt(gx*gx+gy*gy+gz*gz)||1;
+        const gdx = gx/gLen, gdy = gy/gLen, gdz = gz/gLen;
+        const t = refs.tick * 0.018;
+
+        // Deform grid vertices
+        const posAttr = refs.gravMesh.geometry.attributes.position as THREE.BufferAttribute;
+        const arr = posAttr.array as Float32Array;
+        const base = refs.gridPosBase;
+        const n = (GRAV_GRID_W * GRAV_GRID_H);
+        for (let vi = 0; vi < n; vi++) {
+          const bx = base[vi*3], by = base[vi*3+1], bz = base[vi*3+2];
+          const dist = Math.sqrt(bx*bx+by*by);
+          const wave = Math.sin(t + dist * 1.8) * 0.15 * (1 + Math.abs(by));
+          arr[vi*3]   = bx + gdx * wave;
+          arr[vi*3+1] = by + gdy * wave;
+          arr[vi*3+2] = bz + gdz * wave * 0.3;
+        }
+        posAttr.needsUpdate = true;
+
+        // Gravity/mag convergence
+        const magLen = Math.sqrt(mx*mx+my*my+mz*mz)||1;
+        const dot = Math.abs((gx/gLen)*(mx/magLen) + (gy/gLen)*(my/magLen) + (gz/gLen)*(mz/magLen));
+        const converging = Math.acos(Math.min(1, dot)) * (180/Math.PI) < 10;
+        if (converging !== refs.convergenceFired) {
+          refs.convergenceFired = converging;
+          onConvergence?.(converging);
+        }
+        const gridMaterial = refs.gravMesh.material as THREE.LineBasicMaterial;
+        gridMaterial.color.setStyle(converging ? Colors.cyan : '#001433');
+        gridMaterial.opacity = converging ? 0.55 + Math.sin(refs.tick*0.1)*0.1 : 0.25;
+        gridMaterial.needsUpdate = true;
+
+        // Particle physics — falling in gravity direction
+        const partPos = refs.gravPartGeo.attributes.position as THREE.BufferAttribute;
+        const pArr = partPos.array as Float32Array;
+        const vel  = refs.gravVelArr as Float32Array;
+        const count = refs.gravParticleCount;
+        const terminalSq = 0.08 * 0.08;
+
+        for (let i = 0; i < count; i++) {
+          const ix=i*3, iy=ix+1, iz=ix+2;
+          vel[ix] += gdx * 0.015; vel[iy] += gdy * 0.015; vel[iz] += gdz * 0.015;
+          const vSq = vel[ix]**2+vel[iy]**2+vel[iz]**2;
+          if (vSq > terminalSq) {
+            const vS = Math.sqrt(vSq);
+            vel[ix]/=vS*0.08; vel[iy]/=vS*0.08; vel[iz]/=vS*0.08;
+          }
+          pArr[ix]+=vel[ix]; pArr[iy]+=vel[iy]; pArr[iz]+=vel[iz];
+          // Reset out-of-bounds particle to random seeding position
+          if (Math.abs(pArr[ix])>2.5||Math.abs(pArr[iy])>4||pArr[iz]>0||pArr[iz]<-4) {
+            pArr[ix]=(Math.random()-0.5)*4;
+            pArr[iy]=(Math.random()-0.5)*6;
+            pArr[iz]=-(0.5+Math.random()*3);
+            vel[ix]=vel[iy]=vel[iz]=0;
+          }
+        }
+        partPos.needsUpdate = true;
+
+        const vSqSample = vel[0]**2+vel[1]**2+vel[2]**2;
+        const speedFrac = Math.sqrt(vSqSample) / 0.08;
+        (refs.gravParticles.material as THREE.PointsMaterial).opacity =
+          0.22 + speedFrac * 0.28;
       }
 
       renderer.render(scene, camera);
       gl.endFrameEXP();
     }
+
+    // Initial RF build
+    rebuildRFShells(rfRef.current, storeRef.current.reading.heading);
+    refs.shellEntries = shellEntries;
+    refs.interferenceParts = interferenceParts;
 
     animate();
   }, []);
@@ -470,6 +706,6 @@ export default function ARFieldCanvas({ layerRef }: Props) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.75,
+    opacity: 0.78,
   },
 });

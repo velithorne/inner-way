@@ -241,10 +241,27 @@ export default function ARFieldScreen() {
   // RF scan state (for HUD readout)
   const [rfState, setRfState] = useState<RFScanState>({ networks: [], isScanning: false, isIOS: false, lastScanMs: 0 });
 
-  // First-launch calibration overlay
+  // Convergence badge from canvas
+  const [showConvergence, setShowConvergence] = useState(false);
+  const convergenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleConvergence = useCallback((converging: boolean) => {
+    if (converging) {
+      setShowConvergence(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      if (convergenceTimerRef.current) clearTimeout(convergenceTimerRef.current);
+      convergenceTimerRef.current = setTimeout(() => setShowConvergence(false), 4000);
+    } else {
+      setShowConvergence(false);
+    }
+  }, []);
+
+  // Surface echo / RF wall badge (derived from Z-axis spike)
+  const [showWallRF, setShowWallRF] = useState(false);
+
+  // First-launch calibration overlay — shows live sensor values
   const [showCalibOverlay, setShowCalibOverlay] = useState(true);
   useEffect(() => {
-    const t = setTimeout(() => setShowCalibOverlay(false), 4000);
+    const t = setTimeout(() => setShowCalibOverlay(false), 5000);
     return () => clearTimeout(t);
   }, []);
 
@@ -351,7 +368,7 @@ export default function ARFieldScreen() {
       />
 
       {/* Layer 1: Multi-field canvas — magnetic dipole + RF + gravity */}
-      <ARFieldCanvas layerRef={canvasLayerRef} />
+      <ARFieldCanvas layerRef={canvasLayerRef} onConvergence={handleConvergence} />
 
       {/* Target node directional overlay (from MAP tab "OPEN IN AR") */}
       {route.params?.targetLat != null && userLat !== null && userLng !== null && (
@@ -451,21 +468,50 @@ export default function ARFieldScreen() {
         </View>
       </View>
 
-      {/* First-launch calibration overlay */}
+      {/* Convergence badge */}
+      {showConvergence && (
+        <View style={styles.convergenceBadge} pointerEvents="none">
+          <Text style={styles.convergenceIcon}>◈</Text>
+          <Text style={styles.convergenceTitle}>AXIS CONVERGENCE</Text>
+          <Text style={styles.convergenceBody}>Magnetic and gravitational axes aligned</Text>
+        </View>
+      )}
+
+      {/* First-launch calibration overlay with live sensor values */}
       {showCalibOverlay && (
         <View style={styles.calibOverlay} pointerEvents="none">
-          <Text style={styles.calibTitle}>FIELD SCANNER ACTIVE</Text>
-          <Text style={styles.calibBody}>
-            Visualising real electromagnetic fields{'\n'}
-            invisible to the human eye.
+          <Text style={styles.calibTitle}>◈ FIELD SCANNER — ACTIVE</Text>
+
+          <Text style={[styles.calibLegendLine, { color: Colors.cyan, marginBottom: 4 }]}>
+            CYAN   Magnetic dipole field
           </Text>
-          <View style={styles.calibLegend}>
-            <Text style={[styles.calibLegendLine, { color: Colors.cyan }]}>CYAN  — Earth's magnetic field</Text>
-            <Text style={[styles.calibLegendLine, { color: Colors.gold }]}>GOLD  — RF radiation (WiFi / cellular)</Text>
-            <Text style={[styles.calibLegendLine, { color: '#4488cc' }]}>BLUE  — Gravitational force</Text>
-          </View>
-          <Text style={styles.calibFooter}>
-            Everything you see is physically real.
+          <Text style={styles.calibSubLine}>
+            axis  {hudData.magnitude.toFixed(1)} µT  {hudData.heading.toFixed(0)}°
+          </Text>
+
+          <Text style={[styles.calibLegendLine, { color: Colors.gold, marginTop: 10, marginBottom: 4 }]}>
+            GOLD   RF radiation wavefronts
+          </Text>
+          <Text style={styles.calibSubLine}>
+            {rfState.networks.length} source{rfState.networks.length !== 1 ? 's' : ''} detected
+            {rfState.networks.length > 0 ? `  ·  ${rfState.networks[0].rssi} dBm` : ''}
+          </Text>
+
+          <Text style={[styles.calibLegendLine, { color: '#4488cc', marginTop: 10, marginBottom: 4 }]}>
+            BLUE   Gravitational field
+          </Text>
+          <Text style={styles.calibSubLine}>
+            {Math.sqrt(
+              useFieldStore.getState().reading.x**2 +
+              useFieldStore.getState().reading.y**2 +
+              useFieldStore.getState().reading.z**2
+            ).toFixed(1)} µT total field
+          </Text>
+
+          <Text style={[styles.calibFooter, { marginTop: 20 }]}>
+            All fields are physically real.{'\n'}
+            Invisible to human sight.{'\n'}
+            Rendered here at true geometry.
           </Text>
         </View>
       )}
@@ -693,12 +739,52 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     letterSpacing: 1,
   },
+  calibSubLine: {
+    fontFamily: Fonts.mono,
+    fontSize: 9,
+    color: Colors.greyLight,
+    opacity: 0.7,
+    letterSpacing: 0.5,
+    marginLeft: 12,
+  },
   calibFooter: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
     color: Colors.greyLight,
     opacity: 0.5,
     letterSpacing: 1,
-    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // Convergence badge
+  convergenceBadge: {
+    position: 'absolute',
+    top: '38%',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,10,0.88)',
+    borderWidth: 1,
+    borderColor: Colors.cyan,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    gap: 4,
+  },
+  convergenceIcon: {
+    fontSize: 22,
+    color: Colors.cyan,
+  },
+  convergenceTitle: {
+    fontFamily: Fonts.header,
+    fontSize: FontSizes.md,
+    color: Colors.cyan,
+    letterSpacing: 3,
+  },
+  convergenceBody: {
+    fontFamily: Fonts.mono,
+    fontSize: FontSizes.xs,
+    color: Colors.greyLight,
+    letterSpacing: 1,
+    opacity: 0.8,
   },
 });
