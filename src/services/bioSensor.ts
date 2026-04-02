@@ -9,6 +9,10 @@ const COHERENCE_HZ = 0.1;
 const STABILITY_WINDOW_MS = 30_000;
 const STABILITY_TOL_HZ = 0.05;
 
+const SUSTAINED_MS = 30_000;
+const RHYTHM_STABLE_MS = 60_000;
+const BPM_STABILITY_TOL = 5;
+
 type FusionHandle = {
   stop: () => void;
 };
@@ -27,6 +31,11 @@ export function startBioSensorFusion(
 ): FusionHandle {
   let baselineRssi = options?.baselineRssi ?? null;
   const freqHistory: { t: number; hz: number }[] = [];
+  const fusionStartMs = Date.now();
+
+  /** BPM stability for "stable cardiac rhythm" bonus */
+  let stableBpmRef: number | null = null;
+  let stableBpmSinceMs: number | null = null;
 
   const unsubNet = NetInfo.addEventListener((state: NetInfoState) => {
     if (typeof state.details === 'object' && state.details !== null && 'strength' in state.details) {
@@ -40,6 +49,8 @@ export function startBioSensorFusion(
   const interval = setInterval(async () => {
     const accOut = acc.getLatest();
     const magOut = mag.getLatest();
+    const now = Date.now();
+    const scanElapsedMs = now - fusionStartMs;
 
     const accScore = Math.min(40, (accOut.confidence / 100) * 40);
     const magScore = magOut.detected
@@ -74,7 +85,6 @@ export function startBioSensorFusion(
       /* ignore */
     }
 
-    const now = Date.now();
     const domHz =
       accOut.freqHz > 0 ? accOut.freqHz : magOut.freqHz > 0 ? magOut.freqHz : 0;
     if (domHz > 0) {
@@ -83,16 +93,43 @@ export function startBioSensorFusion(
     while (freqHistory.length && now - freqHistory[0].t > STABILITY_WINDOW_MS) {
       freqHistory.shift();
     }
-    let stabilityBonus = 0;
-    if (freqHistory.length >= 25) {
-      const mean =
-        freqHistory.reduce((a, b) => a + b.hz, 0) / freqHistory.length;
-      const stable = freqHistory.every((e) => Math.abs(e.hz - mean) <= STABILITY_TOL_HZ);
-      if (stable) stabilityBonus = 10;
+
+    let sustainedSignalBonus = 0;
+    if (
+      scanElapsedMs > SUSTAINED_MS &&
+      accOut.bpm >= 45 &&
+      accOut.bpm <= 180 &&
+      accOut.confidence > 35
+    ) {
+      sustainedSignalBonus = 8;
+    }
+
+    let stableRhythmBonus = 0;
+    const bpm = accOut.bpm;
+    if (bpm >= 45 && bpm <= 180) {
+      if (stableBpmRef === null) {
+        stableBpmRef = bpm;
+        stableBpmSinceMs = now;
+      } else if (Math.abs(bpm - stableBpmRef) <= BPM_STABILITY_TOL) {
+        if (stableBpmSinceMs !== null && now - stableBpmSinceMs > RHYTHM_STABLE_MS) {
+          stableRhythmBonus = 12;
+        }
+      } else {
+        stableBpmRef = bpm;
+        stableBpmSinceMs = now;
+      }
+    } else {
+      stableBpmRef = null;
+      stableBpmSinceMs = null;
     }
 
     let sum =
-      accScore + magScore + coherenceBonus + rfPoints + stabilityBonus;
+      accScore +
+      magScore +
+      coherenceBonus +
+      rfPoints +
+      sustainedSignalBonus +
+      stableRhythmBonus;
     sum = Math.max(0, Math.min(100, sum));
 
     useBioStore.getState().setFusion({
@@ -103,7 +140,10 @@ export function startBioSensorFusion(
       magSnr: magOut.snr,
       coherenceDetected: coherence,
       rfScoreComponent: rfPoints,
-      stabilityBonusActive: stabilityBonus > 0,
+      stabilityBonusActive: stableRhythmBonus > 0,
+      accSettling: accOut.isWarmup,
+      sustainedSignalBonus,
+      stableRhythmBonus,
       lastUpdateMs: now,
       scanMode: options?.scanMode ?? useBioStore.getState().scanMode,
     });

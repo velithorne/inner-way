@@ -21,7 +21,7 @@ function labelFromBps(bps: number): BpsLabel {
 
 /**
  * BPS can stay low when only the accelerometer contributes (~40 pts max) and mag is ~0.
- * If we already show a plausible BPM from the acc pipeline, do not label "NO SIGNAL" — that contradicts the readout.
+ * If we already show a plausible BPM from the acc pipeline, do not label "NO SIGNAL".
  */
 function deriveBpsLabel(
   bps: number,
@@ -50,7 +50,10 @@ export type BioState = {
   scanMode: ScanMode;
   rfScoreComponent: number;
   stabilityBonusActive: boolean;
-  /** Last fusion tick timestamp */
+  /** Accelerometer warmup (first ~20s): baseline settling */
+  accSettling: boolean;
+  sustainedSignalBonus: number;
+  stableRhythmBonus: number;
   lastUpdateMs: number;
   setFusion: (partial: Partial<Omit<BioState, 'setFusion' | 'reset'>>) => void;
   reset: () => void;
@@ -68,6 +71,9 @@ const initial: Omit<BioState, 'setFusion' | 'reset'> = {
   scanMode: 'CONTACT',
   rfScoreComponent: 0,
   stabilityBonusActive: false,
+  accSettling: false,
+  sustainedSignalBonus: 0,
+  stableRhythmBonus: 0,
   lastUpdateMs: 0,
 };
 

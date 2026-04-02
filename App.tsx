@@ -25,6 +25,7 @@ export default function App() {
     magSnr,
     coherenceDetected,
     scanMode,
+    accSettling,
     setFusion,
   } = useBioStore();
 
@@ -93,6 +94,9 @@ export default function App() {
         </View>
 
         <View style={styles.stats}>
+          {running && accSettling ? (
+            <Text style={styles.settling}>SETTLING…</Text>
+          ) : null}
           <Text style={styles.statLine}>
             Acc: {accBpm.toFixed(0)} BPM · conf {accConfidence.toFixed(0)}%
           </Text>
@@ -179,6 +183,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignSelf: 'stretch',
     maxWidth: 360,
+  },
+  settling: {
+    color: '#ffc107',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    letterSpacing: 1,
   },
   statLine: {
     color: '#b0bec5',
