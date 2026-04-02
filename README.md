@@ -43,12 +43,12 @@ This repo mirrors the usual setup: **`origin` → GitHub**, repo secret **`EXPO_
 
 | Step | What to do |
 |------|------------|
-| 1 | `git remote add origin https://github.com/ORG/REPO.git` and push this branch |
+| 1 | Remote **`origin`** → [github.com/velithorne/inner-way](https://github.com/velithorne/inner-way) — push this branch |
 | 2 | [Expo access token](https://expo.dev/settings/access-tokens) → add as GitHub secret **`EXPO_TOKEN`** |
 | 3 | One-time link: `npx eas-cli login` then `npx eas-cli init --non-interactive` → commit **`app.json`** (gets `expo.extra.eas.projectId`) |
 | 4 | **CI:** Actions → **Android APK release (EAS + GitHub)** → Run workflow — or push tag **`v1.0.0`** |
 
-The workflow (`.github/workflows/android-apk-eas.yml`) runs the same commands as below: **`eas build -p android --profile preview`**, downloads **`applicationArchiveUrl`**, uploads **`biofield-scanner.apk`** to a GitHub Release. The job summary shows **`https://github.com/ORG/REPO/releases/tag/...`**.
+The workflow (`.github/workflows/android-apk-eas.yml`) runs the same commands as below: **`eas build -p android --profile preview`**, downloads **`applicationArchiveUrl`**, uploads **`biofield-scanner.apk`** to a GitHub Release. The job summary shows **`https://github.com/velithorne/inner-way/releases/tag/...`**.
 
 ### Local machine (identical commands to CI)
 
