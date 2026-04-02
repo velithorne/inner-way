@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:android:apk": "eas build -p android --profile preview"
+    "build:android:apk": "eas build -p android --profile preview",
+    "release:android": "bash scripts/android-release.sh"
   },
   "dependencies": {
     "@react-native-community/netinfo": "11.4.1",

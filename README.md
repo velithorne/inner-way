@@ -37,35 +37,35 @@ With **START** running on a real device:
 
 The previous minimal README and HTML helper files are preserved under `_legacy/`.
 
-## Android APK (release build)
+## Android APK (same flow as other Cursor / Expo projects)
 
-APKs are produced with **EAS Build** (cloud). This repo includes `eas.json` with a **`preview`** profile that sets `android.buildType` to **`apk`** for direct sideloading.
+This repo mirrors the usual setup: **`origin` → GitHub**, repo secret **`EXPO_TOKEN`**, **EAS** cloud build, optional **GitHub Release** with the `.apk` attached.
 
-### One-time setup
+| Step | What to do |
+|------|------------|
+| 1 | `git remote add origin https://github.com/ORG/REPO.git` and push this branch |
+| 2 | [Expo access token](https://expo.dev/settings/access-tokens) → add as GitHub secret **`EXPO_TOKEN`** |
+| 3 | One-time link: `npx eas-cli login` then `npx eas-cli init --non-interactive` → commit **`app.json`** (gets `expo.extra.eas.projectId`) |
+| 4 | **CI:** Actions → **Android APK release (EAS + GitHub)** → Run workflow — or push tag **`v1.0.0`** |
 
-1. Install dependencies: `npm install`
-2. Log in to Expo: `npx eas-cli login`
-3. Link the app to an EAS project (writes `expo.extra.eas.projectId` in `app.json`):  
-   `npx eas-cli init --non-interactive`
-4. Commit the updated `app.json` and push.
+The workflow (`.github/workflows/android-apk-eas.yml`) runs the same commands as below: **`eas build -p android --profile preview`**, downloads **`applicationArchiveUrl`**, uploads **`biofield-scanner.apk`** to a GitHub Release. The job summary shows **`https://github.com/ORG/REPO/releases/tag/...`**.
 
-### Build from your machine
+### Local machine (identical commands to CI)
+
+After `eas init` has written `projectId` into `app.json`:
+
+```bash
+export EXPO_TOKEN=...   # same token as the GitHub secret
+npm run release:android
+```
+
+Or only the cloud build (Expo prints the [build details / APK](https://docs.expo.dev/build-reference/apk/) URL):
 
 ```bash
 npm run build:android:apk
 ```
 
-When the build finishes, the CLI prints a **build details URL**. Open it in a browser — that is your **release page** with logs and a **Download** button for the `.apk`. You can share that link for installation on Android devices.
-
-### Build from GitHub (same flow as other Cursor Expo apps)
-
-1. Add repo secret **`EXPO_TOKEN`** ([Expo access tokens](https://expo.dev/settings/access-tokens)).
-2. Ensure **`expo.extra.eas.projectId`** is committed (from `eas init`).
-3. Run **Actions → “Android APK release (EAS + GitHub)” → Run workflow**, or push a tag **`v1.0.0`**.
-
-The workflow runs **EAS Build** (APK profile), downloads the artifact, and publishes a **GitHub Release** with `biofield-scanner.apk` attached. The job summary prints the **release page URL** (`https://github.com/ORG/REPO/releases/tag/...`) — that is the usual download page for testers.
-
-The [Expo build details page](https://docs.expo.dev/build-reference/apk/) still lists logs and history; the APK file itself is on the GitHub Release.
+`scripts/android-release.sh` is the same pipeline as the workflow: EAS build → `curl` the APK → optional `gh release create` if the GitHub CLI is logged in.
 
 ## License
 
