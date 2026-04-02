@@ -1,0 +1,48 @@
+# Build a downloadable Android APK via Expo Application Services (EAS).
+#
+# Setup (one-time):
+# 1. npm install && npx eas login
+# 2. npx eas init --non-interactive   # links project; commits extra.eas.projectId in app.json
+# 3. Create an Expo access token: https://expo.dev/accounts/[account]/settings/access-tokens
+# 4. Add repository secret EXPO_TOKEN with that token
+#
+# Then: Actions → "Android APK (EAS)" → Run workflow
+
+name: Android APK (EAS)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: EAS build (APK, preview profile)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -e
+          npx eas-cli build -p android --profile preview --non-interactive --wait --json > eas-build.json
+          URL="$(jq -r '.[0].url // .url // empty' eas-build.json 2>/dev/null || true)"
+          {
+            echo "### EAS Android APK build"
+            echo "Build details (download **.apk** from this page):"
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then echo "$URL"; else echo "(see build log JSON or expo.dev → Builds)"; fi
+            echo ""
+            echo "If no URL above, open your project on [expo.dev](https://expo.dev) → **Builds** → latest Android build."
+          } >> "$GITHUB_STEP_SUMMARY"

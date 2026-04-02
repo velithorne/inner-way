@@ -37,6 +37,34 @@ With **START** running on a real device:
 
 The previous minimal README and HTML helper files are preserved under `_legacy/`.
 
+## Android APK (release build)
+
+APKs are produced with **EAS Build** (cloud). This repo includes `eas.json` with a **`preview`** profile that sets `android.buildType` to **`apk`** for direct sideloading.
+
+### One-time setup
+
+1. Install dependencies: `npm install`
+2. Log in to Expo: `npx eas-cli login`
+3. Link the app to an EAS project (writes `expo.extra.eas.projectId` in `app.json`):  
+   `npx eas-cli init --non-interactive`
+4. Commit the updated `app.json` and push.
+
+### Build from your machine
+
+```bash
+npm run build:android:apk
+```
+
+When the build finishes, the CLI prints a **build details URL**. Open it in a browser — that is your **release page** with logs and a **Download** button for the `.apk`. You can share that link for installation on Android devices.
+
+### Build from GitHub Actions
+
+Add a repository secret **`EXPO_TOKEN`** (create under [Expo access tokens](https://expo.dev/settings/access-tokens)). Then run **Actions → Android APK (EAS) → Run workflow**. The workflow waits for the build and prints the same build URL in the job log.
+
+### GitHub Releases (optional)
+
+EAS hosts the artifact; to attach the APK to a GitHub Release, download the `.apk` from the build page and upload it to a [GitHub Release](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository) for your repository.
+
 ## License
 
 Private / project-specific — adjust as needed for your GitHub org.
