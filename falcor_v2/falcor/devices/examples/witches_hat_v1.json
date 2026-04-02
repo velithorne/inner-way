@@ -1,0 +1,43 @@
+{
+  "name": "witches_hat_v1",
+  "version": "1.0",
+  "description": "Generic parametric assembly for simulation (non-instructional)",
+  "components": [
+    {
+      "id": "disk",
+      "shape": "disk",
+      "material": "aluminum",
+      "transform": {"x": 0, "y": 0, "z": 0.05, "rx_deg": 0, "ry_deg": 0, "rz_deg": 0},
+      "params": {"radius_m": 0.15, "thickness_m": 0.01}
+    },
+    {
+      "id": "hub",
+      "shape": "cylinder",
+      "material": "steel",
+      "transform": {"x": 0, "y": 0, "z": 0.025, "rx_deg": 0, "ry_deg": 0, "rz_deg": 0},
+      "params": {"radius_m": 0.02, "height_m": 0.05}
+    },
+    {
+      "id": "coil",
+      "shape": "coil",
+      "material": "copper",
+      "transform": {"x": 0, "y": 0, "z": 0.12, "rx_deg": 0, "ry_deg": 0, "rz_deg": 0},
+      "params": {"radius_m": 0.08, "turns": 100, "height_m": 0.02}
+    },
+    {
+      "id": "mount",
+      "shape": "box",
+      "material": "plastic",
+      "transform": {"x": 0, "y": 0, "z": 0, "rx_deg": 0, "ry_deg": 0, "rz_deg": 0},
+      "params": {"width_m": 0.4, "depth_m": 0.3, "height_m": 0.02}
+    },
+    {
+      "id": "enclosure",
+      "shape": "box",
+      "material": "plastic",
+      "transform": {"x": 0, "y": 0, "z": 0.2, "rx_deg": 0, "ry_deg": 0, "rz_deg": 0},
+      "params": {"width_m": 0.5, "depth_m": 0.4, "height_m": 0.1}
+    }
+  ],
+  "materials": {}
+}
