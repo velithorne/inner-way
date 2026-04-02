@@ -141,6 +141,8 @@ function buildGlowLines(pts: THREE.Vector3[]): THREE.Line[] {
 // ── Exports ───────────────────────────────────────────────────────────────────
 export interface ARFieldCanvasHandle {
   setLayers: (mag: boolean, rf: boolean, grav: boolean) => void;
+  pause: () => void;
+  resume: () => void;
 }
 
 interface Props {
@@ -254,28 +256,24 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       }
     }
 
-    // Pole spheres — 0.03 radius, additive, marble-scale
-    const poleGeo = new THREE.SphereGeometry(0.03, 12, 8);
-    const northMat = new THREE.MeshBasicMaterial({
-      color: 0x0044FF, transparent: true, opacity: 0.65,
+    // Pole indicators — tiny glowing Sprites only (no Mesh sphere = no solid disc artefact)
+    const northMat = new THREE.SpriteMaterial({
+      map: glowTex, color: new THREE.Color('#0044FF'),
+      transparent: true, opacity: 0.55,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
-    const southMat = new THREE.MeshBasicMaterial({
-      color: 0xFF2200, transparent: true, opacity: 0.65,
+    const southMat = new THREE.SpriteMaterial({
+      map: glowTex, color: new THREE.Color('#FF2200'),
+      transparent: true, opacity: 0.55,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
-    const northPole = new THREE.Mesh(poleGeo, northMat);
-    const southPole = new THREE.Mesh(poleGeo, southMat);
-    // Initialise at non-zero positions to prevent screen-centre render before data
+    const northPole = new THREE.Sprite(northMat);
+    const southPole = new THREE.Sprite(southMat);
+    northPole.scale.set(0.06, 0.06, 1);
+    southPole.scale.set(0.06, 0.06, 1);
     northPole.position.set(0,  0.3, 0);
     southPole.position.set(0, -0.3, 0);
     magGroup.add(northPole, southPole);
-
-    // Small halo sprite — 0.09 scale max (not 0.12)
-    const nHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#0044FF'), transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false });
-    const sHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#FF2200'), transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false });
-    const nHalo = new THREE.Sprite(nHaloMat); nHalo.scale.set(0.09, 0.09, 1); northPole.add(nHalo);
-    const sHalo = new THREE.Sprite(sHaloMat); sHalo.scale.set(0.09, 0.09, 1); southPole.add(sHalo);
 
     // Precompute curve points arrays for highlight animation
     const lineCurves: THREE.Vector3[][] = MAG_L_VALUES.flatMap((L, li) =>
@@ -362,17 +360,8 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           });
         }
 
-        // Volumetric source glow
-        const vMat = new THREE.SpriteMaterial({
-          map: glowTex, color: new THREE.Color('#442200'),
-          transparent: true, opacity: Math.min(0.12, net.intensity * 0.15),
-          blending: THREE.AdditiveBlending, depthWrite: false,
-        });
-        const vSprite = new THREE.Sprite(vMat);
-        vSprite.position.copy(srcPos);
-        const vSz = 0.1 + net.intensity * 0.35;
-        vSprite.scale.set(vSz, vSz, 1);
-        rfGroup.add(vSprite);
+        // No source glow sprite — the expanding rings are the only RF visual.
+        // Sprites at source position caused large gold ball artefacts.
       }
 
       // Interference particles between first two networks
@@ -467,6 +456,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
       gravPosArr, gravVelArr, gravParticleCount,
       animFrame: null as number | null, tick: 0, lastMs: Date.now(),
+      active: false, // only render when AR tab is focused
       showMag: true, showRF: true, showGrav: false,
       currentQuat: new THREE.Quaternion(),
       prevAxisQuat: new THREE.Quaternion(),
@@ -483,15 +473,16 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     // Gravity off by default
     gravGroup.visible = false;
 
-    // Expose layer handle
-    if (layerRef) {
-      layerRef.current = {
-        setLayers: (mag, rf, grav) => {
-          refs.showMag = mag; refs.showRF = rf; refs.showGrav = grav;
-          magGroup.visible = mag; rfGroup.visible = rf; gravGroup.visible = grav;
-        },
-      };
-    }
+    // Expose handle
+    const handle: ARFieldCanvasHandle = {
+      setLayers: (mag, rf, grav) => {
+        refs.showMag = mag; refs.showRF = rf; refs.showGrav = grav;
+        magGroup.visible = mag; rfGroup.visible = rf; gravGroup.visible = grav;
+      },
+      pause:  () => { refs.active = false; },
+      resume: () => { refs.active = true; refs.lastMs = Date.now(); },
+    };
+    if (layerRef) layerRef.current = handle;
 
     let rfRebuildPending = true;
     let lastHeadingForRF = 0;
@@ -499,6 +490,9 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     // ── Animation loop ─────────────────────────────────────────────────────────
     function animate() {
       refs.animFrame = requestAnimationFrame(animate);
+      // Do nothing when AR tab is not focused — zero GPU/CPU cost on Map screen
+      if (!refs.active) return;
+
       const now = Date.now();
       const dtMs = Math.min(now - refs.lastMs, 50);
       refs.lastMs = now;
@@ -542,6 +536,16 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         refs.lineOpacity = (refs.lineOpacity ?? 0.50) + (envTarget - (refs.lineOpacity ?? 0.50)) * 0.02;
         const lo = refs.lineOpacity as number;
 
+        // Axis-alignment attenuation: when camera looks directly along magnetic axis
+        // all lines converge to a point and additive blending floods the screen.
+        // Detect this and reduce opacity proportionally.
+        const magLen = Math.sqrt(mx*mx+my*my+mz*mz)||1;
+        const axisDir = new THREE.Vector3(mx/magLen, mz/magLen, my/magLen).normalize();
+        const camForward = new THREE.Vector3(0,0,-1);
+        const axisDot = Math.abs(axisDir.dot(camForward));
+        // axisDot near 1 = looking along axis = fade lines out (avoid flood)
+        const axisAttenuation = 1 - Math.max(0, axisDot - 0.7) / 0.3; // 1.0→0.0 as dot 0.7→1.0
+
         // Scale and colour field lines; in perf mode render core pass only
         const col = getMagColor(magnitude, isAnomaly);
         refs.fieldLineSets.forEach((set: THREE.Line[], i: number) => {
@@ -549,30 +553,24 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           const inner = lFrac < 0.4;
           const compScale = inner ? (1 - comp * 0.5) : (1 + comp * 0.25);
           set.forEach((line, pass) => {
-            // In perf mode: only render core (pass 0), hide glow passes
             if (refs.perfMode && pass > 0) { line.visible = false; return; }
             line.visible = true;
             line.scale.setScalar(compScale);
             const mat = line.material as THREE.LineBasicMaterial;
             if (pass === 0) mat.color.copy(col);
             const passMultiplier = pass === 0 ? 1.0 : pass === 1 ? 0.40 : 0.18;
-            mat.opacity = isAnomaly
+            const baseOp = isAnomaly
               ? (pass === 0 ? 0.50 : pass === 1 ? 0.20 : 0.08)
               : lo * passMultiplier;
+            mat.opacity = baseOp * axisAttenuation;
             mat.needsUpdate = true;
           });
         });
 
-        // Pole position (±L_max*pole_offset along Y in local space)
-        const poleY = MAG_L_VALUES[MAG_L_VALUES.length-1] * 0.12;
-        northPole.position.set(0,  poleY, 0);
-        southPole.position.set(0, -poleY, 0);
-
-        // Pole halo opacity scales with camera dot product (stronger when facing camera)
-        const camDir = new THREE.Vector3(0,0,-1);
-        const nWorld = northPole.position.clone().applyQuaternion(refs.currentQuat).normalize();
-        const nDot = Math.max(0, nWorld.dot(camDir));
-        (northPole.children[0] as THREE.Sprite).material.opacity = nDot * 0.20;
+        // Pole sprite position (Sprites, not Meshes — no solid disc artefact)
+        const poleDist = MAG_L_VALUES[MAG_L_VALUES.length-1] * 0.10;
+        northPole.position.set(0,  poleDist, 0);
+        southPole.position.set(0, -poleDist, 0);
 
         // Travelling highlight nodes
         const speed = Math.max(0.3, Math.min(3.0, magnitude / 20)) * (isAnomaly ? 2.0 : 1.0);

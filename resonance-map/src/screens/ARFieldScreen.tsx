@@ -283,6 +283,8 @@ export default function ARFieldScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Resume the GL render loop — it idles when this tab is not focused
+      canvasLayerRef.current?.resume();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       startRFScanner();
 
@@ -300,6 +302,8 @@ export default function ARFieldScreen() {
 
       const unsubRF = subscribeRF(setRfState);
       return () => {
+        // Pause GL loop when navigating away — zero cost on Map screen
+        canvasLayerRef.current?.pause();
         stopRFScanner();
         unsubRF();
         if (anomalyTripleRef.current) clearTimeout(anomalyTripleRef.current);
