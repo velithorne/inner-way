@@ -34,10 +34,11 @@ const MAG_CURVE_PTS = 80;
 const MAG_TUBE_SEGS = 40;
 const HIGHLIGHT_PER_LINE = 3;
 
-const RF_SHELLS_PER_NET = 5;
+const RF_SHELLS_PER_NET = 6;
 const RF_MAX_NETWORKS   = 4;
-const RF_MAX_RADIUS     = 2.8;
+const RF_MAX_RADIUS     = 1.8;
 const INTERFERENCE_PTS  = 40;
+const RF_LOOKATA_EVERY  = 6; // frames between ring.lookAt calls
 
 const GRAV_GRID_W   = 20;
 const GRAV_GRID_H   = 14;
@@ -253,28 +254,28 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       }
     }
 
-    // Pole spheres — small, additive, marble-scale
-    const poleGeo = new THREE.SphereGeometry(0.035, 16, 16);
+    // Pole spheres — 0.03 radius, additive, marble-scale
+    const poleGeo = new THREE.SphereGeometry(0.03, 12, 8);
     const northMat = new THREE.MeshBasicMaterial({
-      color: 0x0044FF, transparent: true, opacity: 0.7,
+      color: 0x0044FF, transparent: true, opacity: 0.65,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const southMat = new THREE.MeshBasicMaterial({
-      color: 0xFF2200, transparent: true, opacity: 0.7,
+      color: 0xFF2200, transparent: true, opacity: 0.65,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const northPole = new THREE.Mesh(poleGeo, northMat);
     const southPole = new THREE.Mesh(poleGeo, southMat);
+    // Initialise at non-zero positions to prevent screen-centre render before data
+    northPole.position.set(0,  0.3, 0);
+    southPole.position.set(0, -0.3, 0);
     magGroup.add(northPole, southPole);
 
-    // Soft halo sprites behind each pole (3× sphere size)
-    const nHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#0044FF'), transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
-    const sHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#FF2200'), transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
-    const nHalo = new THREE.Sprite(nHaloMat); nHalo.scale.set(0.12, 0.12, 1); northPole.add(nHalo);
-    const sHalo = new THREE.Sprite(sHaloMat); sHalo.scale.set(0.12, 0.12, 1); southPole.add(sHalo);
-
-    const northLight = new THREE.PointLight(0x0044FF, 0.4, 0.3); northPole.add(northLight);
-    const southLight = new THREE.PointLight(0xFF2200, 0.4, 0.3); southPole.add(southLight);
+    // Small halo sprite — 0.09 scale max (not 0.12)
+    const nHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#0044FF'), transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false });
+    const sHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#FF2200'), transparent: true, opacity: 0.20, blending: THREE.AdditiveBlending, depthWrite: false });
+    const nHalo = new THREE.Sprite(nHaloMat); nHalo.scale.set(0.09, 0.09, 1); northPole.add(nHalo);
+    const sHalo = new THREE.Sprite(sHaloMat); sHalo.scale.set(0.09, 0.09, 1); southPole.add(sHalo);
 
     // Precompute curve points arrays for highlight animation
     const lineCurves: THREE.Vector3[][] = MAG_L_VALUES.flatMap((L, li) =>
@@ -287,11 +288,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       })
     );
 
-    // Lens flare sprites for poles
-    const nFlareMat = new THREE.SpriteMaterial({ map:glowTex, color:new THREE.Color('#0066FF'), transparent:true, opacity:0, blending:THREE.AdditiveBlending });
-    const sFlareMat = new THREE.SpriteMaterial({ map:glowTex, color:new THREE.Color('#FF4400'), transparent:true, opacity:0, blending:THREE.AdditiveBlending });
-    const nFlare = new THREE.Sprite(nFlareMat); nFlare.scale.set(0.3,0.3,1); magGroup.add(nFlare);
-    const sFlare = new THREE.Sprite(sFlareMat); sFlare.scale.set(0.3,0.3,1); magGroup.add(sFlare);
+    // No large lens-flare sprites — pole halos (0.09 scale) are the only glow
 
     // ══════════════════════════════════════════════════════════════════════════
     // FIELD 2 — RF WAVEFRONT SHELLS
@@ -368,7 +365,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         // Volumetric source glow
         const vMat = new THREE.SpriteMaterial({
           map: glowTex, color: new THREE.Color('#442200'),
-          transparent: true, opacity: net.intensity * 0.5,
+          transparent: true, opacity: Math.min(0.12, net.intensity * 0.15),
           blending: THREE.AdditiveBlending, depthWrite: false,
         });
         const vSprite = new THREE.Sprite(vMat);
@@ -398,7 +395,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         iGeo.setAttribute('position', new THREE.BufferAttribute(iPos, 3));
         const iMat  = new THREE.PointsMaterial({
           map: glowTex, color: new THREE.Color(Colors.gold),
-          size: 0.06, transparent: true, opacity: 0.65,
+          size: 0.04, transparent: true, opacity: 0.15,
           blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
         });
         interferenceParts = new THREE.Points(iGeo, iMat);
@@ -465,17 +462,21 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     // ── Scene refs ─────────────────────────────────────────────────────────────
     const refs: any = {
       renderer, scene, camera,
-      magGroup, fieldLineSets, highlightNodes, lineCurves, northPole, southPole, nFlare, sFlare,
+      magGroup, fieldLineSets, highlightNodes, lineCurves, northPole, southPole,
       rfGroup, shellEntries: [] as ShellEntry[], interferenceParts: null as THREE.Points | null,
       gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
       gravPosArr, gravVelArr, gravParticleCount,
       animFrame: null as number | null, tick: 0, lastMs: Date.now(),
-      showMag: true, showRF: true, showGrav: false, // gravity off by default — too many particles flood screen
+      showMag: true, showRF: true, showGrav: false,
       currentQuat: new THREE.Quaternion(),
       prevAxisQuat: new THREE.Quaternion(),
       anomalyCompression: 0.0,
-      lineOpacity: 0.55,
+      lineOpacity: 0.50,
       convergenceFired: false,
+      lastConvergenceMs: 0,      // cooldown for convergence firing
+      smoothDt: 16,              // EMA frame time for perf mode
+      perfMode: false,           // low-end performance mode
+      perfModeGoodFrames: 0,     // frames above 50fps before exiting perf mode
     };
     sceneRef.current = refs;
 
@@ -503,8 +504,18 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       refs.lastMs = now;
       refs.tick += 1;
 
-      // Auto-reduce gravity particles if slow
-      if (dtMs > FRAME_SLOW_MS && refs.gravParticleCount === GRAV_PARTICLES_FULL) {
+      // EMA frame time → perf mode detection
+      refs.smoothDt = refs.smoothDt * 0.95 + dtMs * 0.05;
+      if (!refs.perfMode && refs.smoothDt > 28) {
+        refs.perfMode = true;
+        refs.perfModeGoodFrames = 0;
+      } else if (refs.perfMode && refs.smoothDt < 20) {
+        refs.perfModeGoodFrames = (refs.perfModeGoodFrames || 0) + 1;
+        if (refs.perfModeGoodFrames > 150) refs.perfMode = false; // ~3s at 50fps
+      }
+
+      // Reduce gravity particles when slow
+      if (refs.smoothDt > FRAME_SLOW_MS && refs.gravParticleCount === GRAV_PARTICLES_FULL) {
         refs.gravParticleCount = GRAV_PARTICLES_REDUCED;
       }
 
@@ -526,25 +537,27 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         refs.anomalyCompression += (compTarget - refs.anomalyCompression) * 0.04;
         const comp = refs.anomalyCompression;
 
-        // Adaptive line opacity: dimmer outdoors (high magnitude = stronger ambient field)
-        const envTarget = magnitude > 80 ? 0.28 : magnitude > 40 ? 0.40 : 0.55;
-        refs.lineOpacity = (refs.lineOpacity ?? 0.55) + (envTarget - (refs.lineOpacity ?? 0.55)) * 0.02;
+        // Adaptive line opacity: dimmer outdoors — capped at 0.50 per spec
+        const envTarget = magnitude > 80 ? 0.25 : magnitude > 40 ? 0.38 : 0.50;
+        refs.lineOpacity = (refs.lineOpacity ?? 0.50) + (envTarget - (refs.lineOpacity ?? 0.50)) * 0.02;
         const lo = refs.lineOpacity as number;
 
-        // Scale field lines — compress inner lines toward axis on anomaly
+        // Scale and colour field lines; in perf mode render core pass only
         const col = getMagColor(magnitude, isAnomaly);
         refs.fieldLineSets.forEach((set: THREE.Line[], i: number) => {
           const lFrac = i / (refs.fieldLineSets.length - 1);
           const inner = lFrac < 0.4;
           const compScale = inner ? (1 - comp * 0.5) : (1 + comp * 0.25);
           set.forEach((line, pass) => {
+            // In perf mode: only render core (pass 0), hide glow passes
+            if (refs.perfMode && pass > 0) { line.visible = false; return; }
+            line.visible = true;
             line.scale.setScalar(compScale);
             const mat = line.material as THREE.LineBasicMaterial;
             if (pass === 0) mat.color.copy(col);
-            // Sharp fall-off: outer passes much dimmer for precise thin-line look
             const passMultiplier = pass === 0 ? 1.0 : pass === 1 ? 0.40 : 0.18;
             mat.opacity = isAnomaly
-              ? (pass === 0 ? 0.90 : pass === 1 ? 0.50 : 0.22)
+              ? (pass === 0 ? 0.50 : pass === 1 ? 0.20 : 0.08)
               : lo * passMultiplier;
             mat.needsUpdate = true;
           });
@@ -555,16 +568,11 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         northPole.position.set(0,  poleY, 0);
         southPole.position.set(0, -poleY, 0);
 
-        // Lens flare
+        // Pole halo opacity scales with camera dot product (stronger when facing camera)
         const camDir = new THREE.Vector3(0,0,-1);
-        const nWorld = northPole.position.clone().applyQuaternion(refs.currentQuat);
-        const sWorld = southPole.position.clone().applyQuaternion(refs.currentQuat);
-        const nDot = nWorld.normalize().dot(camDir);
-        const sDot = sWorld.normalize().dot(camDir);
-        (refs.nFlare.material as THREE.SpriteMaterial).opacity = Math.max(0, nDot - 0.6) * 0.75;
-        (refs.sFlare.material as THREE.SpriteMaterial).opacity = Math.max(0, sDot - 0.6) * 0.75;
-        refs.nFlare.position.copy(northPole.position);
-        refs.sFlare.position.copy(southPole.position);
+        const nWorld = northPole.position.clone().applyQuaternion(refs.currentQuat).normalize();
+        const nDot = Math.max(0, nWorld.dot(camDir));
+        (northPole.children[0] as THREE.Sprite).material.opacity = nDot * 0.20;
 
         // Travelling highlight nodes
         const speed = Math.max(0.3, Math.min(3.0, magnitude / 20)) * (isAnomaly ? 2.0 : 1.0);
@@ -593,20 +601,20 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           lastHeadingForRF = heading;
         }
 
-        // Expand rings — face camera each frame so they appear as circles
-        for (const se of refs.shellEntries as ShellEntry[]) {
+        // Expand rings — lookAt throttled to every 6 frames (cheap enough)
+        const allShells = refs.shellEntries as ShellEntry[];
+        // In perf mode: limit to 4 rings per source
+        const maxShells = refs.perfMode ? allShells.length * (4 / RF_SHELLS_PER_NET) : allShells.length;
+        for (let si = 0; si < allShells.length; si++) {
+          const se = allShells[si];
+          if (si >= maxShells) { se.mesh.visible = false; continue; }
+          se.mesh.visible = true;
           se.phase += se.expandRate;
           if (se.phase > se.maxRadius) se.phase = 0;
           const r = Math.max(0.001, se.phase);
-
-          // Scale ring: inner = r*0.94, outer = r (achieved via uniform scale on RingGeometry)
           se.mesh.scale.setScalar(r);
           se.mesh.position.copy(se.sourcePos);
-
-          // Always face camera — ring appears as a perfect circle
-          se.mesh.lookAt(camera.position);
-
-          // Fade opacity as ring expands: 0.06 at centre → 0 at edge
+          if (refs.tick % RF_LOOKATA_EVERY === 0) se.mesh.lookAt(camera.position);
           const fade = Math.max(0, 1 - r / se.maxRadius);
           (se.mesh.material as THREE.MeshBasicMaterial).opacity = 0.06 * fade;
         }
@@ -614,7 +622,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         // Interference flicker
         if (refs.interferenceParts) {
           (refs.interferenceParts.material as THREE.PointsMaterial).opacity =
-            0.4 + Math.sin(refs.tick * 0.12) * 0.25;
+            0.10 + Math.sin(refs.tick * 0.12) * 0.05;
         }
 
         // Surface echo: Z-axis spike = facing wall
@@ -636,6 +644,25 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         }
       }
 
+      // ── AXIS CONVERGENCE (always checked, not gated on gravity being visible) ──
+      {
+        const gLen = Math.sqrt(gx*gx+gy*gy+gz*gz)||1;
+        const magLen = Math.sqrt(mx*mx+my*my+mz*mz)||1;
+        const dot = Math.abs((gx/gLen)*(mx/magLen)+(gy/gLen)*(my/magLen)+(gz/gLen)*(mz/magLen));
+        const angleDeg = Math.acos(Math.min(1, dot)) * (180/Math.PI);
+        // Strict 4° threshold + 45s cooldown to prevent constant firing
+        const converging = angleDeg < 4;
+        if (converging && !refs.convergenceFired &&
+            (now - refs.lastConvergenceMs) > 45000) {
+          refs.convergenceFired = true;
+          refs.lastConvergenceMs = now;
+          onConvergence?.(true);
+        } else if (!converging && refs.convergenceFired) {
+          refs.convergenceFired = false;
+          onConvergence?.(false);
+        }
+      }
+
       // ── GRAVITY FIELD ────────────────────────────────────────────────────────
       if (refs.showGrav) {
         const gLen = Math.sqrt(gx*gx+gy*gy+gz*gz)||1;
@@ -650,57 +677,45 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         for (let vi = 0; vi < n; vi++) {
           const bx = base[vi*3], by = base[vi*3+1], bz = base[vi*3+2];
           const dist = Math.sqrt(bx*bx+by*by);
-          const wave = Math.sin(t + dist * 1.8) * 0.15 * (1 + Math.abs(by));
+          const wave = Math.sin(t + dist * 1.8) * 0.10 * (1 + Math.abs(by) * 0.5);
           arr[vi*3]   = bx + gdx * wave;
           arr[vi*3+1] = by + gdy * wave;
-          arr[vi*3+2] = bz + gdz * wave * 0.3;
+          arr[vi*3+2] = bz;
         }
         posAttr.needsUpdate = true;
 
-        // Gravity/mag convergence
-        const magLen = Math.sqrt(mx*mx+my*my+mz*mz)||1;
-        const dot = Math.abs((gx/gLen)*(mx/magLen) + (gy/gLen)*(my/magLen) + (gz/gLen)*(mz/magLen));
-        const converging = Math.acos(Math.min(1, dot)) * (180/Math.PI) < 10;
-        if (converging !== refs.convergenceFired) {
-          refs.convergenceFired = converging;
-          onConvergence?.(converging);
-        }
         const gridMaterial = refs.gravMesh.material as THREE.LineBasicMaterial;
-        gridMaterial.color.setStyle(converging ? Colors.cyan : '#001433');
-        gridMaterial.opacity = converging ? 0.18 + Math.sin(refs.tick*0.1)*0.05 : 0.06;
+        gridMaterial.opacity = refs.convergenceFired ? 0.18 : 0.06;
+        gridMaterial.color.setStyle(refs.convergenceFired ? Colors.cyan : '#001433');
         gridMaterial.needsUpdate = true;
 
-        // Particle physics — falling in gravity direction
-        const partPos = refs.gravPartGeo.attributes.position as THREE.BufferAttribute;
-        const pArr = partPos.array as Float32Array;
-        const vel  = refs.gravVelArr as Float32Array;
-        const count = refs.gravParticleCount;
-        const terminalSq = 0.08 * 0.08;
+        // Skip particles in perf mode entirely
+        if (!refs.perfMode) {
+          const partPos = refs.gravPartGeo.attributes.position as THREE.BufferAttribute;
+          const pArr = partPos.array as Float32Array;
+          const vel  = refs.gravVelArr as Float32Array;
+          const count = refs.gravParticleCount;
+          const terminalSq = 0.08 * 0.08;
 
-        for (let i = 0; i < count; i++) {
-          const ix=i*3, iy=ix+1, iz=ix+2;
-          vel[ix] += gdx * 0.015; vel[iy] += gdy * 0.015; vel[iz] += gdz * 0.015;
-          const vSq = vel[ix]**2+vel[iy]**2+vel[iz]**2;
-          if (vSq > terminalSq) {
-            const vS = Math.sqrt(vSq);
-            vel[ix]/=vS*0.08; vel[iy]/=vS*0.08; vel[iz]/=vS*0.08;
+          for (let i = 0; i < count; i++) {
+            const ix=i*3, iy=ix+1, iz=ix+2;
+            vel[ix] += gdx*0.015; vel[iy] += gdy*0.015; vel[iz] += gdz*0.015;
+            const vSq = vel[ix]**2+vel[iy]**2+vel[iz]**2;
+            if (vSq > terminalSq) {
+              const vS = Math.sqrt(vSq);
+              vel[ix]/=vS*0.08; vel[iy]/=vS*0.08; vel[iz]/=vS*0.08;
+            }
+            pArr[ix]+=vel[ix]; pArr[iy]+=vel[iy]; pArr[iz]+=vel[iz];
+            if (Math.abs(pArr[ix])>2.5||Math.abs(pArr[iy])>4||pArr[iz]>0||pArr[iz]<-4) {
+              pArr[ix]=(Math.random()-0.5)*4;
+              pArr[iy]=(Math.random()-0.5)*6;
+              pArr[iz]=-(0.5+Math.random()*3);
+              vel[ix]=vel[iy]=vel[iz]=0;
+            }
           }
-          pArr[ix]+=vel[ix]; pArr[iy]+=vel[iy]; pArr[iz]+=vel[iz];
-          // Reset out-of-bounds particle to random seeding position
-          if (Math.abs(pArr[ix])>2.5||Math.abs(pArr[iy])>4||pArr[iz]>0||pArr[iz]<-4) {
-            pArr[ix]=(Math.random()-0.5)*4;
-            pArr[iy]=(Math.random()-0.5)*6;
-            pArr[iz]=-(0.5+Math.random()*3);
-            vel[ix]=vel[iy]=vel[iz]=0;
-          }
+          partPos.needsUpdate = true;
+          (refs.gravParticles.material as THREE.PointsMaterial).opacity = 0.04;
         }
-        partPos.needsUpdate = true;
-
-        const vSqSample = vel[0]**2+vel[1]**2+vel[2]**2;
-        const speedFrac = Math.sqrt(vSqSample) / 0.08;
-        // Keep gravity particles very dim — 80 particles additive stacks quickly
-        (refs.gravParticles.material as THREE.PointsMaterial).opacity =
-          0.03 + speedFrac * 0.04;
       }
 
       renderer.render(scene, camera);

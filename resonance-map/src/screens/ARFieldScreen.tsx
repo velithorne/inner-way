@@ -249,8 +249,10 @@ export default function ARFieldScreen() {
       setShowConvergence(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       if (convergenceTimerRef.current) clearTimeout(convergenceTimerRef.current);
-      convergenceTimerRef.current = setTimeout(() => setShowConvergence(false), 4000);
+      // Auto-dismiss after 3 seconds — never blocks the view
+      convergenceTimerRef.current = setTimeout(() => setShowConvergence(false), 3000);
     } else {
+      if (convergenceTimerRef.current) clearTimeout(convergenceTimerRef.current);
       setShowConvergence(false);
     }
   }, []);
@@ -468,12 +470,12 @@ export default function ARFieldScreen() {
         </View>
       </View>
 
-      {/* Convergence badge */}
+      {/* Convergence toast — small, 3s, non-blocking */}
       {showConvergence && (
-        <View style={styles.convergenceBadge} pointerEvents="none">
-          <Text style={styles.convergenceIcon}>◈</Text>
-          <Text style={styles.convergenceTitle}>AXIS CONVERGENCE</Text>
-          <Text style={styles.convergenceBody}>Magnetic and gravitational axes aligned</Text>
+        <View style={styles.convergenceToast} pointerEvents="none">
+          <Text style={styles.convergenceToastText}>
+            ◈ AXIS CONVERGENCE  Mag/Grav aligned
+          </Text>
         </View>
       )}
 
@@ -757,34 +759,21 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Convergence badge
-  convergenceBadge: {
+  // Convergence toast — compact, 48px, top of screen below HUD
+  convergenceToast: {
     position: 'absolute',
-    top: '38%',
+    top: 155,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,10,0.88)',
-    borderWidth: 1,
-    borderColor: Colors.cyan,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    height: 48,
+    justifyContent: 'center',
   },
-  convergenceIcon: {
-    fontSize: 22,
-    color: Colors.cyan,
-  },
-  convergenceTitle: {
-    fontFamily: Fonts.header,
-    fontSize: FontSizes.md,
-    color: Colors.cyan,
-    letterSpacing: 3,
-  },
-  convergenceBody: {
+  convergenceToastText: {
     fontFamily: Fonts.mono,
     fontSize: FontSizes.xs,
-    color: Colors.greyLight,
-    letterSpacing: 1,
-    opacity: 0.8,
+    color: Colors.cyan,
+    letterSpacing: 1.5,
   },
 });
