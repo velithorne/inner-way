@@ -33,15 +33,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Must be a *repository* secret named exactly EXPO_TOKEN (Actions tab), not only org/env/codespaces.
+      - name: Verify EXPO_TOKEN is available to Actions
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::EXPO_TOKEN is empty. Add it here: Repo → Settings → Secrets and variables → Actions → Secrets → New repository secret. Name must be exactly EXPO_TOKEN (all caps). Value = token from https://expo.dev/settings/access-tokens — then re-run this workflow."
+            exit 1
+          fi
+          echo "EXPO_TOKEN is set (value hidden)."
+
       - name: EAS build (APK, preview profile)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::Missing repo secret EXPO_TOKEN. Add an Expo access token in GitHub → Settings → Secrets and variables → Actions."
-            exit 1
-          fi
           npx eas-cli build -p android --profile preview --non-interactive --wait --json > eas-build.json
           APK_URL="$(jq -r 'if type == "array" then .[0] else . end | .artifacts.applicationArchiveUrl // empty' eas-build.json)"
           BUILD_PAGE="$(jq -r 'if type == "array" then .[0] else . end | .url // empty' eas-build.json)"
