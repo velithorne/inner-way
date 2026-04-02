@@ -253,16 +253,28 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       }
     }
 
-    // Pole spheres
-    const poleGeo = new THREE.SphereGeometry(0.04, 10, 8);
-    const northMat = new THREE.MeshStandardMaterial({ color:0x0044FF, emissive:0x0044FF, emissiveIntensity:1.5, transparent:true, opacity:0.9 });
-    const southMat = new THREE.MeshStandardMaterial({ color:0xFF2200, emissive:0xFF2200, emissiveIntensity:1.5, transparent:true, opacity:0.9 });
+    // Pole spheres — small, additive, marble-scale
+    const poleGeo = new THREE.SphereGeometry(0.035, 16, 16);
+    const northMat = new THREE.MeshBasicMaterial({
+      color: 0x0044FF, transparent: true, opacity: 0.7,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const southMat = new THREE.MeshBasicMaterial({
+      color: 0xFF2200, transparent: true, opacity: 0.7,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
     const northPole = new THREE.Mesh(poleGeo, northMat);
     const southPole = new THREE.Mesh(poleGeo, southMat);
     magGroup.add(northPole, southPole);
 
-    const northLight = new THREE.PointLight(0x0044FF, 0.6, 1.5); northPole.add(northLight);
-    const southLight = new THREE.PointLight(0xFF2200, 0.6, 1.5); southPole.add(southLight);
+    // Soft halo sprites behind each pole (3× sphere size)
+    const nHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#0044FF'), transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
+    const sHaloMat = new THREE.SpriteMaterial({ map: glowTex, color: new THREE.Color('#FF2200'), transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false });
+    const nHalo = new THREE.Sprite(nHaloMat); nHalo.scale.set(0.12, 0.12, 1); northPole.add(nHalo);
+    const sHalo = new THREE.Sprite(sHaloMat); sHalo.scale.set(0.12, 0.12, 1); southPole.add(sHalo);
+
+    const northLight = new THREE.PointLight(0x0044FF, 0.4, 0.3); northPole.add(northLight);
+    const southLight = new THREE.PointLight(0xFF2200, 0.4, 0.3); southPole.add(southLight);
 
     // Precompute curve points arrays for highlight animation
     const lineCurves: THREE.Vector3[][] = MAG_L_VALUES.flatMap((L, li) =>
@@ -289,11 +301,11 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
 
     interface ShellEntry {
       mesh: THREE.Mesh;
-      phase: number;
-      baseOpacity: number;
+      phase: number;       // current expansion radius (0 → maxRadius)
       maxRadius: number;
       expandRate: number;
       sourcePos: THREE.Vector3;
+      color: number;
     }
 
     let shellEntries: ShellEntry[] = [];
@@ -322,28 +334,34 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         if (net.frequency > 4900)      col = new THREE.Color('#FFDDAA'); // 5GHz
         else if (net.frequency === 0)  col = new THREE.Color('#FF6600'); // cellular
 
-        // 0.08 base — 5 shells stack to ~0.35 combined, visible without dominating
-        const baseOpacity = 0.08;
-        const spacingFactor = net.frequency > 4900 ? 0.38 : 0.62;
+        // 6 rings evenly phased — expanding halos, not filled volumes
+        const RING_COUNT = 6;
+        const MAX_RING_RADIUS = 1.8;
+        // Shell spacing maps to WiFi frequency (wavelength difference)
+        const phaseSpacing = net.frequency > 4900 ? MAX_RING_RADIUS / 8 : MAX_RING_RADIUS / 5;
 
-        for (let s = 0; s < RF_SHELLS_PER_NET; s++) {
-          const shellGeo = new THREE.SphereGeometry(0.01, 12, 8);
-          const shellMat = new THREE.MeshBasicMaterial({
-            color: col, transparent: true, opacity: baseOpacity,
-            wireframe: false, depthWrite: false, blending: THREE.AdditiveBlending,
-            side: THREE.FrontSide,
+        for (let s = 0; s < RING_COUNT; s++) {
+          // RingGeometry: thin annulus — inner 94% of outer
+          const ringGeo = new THREE.RingGeometry(0.001 * 0.94, 0.001, 64);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: col,
+            transparent: true,
+            opacity: 0.06,   // 6 rings stack to ~0.28 at any point — visible but not flooding
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
           });
-          const shell = new THREE.Mesh(shellGeo, shellMat);
-          shell.position.copy(srcPos);
-          rfGroup.add(shell);
+          const ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.position.copy(srcPos);
+          rfGroup.add(ring);
 
           shellEntries.push({
-            mesh: shell,
-            phase: (s / RF_SHELLS_PER_NET) * spacingFactor * RF_MAX_RADIUS,
-            baseOpacity: 0.08,
-            maxRadius: RF_MAX_RADIUS,
-            expandRate: 0.012 + net.intensity * 0.008,
+            mesh: ring,
+            phase: (s / RING_COUNT) * MAX_RING_RADIUS + phaseSpacing * s * 0.1,
+            maxRadius: MAX_RING_RADIUS,
+            expandRate: 0.008 + net.intensity * 0.005,
             sourcePos: srcPos.clone(),
+            color: col.getHex(),
           });
         }
 
@@ -456,6 +474,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       currentQuat: new THREE.Quaternion(),
       prevAxisQuat: new THREE.Quaternion(),
       anomalyCompression: 0.0,
+      lineOpacity: 0.55,
       convergenceFired: false,
     };
     sceneRef.current = refs;
@@ -504,19 +523,26 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         refs.anomalyCompression += (compTarget - refs.anomalyCompression) * 0.04;
         const comp = refs.anomalyCompression;
 
+        // Adaptive line opacity: dimmer outdoors (high magnitude = stronger ambient field)
+        const envTarget = magnitude > 80 ? 0.28 : magnitude > 40 ? 0.40 : 0.55;
+        refs.lineOpacity = (refs.lineOpacity ?? 0.55) + (envTarget - (refs.lineOpacity ?? 0.55)) * 0.02;
+        const lo = refs.lineOpacity as number;
+
         // Scale field lines — compress inner lines toward axis on anomaly
+        const col = getMagColor(magnitude, isAnomaly);
         refs.fieldLineSets.forEach((set: THREE.Line[], i: number) => {
           const lFrac = i / (refs.fieldLineSets.length - 1);
           const inner = lFrac < 0.4;
           const compScale = inner ? (1 - comp * 0.5) : (1 + comp * 0.25);
-          const baseOpacities = [0.60, 0.28, 0.12];
-          const anomalyOpacities = [0.90, 0.50, 0.22];
           set.forEach((line, pass) => {
             line.scale.setScalar(compScale);
             const mat = line.material as THREE.LineBasicMaterial;
-            const col = getMagColor(magnitude, isAnomaly);
             if (pass === 0) mat.color.copy(col);
-            mat.opacity = isAnomaly ? anomalyOpacities[pass] : baseOpacities[pass];
+            // Sharp fall-off: outer passes much dimmer for precise thin-line look
+            const passMultiplier = pass === 0 ? 1.0 : pass === 1 ? 0.40 : 0.18;
+            mat.opacity = isAnomaly
+              ? (pass === 0 ? 0.90 : pass === 1 ? 0.50 : 0.22)
+              : lo * passMultiplier;
             mat.needsUpdate = true;
           });
         });
@@ -564,15 +590,22 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           lastHeadingForRF = heading;
         }
 
-        // Expand shells
+        // Expand rings — face camera each frame so they appear as circles
         for (const se of refs.shellEntries as ShellEntry[]) {
           se.phase += se.expandRate;
           if (se.phase > se.maxRadius) se.phase = 0;
-          const r = se.phase;
-          se.mesh.scale.setScalar(r < 0.01 ? 0.01 : r);
+          const r = Math.max(0.001, se.phase);
+
+          // Scale ring: inner = r*0.94, outer = r (achieved via uniform scale on RingGeometry)
+          se.mesh.scale.setScalar(r);
           se.mesh.position.copy(se.sourcePos);
+
+          // Always face camera — ring appears as a perfect circle
+          se.mesh.lookAt(camera.position);
+
+          // Fade opacity as ring expands: 0.06 at centre → 0 at edge
           const fade = Math.max(0, 1 - r / se.maxRadius);
-          (se.mesh.material as THREE.MeshBasicMaterial).opacity = fade * se.baseOpacity;
+          (se.mesh.material as THREE.MeshBasicMaterial).opacity = 0.06 * fade;
         }
 
         // Interference flicker
@@ -688,7 +721,10 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
 
   return (
     <View style={styles.container} pointerEvents="none">
-      <GLView style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />
+      <GLView
+        style={styles.gl}
+        onContextCreate={onContextCreate}
+      />
     </View>
   );
 }
@@ -696,6 +732,11 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.85,  // camera always dominant; lines add light via AdditiveBlending
+    backgroundColor: 'transparent',  // no tint on any RN layer
+    opacity: 1.0,  // opacity handled per-material via AdditiveBlending + alpha
+  },
+  gl: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
   },
 });
