@@ -44,6 +44,12 @@ jobs:
           fi
           echo "EXPO_TOKEN is set (value hidden)."
 
+      # Creates/links the Expo project and writes extra.eas.projectId into app.json (required for non-interactive eas build).
+      - name: EAS init (link or create project)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx eas-cli init --non-interactive --force
+
       - name: EAS build (APK, preview profile)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
