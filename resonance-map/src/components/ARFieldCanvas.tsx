@@ -42,8 +42,8 @@ const INTERFERENCE_PTS  = 40;
 const GRAV_GRID_W   = 20;
 const GRAV_GRID_H   = 14;
 const GRAV_GRID_D   = 4;
-const GRAV_PARTICLES_FULL    = 1200;
-const GRAV_PARTICLES_REDUCED = 600;
+const GRAV_PARTICLES_FULL    = 80;   // additive stacking — 80 is plenty
+const GRAV_PARTICLES_REDUCED = 40;
 const ACCEL_ALPHA   = 0.04;
 const FRAME_SLOW_MS = 1000 / 45;
 
@@ -435,7 +435,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     gridGeo.setAttribute('position', new THREE.BufferAttribute(gridPosCurr, 3));
     gridGeo.setIndex(new THREE.BufferAttribute(new Uint16Array(gridIndices), 1));
     const gridMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color('#001433'), transparent: true, opacity: 0.25,
+      color: new THREE.Color('#001433'), transparent: true, opacity: 0.06,
       depthWrite: false, blending: THREE.AdditiveBlending,
     });
     const gravMesh = new THREE.LineSegments(gridGeo, gridMat);
@@ -455,8 +455,8 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     const gravPartGeo = new THREE.BufferGeometry();
     gravPartGeo.setAttribute('position', new THREE.BufferAttribute(gravPosArr.slice(), 3));
     const gravPartMat = new THREE.PointsMaterial({
-      map: glowTex, color: new THREE.Color('#001850'),
-      size: 1.8, sizeAttenuation: true, transparent: true, opacity: 0.3,
+      map: glowTex, color: new THREE.Color('#002266'),
+      size: 0.8, sizeAttenuation: true, transparent: true, opacity: 0.04,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const gravParticles = new THREE.Points(gravPartGeo, gravPartMat);
@@ -470,7 +470,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
       gravPosArr, gravVelArr, gravParticleCount,
       animFrame: null as number | null, tick: 0, lastMs: Date.now(),
-      showMag: true, showRF: true, showGrav: true,
+      showMag: true, showRF: true, showGrav: false, // gravity off by default — too many particles flood screen
       currentQuat: new THREE.Quaternion(),
       prevAxisQuat: new THREE.Quaternion(),
       anomalyCompression: 0.0,
@@ -478,6 +478,9 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       convergenceFired: false,
     };
     sceneRef.current = refs;
+
+    // Gravity off by default
+    gravGroup.visible = false;
 
     // Expose layer handle
     if (layerRef) {
@@ -664,7 +667,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         }
         const gridMaterial = refs.gravMesh.material as THREE.LineBasicMaterial;
         gridMaterial.color.setStyle(converging ? Colors.cyan : '#001433');
-        gridMaterial.opacity = converging ? 0.55 + Math.sin(refs.tick*0.1)*0.1 : 0.25;
+        gridMaterial.opacity = converging ? 0.18 + Math.sin(refs.tick*0.1)*0.05 : 0.06;
         gridMaterial.needsUpdate = true;
 
         // Particle physics — falling in gravity direction
@@ -695,8 +698,9 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
 
         const vSqSample = vel[0]**2+vel[1]**2+vel[2]**2;
         const speedFrac = Math.sqrt(vSqSample) / 0.08;
+        // Keep gravity particles very dim — 80 particles additive stacks quickly
         (refs.gravParticles.material as THREE.PointsMaterial).opacity =
-          0.22 + speedFrac * 0.28;
+          0.03 + speedFrac * 0.04;
       }
 
       renderer.render(scene, camera);

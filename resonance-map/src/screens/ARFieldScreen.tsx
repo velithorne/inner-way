@@ -235,7 +235,7 @@ export default function ARFieldScreen() {
   // Field layer toggles
   const [layerMag, setLayerMag] = useState(true);
   const [layerRF, setLayerRF] = useState(true);
-  const [layerGrav, setLayerGrav] = useState(true);
+  const [layerGrav, setLayerGrav] = useState(false); // off by default — particles flood screen when on
   const canvasLayerRef = useRef<ARFieldCanvasHandle | null>(null);
 
   // RF scan state (for HUD readout)
