@@ -37,35 +37,22 @@ With **START** running on a real device:
 
 The previous minimal README and HTML helper files are preserved under `_legacy/`.
 
-## Android APK (same flow as other Cursor / Expo projects)
+## Android APK (same as Resonance Map — no Expo token)
 
-This repo mirrors the usual setup: **`origin` → GitHub**, repo secret **`EXPO_TOKEN`**, **EAS** cloud build, optional **GitHub Release** with the `.apk` attached.
-
-| Step | What to do |
-|------|------------|
-| 1 | Remote **`origin`** → [github.com/velithorne/inner-way](https://github.com/velithorne/inner-way) — push this branch |
-| 2 | [Expo access token](https://expo.dev/settings/access-tokens) → add as GitHub secret **`EXPO_TOKEN`** |
-| 3 | One-time link: `npx eas-cli login` then `npx eas-cli init --non-interactive` → commit **`app.json`** (gets `expo.extra.eas.projectId`) |
-| 4 | **CI:** Actions → **Android APK release (EAS + GitHub)** → Run workflow — or push tag **`v1.0.0`** |
-
-The workflow (`.github/workflows/android-apk-eas.yml`) runs the same commands as below: **`eas build -p android --profile preview`**, downloads **`applicationArchiveUrl`**, uploads **`biofield-scanner.apk`** to a GitHub Release. The job summary shows **`https://github.com/velithorne/inner-way/releases/tag/...`**.
-
-### Local machine (identical commands to CI)
-
-After `eas init` has written `projectId` into `app.json`:
+**Default release path** matches your other **`velithorne/inner-way`** projects: push a **`v*`** tag → GitHub Actions runs **`expo prebuild`** + **Gradle `assembleDebug`** → uploads **`BiofieldScanner-<tag>-debug.apk`** to a **GitHub Release**. **No `EXPO_TOKEN`** required (only the automatic `GITHUB_TOKEN`).
 
 ```bash
-export EXPO_TOKEN=...   # same token as the GitHub secret
-npm run release:android
+git tag v1.0.0-biofield
+git push origin v1.0.0-biofield
 ```
 
-Or only the cloud build (Expo prints the [build details / APK](https://docs.expo.dev/build-reference/apk/) URL):
+**Download:** [github.com/velithorne/inner-way/releases/latest](https://github.com/velithorne/inner-way/releases/latest)
 
-```bash
-npm run build:android:apk
-```
+Workflow: `.github/workflows/release-apk.yml`
 
-`scripts/android-release.sh` is the same pipeline as the workflow: EAS build → `curl` the APK → optional `gh release create` if the GitHub CLI is logged in.
+### Optional: EAS cloud build (Expo servers)
+
+If you want an Expo-hosted build instead, add repo secret **`EXPO_TOKEN`** and run **Actions → Android APK release (EAS + GitHub)** manually (`.github/workflows/android-apk-eas.yml`). See `npm run build:android:apk` and `scripts/android-release.sh`.
 
 ## License
 

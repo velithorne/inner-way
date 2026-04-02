@@ -10,9 +10,7 @@ name: Android APK release (EAS + GitHub)
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  # Tag-based releases use release-apk.yml (Gradle, no EXPO_TOKEN) — same as Resonance Map.
 
 permissions:
   contents: write
