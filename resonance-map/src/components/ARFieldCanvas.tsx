@@ -158,6 +158,18 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
   const gravRef    = useRef({ x: 0, y: -9.8, z: 0 });
   const highRamRef = useRef(false);
 
+  // Pre-populate layerRef with no-op stubs immediately so useFocusEffect's
+  // resume() call is safe even before onContextCreate fires.
+  useEffect(() => {
+    if (layerRef && !layerRef.current) {
+      layerRef.current = {
+        setLayers: () => {},
+        pause:  () => { if (sceneRef.current) sceneRef.current.active = false; },
+        resume: () => { if (sceneRef.current) { sceneRef.current.active = true; sceneRef.current.lastMs = Date.now(); } },
+      };
+    }
+  }, [layerRef]);
+
   useEffect(() => {
     return useFieldStore.subscribe(s => { storeRef.current = s; });
   }, []);
@@ -456,7 +468,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
       gravPosArr, gravVelArr, gravParticleCount,
       animFrame: null as number | null, tick: 0, lastMs: Date.now(),
-      active: false, // only render when AR tab is focused
+      active: true, // start rendering immediately; pause() called when tab loses focus
       showMag: true, showRF: true, showGrav: false,
       currentQuat: new THREE.Quaternion(),
       prevAxisQuat: new THREE.Quaternion(),
@@ -473,16 +485,17 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     // Gravity off by default
     gravGroup.visible = false;
 
-    // Expose handle
-    const handle: ARFieldCanvasHandle = {
-      setLayers: (mag, rf, grav) => {
-        refs.showMag = mag; refs.showRF = rf; refs.showGrav = grav;
-        magGroup.visible = mag; rfGroup.visible = rf; gravGroup.visible = grav;
-      },
-      pause:  () => { refs.active = false; },
-      resume: () => { refs.active = true; refs.lastMs = Date.now(); },
-    };
-    if (layerRef) layerRef.current = handle;
+    // Expose handle — update the ref that ARFieldScreen already holds
+    if (layerRef) {
+      layerRef.current = {
+        setLayers: (mag, rf, grav) => {
+          refs.showMag = mag; refs.showRF = rf; refs.showGrav = grav;
+          magGroup.visible = mag; rfGroup.visible = rf; gravGroup.visible = grav;
+        },
+        pause:  () => { refs.active = false; },
+        resume: () => { refs.active = true; refs.lastMs = Date.now(); },
+      };
+    }
 
     let rfRebuildPending = true;
     let lastHeadingForRF = 0;
