@@ -92,63 +92,49 @@ function getMagColor(magnitude: number, isAnomaly: boolean): THREE.Color {
   return new THREE.Color(Colors.blueBright);
 }
 
-/** Build tube-like geometry for a CatmullRom curve with vertex colours. */
-function buildLineTube(pts: THREE.Vector3[], tubeRadius: number): THREE.BufferGeometry {
+/**
+ * Build a 3-pass glowing line from dipole curve points.
+ * Returns [core, mid, outer] THREE.Line objects with LineBasicMaterial.
+ *
+ * Tubes were causing solid opaque planes on mobile WebGL — replaced with
+ * three overlapping lines at additive blending creating a soft glow core.
+ * More visible on dark surfaces, nearly invisible on white (physically correct).
+ */
+function buildGlowLines(pts: THREE.Vector3[]): THREE.Line[] {
   const curve = new THREE.CatmullRomCurve3(pts);
-  const positions: number[] = [];
-  const colours: number[] = [];
-  const nTube = MAG_TUBE_SEGS;
-  const nSides = 5; // low-poly tube for performance
-  const curvePoints = curve.getPoints(nTube);
+  const curvePoints = curve.getPoints(MAG_CURVE_PTS);
 
-  for (let i = 0; i < nTube; i++) {
-    const t = i / (nTube - 1);
-    // Vertex colour: white at poles, cyan mid-arc, dark at equator
-    const distFromPole = Math.min(t, 1 - t) * 2; // 0 at poles, 1 at equator
-    const r = THREE.MathUtils.lerp(1.0,  0.0, distFromPole);
-    const g = THREE.MathUtils.lerp(1.0,  0.5, distFromPole);
-    const b = THREE.MathUtils.lerp(1.0,  0.8, distFromPole);
-    const a = THREE.MathUtils.lerp(1.0,  0.4, distFromPole);
+  const passes = [
+    { opacity: 0.60, color: 0x00FFE5, offset: 0.000 },  // core — cyan
+    { opacity: 0.28, color: 0xAFFFFF, offset: 0.0018 }, // mid  — pale cyan
+    { opacity: 0.12, color: 0xFFFFFF, offset: 0.0038 }, // outer — white diffuse
+  ];
 
-    const centre = curvePoints[i];
-    const next   = curvePoints[Math.min(i+1,nTube-1)];
-    const tangent = new THREE.Vector3().subVectors(next, centre).normalize();
-    const up = new THREE.Vector3(0,1,0);
-    const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
-    if (normal.lengthSq() < 0.01) normal.set(1,0,0);
-    const binorm = new THREE.Vector3().crossVectors(tangent, normal).normalize();
-
-    // Vary tube radius — thicker near poles
-    const rr = tubeRadius * (0.3 + (1 - distFromPole) * 0.7) * (0.006 / 0.008);
-
-    for (let s = 0; s <= nSides; s++) {
-      const angle = (s / nSides) * Math.PI * 2;
-      const px = centre.x + (Math.cos(angle)*normal.x + Math.sin(angle)*binorm.x)*rr;
-      const py = centre.y + (Math.cos(angle)*normal.y + Math.sin(angle)*binorm.y)*rr;
-      const pz = centre.z + (Math.cos(angle)*normal.z + Math.sin(angle)*binorm.z)*rr;
-      positions.push(px, py, pz);
-      colours.push(r, g, b, a);
+  return passes.map(pass => {
+    const positions = new Float32Array(curvePoints.length * 3);
+    for (let i = 0; i < curvePoints.length; i++) {
+      const p    = curvePoints[i];
+      const next = curvePoints[Math.min(i + 1, curvePoints.length - 1)];
+      // Small normal offset for mid/outer passes (XY plane normal to tangent)
+      const tx = next.x - p.x, ty = next.y - p.y;
+      const tlen = Math.sqrt(tx*tx + ty*ty) || 1;
+      const nx = -ty / tlen, ny = tx / tlen;
+      positions[i*3]   = p.x + nx * pass.offset;
+      positions[i*3+1] = p.y + ny * pass.offset;
+      positions[i*3+2] = p.z;
     }
-  }
-
-  // Build index faces between rings
-  const indices: number[] = [];
-  const stride = nSides + 1;
-  for (let i = 0; i < nTube - 1; i++) {
-    for (let s = 0; s < nSides; s++) {
-      const a = i * stride + s;
-      const b = a + 1;
-      const c = a + stride;
-      const dd = c + 1;
-      indices.push(a,b,c, b,dd,c);
-    }
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-  geo.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(colours), 4));
-  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
-  return geo;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({
+      color: pass.color,
+      transparent: true,
+      opacity: pass.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+    return new THREE.Line(geo, mat);
+  });
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
@@ -210,20 +196,25 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
       canvas, context: gl as unknown as WebGLRenderingContext,
       antialias: false, alpha: true,
     });
-    renderer.setSize(W, H); renderer.setPixelRatio(1);
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(1);
     renderer.setClearColor(0x000000, 0);
+    renderer.setClearAlpha(0);
+    // Ensure GL buffer is cleared to fully transparent each frame
+    const glCtx = gl as any;
+    glCtx.clearColor(0, 0, 0, 0);
 
     const scene  = new THREE.Scene();
-    // Depth fog — distant geometry fades to near-black
-    scene.fog = new THREE.FogExp2(0x00000A, 0.38);
+    scene.background = null; // critical — any colour value kills camera transparency
+    // No fog — FogExp2 has a colour that bleeds into the transparent background
 
     const camera = new THREE.PerspectiveCamera(70, W/H, 0.01, 20);
     camera.position.set(0,0,0);
 
     const glowTex = makeGlowTex();
 
-    // ── AMBIENT LIGHT ─────────────────────────────────────────────────────────
-    scene.add(new THREE.AmbientLight(0x111122, 1.0));
+    // No ambient light — field lines use AdditiveBlending and don't need lighting.
+    // Pole spheres use emissive material which works without lights.
 
     // ══════════════════════════════════════════════════════════════════════════
     // FIELD 1 — MAGNETIC DIPOLE
@@ -231,7 +222,8 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     const magGroup = new THREE.Group();
     scene.add(magGroup);
 
-    const fieldLines: THREE.Mesh[] = [];
+    // Each field line = 3 Line objects (core/mid/outer glow passes)
+    const fieldLineSets: THREE.Line[][] = [];
     const highlightNodes: { mesh: THREE.Sprite; lineIndex: number; phase: number }[] = [];
 
     // Azimuthal density distribution: arcsin(sqrt(i/n))*2 for natural clustering
@@ -242,18 +234,9 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         const frac = (li * MAG_AZ_COUNT + az) / (nL * MAG_AZ_COUNT - 1);
         const phi  = Math.asin(Math.sqrt(frac)) * 2 * Math.PI * (az === 0 ? 1 : -1);
         const pts  = dipolePoints(L, phi, MAG_CURVE_PTS);
-        const geo  = buildLineTube(pts, 0.008);
-        const mat  = new THREE.MeshBasicMaterial({
-          vertexColors: true,
-          transparent: true,
-          opacity: 0.75,
-          depthWrite: false,
-          blending: THREE.AdditiveBlending,
-          side: THREE.DoubleSide,
-        });
-        const mesh = new THREE.Mesh(geo, mat);
-        magGroup.add(mesh);
-        fieldLines.push(mesh);
+        const glowSet = buildGlowLines(pts);
+        glowSet.forEach(l => magGroup.add(l));
+        fieldLineSets.push(glowSet);
 
         // Highlight travelling nodes
         for (let h = 0; h < HIGHLIGHT_PER_LINE; h++) {
@@ -265,7 +248,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           const hMesh = new THREE.Sprite(hMat);
           hMesh.scale.set(0.04, 0.04, 1);
           magGroup.add(hMesh);
-          highlightNodes.push({ mesh: hMesh, lineIndex: fieldLines.length - 1, phase: h / HIGHLIGHT_PER_LINE });
+          highlightNodes.push({ mesh: hMesh, lineIndex: fieldLineSets.length - 1, phase: h / HIGHLIGHT_PER_LINE });
         }
       }
     }
@@ -339,16 +322,16 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         if (net.frequency > 4900)      col = new THREE.Color('#FFDDAA'); // 5GHz
         else if (net.frequency === 0)  col = new THREE.Color('#FF6600'); // cellular
 
-        const baseOpacity = Math.max(0.1, net.intensity * 0.72);
-        // Shell spacing: 5GHz tighter, 2.4GHz wider
+        // 0.08 base — 5 shells stack to ~0.35 combined, visible without dominating
+        const baseOpacity = 0.08;
         const spacingFactor = net.frequency > 4900 ? 0.38 : 0.62;
 
         for (let s = 0; s < RF_SHELLS_PER_NET; s++) {
-          const shellGeo = new THREE.SphereGeometry(0.01, 16, 10);
+          const shellGeo = new THREE.SphereGeometry(0.01, 12, 8);
           const shellMat = new THREE.MeshBasicMaterial({
             color: col, transparent: true, opacity: baseOpacity,
             wireframe: false, depthWrite: false, blending: THREE.AdditiveBlending,
-            side: THREE.DoubleSide,
+            side: THREE.FrontSide,
           });
           const shell = new THREE.Mesh(shellGeo, shellMat);
           shell.position.copy(srcPos);
@@ -357,7 +340,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
           shellEntries.push({
             mesh: shell,
             phase: (s / RF_SHELLS_PER_NET) * spacingFactor * RF_MAX_RADIUS,
-            baseOpacity,
+            baseOpacity: 0.08,
             maxRadius: RF_MAX_RADIUS,
             expandRate: 0.012 + net.intensity * 0.008,
             sourcePos: srcPos.clone(),
@@ -464,7 +447,7 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
     // ── Scene refs ─────────────────────────────────────────────────────────────
     const refs: any = {
       renderer, scene, camera,
-      magGroup, fieldLines, highlightNodes, lineCurves, northPole, southPole, nFlare, sFlare,
+      magGroup, fieldLineSets, highlightNodes, lineCurves, northPole, southPole, nFlare, sFlare,
       rfGroup, shellEntries: [] as ShellEntry[], interferenceParts: null as THREE.Points | null,
       gravGroup, gravMesh, gravParticles, gravPartGeo, gridPosBase, gridPosCurr,
       gravPosArr, gravVelArr, gravParticleCount,
@@ -522,13 +505,20 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
         const comp = refs.anomalyCompression;
 
         // Scale field lines — compress inner lines toward axis on anomaly
-        refs.fieldLines.forEach((mesh: THREE.Mesh, i: number) => {
-          const lFrac = i / (refs.fieldLines.length - 1);
+        refs.fieldLineSets.forEach((set: THREE.Line[], i: number) => {
+          const lFrac = i / (refs.fieldLineSets.length - 1);
           const inner = lFrac < 0.4;
           const compScale = inner ? (1 - comp * 0.5) : (1 + comp * 0.25);
-          mesh.scale.setScalar(compScale);
-          const mat = mesh.material as THREE.MeshBasicMaterial;
-          mat.opacity = isAnomaly ? 0.95 : 0.75;
+          const baseOpacities = [0.60, 0.28, 0.12];
+          const anomalyOpacities = [0.90, 0.50, 0.22];
+          set.forEach((line, pass) => {
+            line.scale.setScalar(compScale);
+            const mat = line.material as THREE.LineBasicMaterial;
+            const col = getMagColor(magnitude, isAnomaly);
+            if (pass === 0) mat.color.copy(col);
+            mat.opacity = isAnomaly ? anomalyOpacities[pass] : baseOpacities[pass];
+            mat.needsUpdate = true;
+          });
         });
 
         // Pole position (±L_max*pole_offset along Y in local space)
@@ -706,6 +696,6 @@ export default function ARFieldCanvas({ layerRef, onConvergence }: Props) {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.78,
+    opacity: 0.85,  // camera always dominant; lines add light via AdditiveBlending
   },
 });
