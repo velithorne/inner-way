@@ -19,6 +19,25 @@ function labelFromBps(bps: number): BpsLabel {
   return 'CONFIRMED';
 }
 
+/**
+ * BPS can stay low when only the accelerometer contributes (~40 pts max) and mag is ~0.
+ * If we already show a plausible BPM from the acc pipeline, do not label "NO SIGNAL" — that contradicts the readout.
+ */
+function deriveBpsLabel(
+  bps: number,
+  accBpm: number,
+  accConfidence: number
+): BpsLabel {
+  const accShowsCardiac =
+    accBpm >= 36 &&
+    accBpm <= 200 &&
+    accConfidence >= 22;
+  if (bps <= 20 && accShowsCardiac) {
+    return 'TRACE';
+  }
+  return labelFromBps(bps);
+}
+
 export type BioState = {
   bps: number;
   bpsLabel: BpsLabel;
@@ -57,10 +76,12 @@ export const useBioStore = create<BioState>((set) => ({
   setFusion: (partial) =>
     set((s) => {
       const bps = partial.bps ?? s.bps;
+      const accBpm = partial.accBpm ?? s.accBpm;
+      const accConfidence = partial.accConfidence ?? s.accConfidence;
       return {
         ...s,
         ...partial,
-        bpsLabel: labelFromBps(bps),
+        bpsLabel: deriveBpsLabel(bps, accBpm, accConfidence),
       };
     }),
   reset: () => set(initial),

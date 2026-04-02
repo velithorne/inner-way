@@ -99,6 +99,12 @@ export default function App() {
           <Text style={styles.statLine}>
             Mag: {magFreqHz > 0 ? `${magFreqHz.toFixed(2)} Hz` : '—'} · SNR {magSnr.toFixed(1)}
           </Text>
+          {magSnr < 1 ? (
+            <Text style={styles.magHint}>
+              Magnetometer cardiac signal is usually below phone sensor noise; CONTACT mode still uses
+              accelerometer (chest vibration).
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.modes}>
@@ -179,6 +185,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 6,
     fontVariant: ['tabular-nums'],
+  },
+  magHint: {
+    color: '#78909c',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
   },
   modes: {
     flexDirection: 'row',
