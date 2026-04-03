@@ -1,5 +1,13 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+// Expo modules (e.g. expo-file-system) use safeExtGet("compileSdkVersion") → rootProject.ext
+ext {
+  compileSdkVersion = (findProperty("android.compileSdkVersion") ?: "36").toInteger()
+  targetSdkVersion = (findProperty("android.targetSdkVersion") ?: "36").toInteger()
+  minSdkVersion = (findProperty("android.minSdkVersion") ?: "24").toInteger()
+  buildToolsVersion = findProperty("android.buildToolsVersion") ?: "36.0.0"
+}
+
 buildscript {
   repositories {
     google()
