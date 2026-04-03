@@ -36,6 +36,6 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders (iOS generated on demand)
 /ios
-/android
+# Android is tracked: custom native modules (SILICON SystemData) must persist across prebuild.
