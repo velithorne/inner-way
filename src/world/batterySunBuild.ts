@@ -13,7 +13,7 @@ const TARGETS = [
   WORLD.sensors,
 ];
 
-const RIVER_BASE_OPACITY = [0.5, 0.4, 0.3, 0.2, 0.25, 0.15];
+const RIVER_BASE_OPACITY = [0.62, 0.52, 0.42, 0.34, 0.38, 0.28];
 
 function sunLightFromBattery(level: number): { color: THREE.Color; intensity: number } {
   const lvl = Math.max(0, Math.min(100, level));
@@ -33,12 +33,12 @@ function sunLightFromBattery(level: number): { color: THREE.Color; intensity: nu
     if (lvl >= a.t && lvl <= b.t) {
       const u = (lvl - a.t) / Math.max(1e-6, b.t - a.t);
       const c = new THREE.Color(a.hex).lerp(new THREE.Color(b.hex), u);
-      const intensity = THREE.MathUtils.lerp(a.i, b.i, u);
+      const intensity = THREE.MathUtils.lerp(a.i, b.i, u) * 1.35;
       return { color: c, intensity };
     }
   }
   const last = stops[stops.length - 1];
-  return { color: new THREE.Color(last.hex), intensity: last.i };
+  return { color: new THREE.Color(last.hex), intensity: last.i * 1.35 };
 }
 
 const plasmaVertex = `
@@ -87,6 +87,8 @@ export type BatterySunHandles = {
   riverCurves: THREE.CatmullRomCurve3[];
   riverPulses: { mesh: THREE.Mesh; t: number }[];
   sunLight: THREE.PointLight;
+  /** Boost illumination at each power-river destination (world-relative to sun group at origin) */
+  anchorLights: THREE.PointLight[];
   dispose: () => void;
 };
 
@@ -176,6 +178,15 @@ export function createBatterySun(): BatterySunHandles {
   sunLight.shadow.camera.far = 600;
   group.add(sunLight);
 
+  const anchorLights: THREE.PointLight[] = [];
+  for (let i = 0; i < TARGETS.length; i++) {
+    const pl = new THREE.PointLight(0xffaa66, 0, 160, 1.5);
+    pl.position.copy(TARGETS[i]);
+    pl.castShadow = false;
+    group.add(pl);
+    anchorLights.push(pl);
+  }
+
   const rivers: THREE.Mesh[] = [];
   const riverGlows: THREE.Mesh[] = [];
   const riverCurves: THREE.CatmullRomCurve3[] = [];
@@ -242,6 +253,7 @@ export function createBatterySun(): BatterySunHandles {
     riverCurves,
     riverPulses,
     sunLight,
+    anchorLights,
     dispose: () => {
       geo.dispose();
       sunMat.dispose();
@@ -271,6 +283,7 @@ export function createBatterySun(): BatterySunHandles {
       });
       pulseGeo.dispose();
       pulseMat.dispose();
+      anchorLights.forEach((l) => l.dispose());
     },
   };
 }
@@ -307,6 +320,12 @@ export function updateBatterySun(
   h.sunLight.color.copy(sunParams.color);
   h.sunLight.intensity = sunParams.intensity * reveal;
 
+  h.anchorLights.forEach((pl, i) => {
+    pl.color.copy(sunParams.color);
+    const weight = RIVER_BASE_OPACITY[i];
+    pl.intensity = sunParams.intensity * weight * 0.28 * reveal;
+  });
+
   const pulse = (1 + Math.sin(time * Math.PI * 2 * 0.25) * 0.02) * reveal;
   h.group.scale.setScalar(Math.max(0.001, pulse));
 
@@ -328,13 +347,13 @@ export function updateBatterySun(
     m.color.copy(col);
     const baseOp = RIVER_BASE_OPACITY[i];
     const netBoost = i === 4 ? 1 + pNorm * 0.4 : 1;
-    m.opacity = Math.min(0.85, baseOp * (0.45 + pNorm * 0.5) * netBoost * reveal);
+    m.opacity = Math.min(0.95, baseOp * (0.65 + pNorm * 0.45) * netBoost * reveal);
   });
 
   h.riverGlows.forEach((glow, i) => {
     const m = glow.material as THREE.MeshBasicMaterial;
     m.color.copy(col);
-    m.opacity = 0.035 * reveal * (0.5 + (lvl / 100) * 0.5);
+    m.opacity = 0.08 * reveal * (0.55 + (lvl / 100) * 0.45);
   });
 
   h.riverPulses.forEach((rp, i) => {

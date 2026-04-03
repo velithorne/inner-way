@@ -94,24 +94,28 @@ export function WorldEngine({ entryProgress }: Props) {
     const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
     const renderer = new Renderer({ gl }) as THREE.WebGLRenderer;
     renderer.setSize(w, h);
-    renderer.setClearColor(0x000008, 1);
+    const SKY_BASE = new THREE.Color(0x0a1528);
+    renderer.setClearColor(SKY_BASE, 1);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = new THREE.Scene();
-    const fog = new THREE.FogExp2(0x050814, 0.0055);
+    const fog = new THREE.FogExp2(0x0a1528, 0.0038);
     scene.fog = fog;
 
     const camera = new THREE.PerspectiveCamera(65, w / h, 0.1, 2500);
     camera.position.copy(ENTRY_START_POS);
     camera.lookAt(0, 0, 0);
 
-    const ambient = new THREE.AmbientLight(0x223355, 1.5);
+    const ambient = new THREE.AmbientLight(0x334466, 1.85);
     scene.add(ambient);
 
-    const fillLight = new THREE.PointLight(0x112244, 1.2, 800, 1.0);
-    fillLight.position.set(0, 50, 200);
+    const fillLight = new THREE.PointLight(0x2a4060, 2.0, 1200, 1.0);
+    fillLight.position.set(0, 120, 280);
     scene.add(fillLight);
+
+    const hemi = new THREE.HemisphereLight(0x6a8ab0, 0x1a2238, 0.55);
+    scene.add(hemi);
 
     const cpuLight = new THREE.PointLight(0xff6600, 0, 420);
     cpuLight.position.copy(WORLD.processor);
@@ -242,8 +246,12 @@ export function WorldEngine({ entryProgress }: Props) {
 
       updateAtmosphere(atmH, now, camera.position, batteryLevel);
 
-      const fogD = 0.006 + (avgCpu / 100) * 0.0012 - (batteryLevel / 100) * 0.0008;
-      fog.density = THREE.MathUtils.clamp(fogD, 0.004, 0.012);
+      const fogD = 0.0028 + (avgCpu / 100) * 0.0009 - (batteryLevel / 100) * 0.0005;
+      fog.density = THREE.MathUtils.clamp(fogD, 0.002, 0.008);
+      const sunCol = sunH.sunLight.color;
+      const skyTint = SKY_BASE.clone().lerp(sunCol, 0.12 + (batteryLevel / 100) * 0.08);
+      fog.color.copy(skyTint);
+      renderer.setClearColor(skyTint, 1);
 
       if (entryT < 1) {
         const camT = ease(entryT);
@@ -312,6 +320,6 @@ export function WorldEngine({ entryProgress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1, backgroundColor: '#000008' },
+  fill: { flex: 1, backgroundColor: '#0a1528' },
   gl: { flex: 1 },
 });
