@@ -11,18 +11,42 @@ const WARMUP_SEC = 20;
 const NOISE_WINDOW_SEC = 15;
 const SUBHARMONIC_RATIO = 0.4;
 
+/** RMS window for ambient vs cardiac gating (Fix 1) */
+const RMS_WINDOW_SEC = 5;
+const MIN_RMS_MPS2 = 0.008;
+
+/** First 10s: learn table noise floor; no cardiac reporting (Fix 4) */
+const CONTROL_PHASE_SEC = 10;
+const NOISE_FLOOR_MULTIPLIER = 2.5;
+
+/** Autocorr peak must exceed this multiple of mean r (Fix 2) */
+const PROMINENCE_MEAN_RATIO = 3.5;
+
+const INTERFERENCE_HZ = [0.83, 1.0, 1.17, 1.67];
+const INTERFERENCE_TOL_HZ = 0.05;
+
 export type AccelerometerCardiacOutput = {
   bpm: number;
   confidence: number;
   amplitude: number;
-  /** Dominant frequency in cardiac band (Hz), for coherence */
   freqHz: number;
-  /** First 20s after start: baseline stabilising; UI should show SETTLING */
   isWarmup: boolean;
+  /** First 10s: calibrating table noise floor */
+  isControlPhase: boolean;
+  possibleInterference: boolean;
 };
 
 function magnitude(x: number, y: number, z: number): number {
   return Math.sqrt(x * x + y * y + z * z);
+}
+
+function rms(samples: Float32Array): number {
+  if (samples.length === 0) return 0;
+  let s2 = 0;
+  for (let i = 0; i < samples.length; i++) {
+    s2 += samples[i] * samples[i];
+  }
+  return Math.sqrt(s2 / samples.length);
 }
 
 function stdDev(samples: Float32Array): number {
@@ -54,25 +78,42 @@ function autocorrAtLag(
   return sum / (count * variance);
 }
 
+function nearInterferenceHz(freqHz: number): boolean {
+  for (const f of INTERFERENCE_HZ) {
+    if (Math.abs(freqHz - f) <= INTERFERENCE_TOL_HZ) return true;
+  }
+  return false;
+}
+
 type PeakResult = {
   freqHz: number;
   prominence: number;
   amplitude: number;
   bestLag: number;
   bestR: number;
+  meanR: number;
+  peakAcceptable: boolean;
 };
 
-/** Autocorrelation peak with sub-harmonic correction (prefer L/2 when it is the real beat). */
+/** Autocorrelation peak with sub-harmonic correction; peak must be ≥ 3.5× mean r (Fix 2). */
 function autocorrPeakFreq(
   x: Float32Array,
   sampleRate: number,
   minHz: number,
   maxHz: number
 ): PeakResult {
+  const empty = (): PeakResult => ({
+    freqHz: 0,
+    prominence: 0,
+    amplitude: 0,
+    bestLag: 0,
+    bestR: 0,
+    meanR: 0,
+    peakAcceptable: false,
+  });
+
   const n = x.length;
-  if (n < 64) {
-    return { freqHz: 0, prominence: 0, amplitude: 0, bestLag: 0, bestR: 0 };
-  }
+  if (n < 64) return empty();
 
   let maxAmp = 0;
   for (let i = 0; i < n; i++) {
@@ -83,7 +124,7 @@ function autocorrPeakFreq(
   const minLag = Math.max(2, Math.floor(sampleRate / maxHz));
   const maxLag = Math.min(n - 1, Math.ceil(sampleRate / minHz));
   if (minLag >= maxLag) {
-    return { freqHz: 0, prominence: 0, amplitude: maxAmp, bestLag: 0, bestR: 0 };
+    return { ...empty(), amplitude: maxAmp };
   }
 
   let mean = 0;
@@ -99,14 +140,19 @@ function autocorrPeakFreq(
   let bestLag = minLag;
   let bestR = -1;
   const rAtLag: number[] = [];
+  let sumR = 0;
+  let countR = 0;
   for (let lag = minLag; lag <= maxLag; lag++) {
     const r = autocorrAtLag(x, mean, variance, lag);
     rAtLag.push(r);
+    sumR += r;
+    countR += 1;
     if (r > bestR) {
       bestR = r;
       bestLag = lag;
     }
   }
+  const meanR = countR > 0 ? sumR / countR : 0;
 
   let useLag = bestLag;
   let useR = bestR;
@@ -127,12 +173,20 @@ function autocorrPeakFreq(
   const prominence = Math.max(0, useR - medianR);
   const freqHz = useLag > 0 ? sampleRate / useLag : 0;
 
-  return { freqHz, prominence, amplitude: maxAmp, bestLag: useLag, bestR: useR };
+  const peakAcceptable =
+    meanR > 1e-9 && useR >= PROMINENCE_MEAN_RATIO * meanR;
+
+  return {
+    freqHz,
+    prominence,
+    amplitude: maxAmp,
+    bestLag: useLag,
+    bestR: useR,
+    meanR,
+    peakAcceptable,
+  };
 }
 
-/**
- * Phase 2 confidence: prominence + SNR vs noise std from last 15s of bandpassed signal only.
- */
 function confidenceSteady(
   prominence: number,
   bandpassLast15s: Float32Array,
@@ -158,10 +212,6 @@ export type AccelerometerCardiacHandle = {
   stop: () => void;
 };
 
-/**
- * Ballistocardiography-style accelerometer pipeline: gravity removal, cardiac bandpass,
- * autocorrelation on a 10 s buffer.
- */
 export function startAccelerometerCardiac(
   onTick?: (out: AccelerometerCardiacOutput) => void
 ): AccelerometerCardiacHandle {
@@ -171,6 +221,7 @@ export function startAccelerometerCardiac(
     (1 / ACC_HZ) / (1 / (2 * Math.PI * GRAVITY_LP_HZ) + 1 / ACC_HZ);
 
   const sessionStartMs = Date.now();
+  let sessionNoiseFloor = 0;
 
   let latest: AccelerometerCardiacOutput = {
     bpm: 0,
@@ -178,6 +229,8 @@ export function startAccelerometerCardiac(
     amplitude: 0,
     freqHz: 0,
     isWarmup: true,
+    isControlPhase: true,
+    possibleInterference: false,
   };
 
   Accelerometer.setUpdateInterval(1000 / ACC_HZ);
@@ -195,16 +248,67 @@ export function startAccelerometerCardiac(
     if (tick % 10 !== 0) return;
 
     const elapsedSec = (Date.now() - sessionStartMs) / 1000;
+    const isControlPhase = elapsedSec < CONTROL_PHASE_SEC;
     const isWarmup = elapsedSec < WARMUP_SEC;
 
     const buf = Float32Array.from(samples);
     const bp = butterworth4thOrderBandpass(buf, LOW_HZ, HIGH_HZ, ACC_HZ);
-    const { freqHz, prominence, amplitude, bestR } = autocorrPeakFreq(
-      bp,
-      ACC_HZ,
-      0.5,
-      3.0
-    );
+
+    const n5 = Math.min(bp.length, ACC_HZ * RMS_WINDOW_SEC);
+    const bpLast5 = bp.slice(-n5);
+    const rms5s = rms(bpLast5);
+
+    if (isControlPhase) {
+      sessionNoiseFloor = Math.max(sessionNoiseFloor, rms5s);
+      latest = {
+        bpm: 0,
+        confidence: 0,
+        amplitude: 0,
+        freqHz: 0,
+        isWarmup,
+        isControlPhase: true,
+        possibleInterference: false,
+      };
+      onTick?.(latest);
+      return;
+    }
+
+    const floorRef = Math.max(sessionNoiseFloor, 1e-6);
+    if (rms5s < MIN_RMS_MPS2 || rms5s < NOISE_FLOOR_MULTIPLIER * floorRef) {
+      latest = {
+        bpm: 0,
+        confidence: 0,
+        amplitude: 0,
+        freqHz: 0,
+        isWarmup,
+        isControlPhase: false,
+        possibleInterference: false,
+      };
+      onTick?.(latest);
+      return;
+    }
+
+    const {
+      freqHz,
+      prominence,
+      amplitude,
+      bestR,
+      peakAcceptable,
+    } = autocorrPeakFreq(bp, ACC_HZ, 0.5, 3.0);
+
+    if (!peakAcceptable) {
+      latest = {
+        bpm: 0,
+        confidence: 0,
+        amplitude: 0,
+        freqHz: 0,
+        isWarmup,
+        isControlPhase: false,
+        possibleInterference: false,
+      };
+      onTick?.(latest);
+      return;
+    }
 
     const cardiacCandidate = freqHz >= 0.5 && freqHz <= 3.0 && amplitude > 0.002;
     let bpm = cardiacCandidate ? 60 * freqHz : 0;
@@ -215,28 +319,37 @@ export function startAccelerometerCardiac(
       );
     }
 
+    const interference = cardiacCandidate && nearInterferenceHz(freqHz);
+
     const n15 = Math.min(bp.length, ACC_HZ * NOISE_WINDOW_SEC);
     const bpLast15 = bp.slice(-n15);
 
     let confidence = 0;
     if (cardiacCandidate) {
+      let raw = confidenceSteady(prominence, bpLast15, bestR);
+      if (interference) raw *= 0.4;
       if (isWarmup) {
-        const raw = confidenceSteady(prominence, bpLast15, bestR);
         confidence = Math.min(30, raw);
       } else {
-        confidence = confidenceSteady(prominence, bpLast15, bestR);
+        confidence = raw;
       }
     } else {
       confidence = Math.min(30, prominence * 20);
       if (isWarmup) confidence = Math.min(30, confidence);
     }
 
+    if (!cardiacCandidate) {
+      bpm = 0;
+    }
+
     latest = {
       bpm,
       confidence,
-      amplitude,
+      amplitude: cardiacCandidate ? amplitude : 0,
       freqHz: cardiacCandidate ? freqHz : 0,
       isWarmup,
+      isControlPhase: false,
+      possibleInterference: interference && cardiacCandidate && bpm > 0,
     };
     onTick?.(latest);
   });

@@ -52,7 +52,10 @@ export function startBioSensorFusion(
     const now = Date.now();
     const scanElapsedMs = now - fusionStartMs;
 
-    const accScore = Math.min(40, (accOut.confidence / 100) * 40);
+    const accScore =
+      accOut.isControlPhase || accOut.bpm <= 0
+        ? 0
+        : Math.min(40, (accOut.confidence / 100) * 40);
     const magScore = magOut.detected
       ? Math.min(35, (Math.min(magOut.snr, 20) / 20) * 35)
       : 0;
@@ -96,6 +99,7 @@ export function startBioSensorFusion(
 
     let sustainedSignalBonus = 0;
     if (
+      !accOut.isControlPhase &&
       scanElapsedMs > SUSTAINED_MS &&
       accOut.bpm >= 45 &&
       accOut.bpm <= 180 &&
@@ -106,7 +110,7 @@ export function startBioSensorFusion(
 
     let stableRhythmBonus = 0;
     const bpm = accOut.bpm;
-    if (bpm >= 45 && bpm <= 180) {
+    if (!accOut.isControlPhase && bpm >= 45 && bpm <= 180) {
       if (stableBpmRef === null) {
         stableBpmRef = bpm;
         stableBpmSinceMs = now;
@@ -142,6 +146,8 @@ export function startBioSensorFusion(
       rfScoreComponent: rfPoints,
       stabilityBonusActive: stableRhythmBonus > 0,
       accSettling: accOut.isWarmup,
+      accControlPhase: accOut.isControlPhase,
+      accPossibleInterference: accOut.possibleInterference,
       sustainedSignalBonus,
       stableRhythmBonus,
       lastUpdateMs: now,

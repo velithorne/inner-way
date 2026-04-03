@@ -26,6 +26,8 @@ export default function App() {
     coherenceDetected,
     scanMode,
     accSettling,
+    accControlPhase,
+    accPossibleInterference,
     setFusion,
   } = useBioStore();
 
@@ -94,12 +96,18 @@ export default function App() {
         </View>
 
         <View style={styles.stats}>
-          {running && accSettling ? (
+          {running && accControlPhase ? (
+            <Text style={styles.controlPhase}>CONTROL CAL (10s) — table noise floor</Text>
+          ) : null}
+          {running && !accControlPhase && accSettling ? (
             <Text style={styles.settling}>SETTLING…</Text>
           ) : null}
           <Text style={styles.statLine}>
             Acc: {accBpm.toFixed(0)} BPM · conf {accConfidence.toFixed(0)}%
           </Text>
+          {accPossibleInterference ? (
+            <Text style={styles.warn}>POSSIBLE_INTERFERENCE (ambient periodic noise)</Text>
+          ) : null}
           <Text style={styles.statLine}>
             Mag: {magFreqHz > 0 ? `${magFreqHz.toFixed(2)} Hz` : '—'} · SNR {magSnr.toFixed(1)}
           </Text>
@@ -184,12 +192,23 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     maxWidth: 360,
   },
+  controlPhase: {
+    color: '#81d4fa',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
   settling: {
     color: '#ffc107',
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 8,
     letterSpacing: 1,
+  },
+  warn: {
+    color: '#ff9800',
+    fontSize: 11,
+    marginTop: 4,
   },
   statLine: {
     color: '#b0bec5',

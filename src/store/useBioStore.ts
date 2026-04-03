@@ -31,7 +31,7 @@ function deriveBpsLabel(
   const accShowsCardiac =
     accBpm >= 36 &&
     accBpm <= 200 &&
-    accConfidence >= 22;
+    accConfidence >= 28;
   if (bps <= 20 && accShowsCardiac) {
     return 'TRACE';
   }
@@ -52,6 +52,9 @@ export type BioState = {
   stabilityBonusActive: boolean;
   /** Accelerometer warmup (first ~20s): baseline settling */
   accSettling: boolean;
+  /** First 10s: table noise floor calibration — no cardiac readout */
+  accControlPhase: boolean;
+  accPossibleInterference: boolean;
   sustainedSignalBonus: number;
   stableRhythmBonus: number;
   lastUpdateMs: number;
@@ -72,6 +75,8 @@ const initial: Omit<BioState, 'setFusion' | 'reset'> = {
   rfScoreComponent: 0,
   stabilityBonusActive: false,
   accSettling: false,
+  accControlPhase: false,
+  accPossibleInterference: false,
   sustainedSignalBonus: 0,
   stableRhythmBonus: 0,
   lastUpdateMs: 0,
