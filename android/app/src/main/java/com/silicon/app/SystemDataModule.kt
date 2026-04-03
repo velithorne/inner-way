@@ -10,8 +10,8 @@ import android.os.Build
 import android.os.Environment
 import android.os.Process
 import android.os.StatFs
+import android.app.usage.StorageStatsManager
 import android.os.storage.StorageManager
-import android.os.storage.StorageStatsManager
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -209,7 +209,7 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
     try {
       val dataStat = StatFs(Environment.getDataDirectory().absolutePath)
       val totalBytes = dataStat.blockCountLong * dataStat.blockSizeLong
-      val freeBytes = dataStat.availableBytesLong
+      val freeBytes = dataStat.availableBytes
       val usedBytes = totalBytes - freeBytes
 
       var appDataBytes = 0L
