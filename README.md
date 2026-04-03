@@ -1,6 +1,6 @@
-# Biofield Scanner
+# DECODE
 
-Citizen science mobile app (React Native + Expo) implementing the **Biofield Scanner Blueprint v1.0**: multi-sensor fusion for experimental biological signal detection on consumer phones.
+Mobile app (React Native + Expo) for **DECODE — Reality Source Code** (Blueprint v1.0): a unified sensor-visualization instrument. This repository currently implements the **Biofield Scanner** sensor core (multi-sensor fusion, BPS gauge, scan modes) as the foundation for the broader DECODE roadmap.
 
 **Important:** This is an experimental instrument. It does not diagnose medical conditions or prove “biofields.” All readings are labeled as experimental.
 
@@ -16,16 +16,16 @@ npm install
 npx expo start
 ```
 
-Then open the project in Expo Go (scan QR) or press `a` / `i` for emulators. **Magnetometer and accelerometer do not work meaningfully in most simulators**—use a real device for Phase 1 validation.
+Then open the project in Expo Go (scan QR) or press `a` / `i` for emulators. **Magnetometer and accelerometer do not work meaningfully in most simulators**—use a real device for validation.
 
 ## What is implemented
 
-- **Phase 1 (core):** DSP filters (`src/dsp/`), FFT, accelerometer cardiac pipeline, magnetometer cardiac pipeline, BPS fusion (`src/services/bioSensor.ts`), Zustand store (`src/store/useBioStore.ts`)
-- **Phase 2 (minimal):** Scan screen with BPS gauge, live stats, scan modes (CONTACT / PROXIMITY / SWEEP), ethics disclaimer
+- **Core:** DSP filters (`src/dsp/`), FFT, accelerometer cardiac pipeline, magnetometer cardiac pipeline, BPS fusion (`src/services/bioSensor.ts`), Zustand store (`src/store/useBioStore.ts`)
+- **UI:** Scan screen with BPS gauge, live stats, scan modes (CONTACT / PROXIMITY / SWEEP), ethics disclaimer
 
-Roadmap items from the blueprint (calibration flows, AR overlay, maps, Supabase sync, research mode) are not built yet.
+Roadmap items from the full DECODE blueprint (five layers, modes, AR, maps, sync) are not built yet.
 
-## Validation protocol (from blueprint)
+## Validation protocol (biofield pipeline)
 
 With **START** running on a real device:
 
@@ -37,13 +37,13 @@ With **START** running on a real device:
 
 The previous minimal README and HTML helper files are preserved under `_legacy/`.
 
-## Android APK (same as Resonance Map — no Expo token)
+## Android APK (same as other velithorne projects — no Expo token)
 
-**Default release path:** push a **`v*`** tag → GitHub Actions runs **`expo prebuild`** + **Gradle `assembleRelease`** (embeds the JS bundle — **no Metro required** on the phone) → uploads **`BiofieldScanner-<tag>-release.apk`**. **No `EXPO_TOKEN`** required.
+**Default release path:** push a **`v*`** tag → GitHub Actions runs **`expo prebuild`** + **Gradle `assembleRelease`** (embeds the JS bundle — **no Metro required** on the phone) → uploads **`DECODE-<tag>-release.apk`**. **No `EXPO_TOKEN`** required.
 
 ```bash
-git tag v1.0.0-biofield
-git push origin v1.0.0-biofield
+git tag v1.0.0-decode
+git push origin v1.0.0-decode
 ```
 
 **Download:** [github.com/velithorne/inner-way/releases/latest](https://github.com/velithorne/inner-way/releases/latest)

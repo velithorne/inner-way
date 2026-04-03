@@ -80,7 +80,7 @@ export default function App() {
     <View style={styles.root}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Biofield Scanner</Text>
+        <Text style={styles.title}>DECODE</Text>
         <Text style={styles.disclaimer}>
           Experimental citizen science instrument. Readings are not medical diagnoses and do not
           prove biofields. Use only with informed consent when scanning others.

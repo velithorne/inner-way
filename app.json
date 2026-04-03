@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "biofield-scanner",
-    "slug": "biofield-scanner",
+    "name": "DECODE",
+    "slug": "decode",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.biofieldscanner.app",
+      "package": "com.velithorne.decode",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
