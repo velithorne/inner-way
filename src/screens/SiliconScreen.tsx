@@ -7,6 +7,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { isSystemDataAvailable } from '../native/systemData';
 import { startPolling, stopPolling } from '../services/systemPoller';
 import { useWorldStore } from '../store/useWorldStore';
+import { addCameraPan, multiplyCameraZoom } from '../world/cameraTouchInput';
 import { WorldEngine } from '../world/WorldEngine';
 import { WORLD } from '../world/worldConstants';
 import { batteryLevelToEmissive } from '../world/batteryColors';
@@ -31,10 +32,40 @@ export function SiliconScreen() {
   const telemetryOk = useWorldStore((s) => s.telemetryState === 'ok');
 
   const [entryProgress, setEntryProgress] = useState(0);
-  const [orbital, setOrbital] = useState(false);
   const [showEntryText, setShowEntryText] = useState(true);
   const [zoneLabel, setZoneLabel] = useState('');
   const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const panLast = useRef({ x: 0, y: 0 });
+  const pinchLast = useRef(1);
+
+  const composedGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .onBegin(() => {
+        panLast.current = { x: 0, y: 0 };
+      })
+      .onUpdate((e) => {
+        const dx = e.translationX - panLast.current.x;
+        const dy = e.translationY - panLast.current.y;
+        panLast.current = { x: e.translationX, y: e.translationY };
+        addCameraPan(dx, dy);
+      });
+
+    const pinch = Gesture.Pinch()
+      .onBegin(() => {
+        pinchLast.current = 1;
+      })
+      .onUpdate((e) => {
+        const prev = pinchLast.current;
+        const s = e.scale;
+        if (prev > 0 && s > 0) {
+          multiplyCameraZoom(s / prev);
+        }
+        pinchLast.current = s;
+      });
+
+    return Gesture.Simultaneous(pan, pinch);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !isSystemDataAvailable()) return;
@@ -91,18 +122,6 @@ export function SiliconScreen() {
     };
   }, []);
 
-  const pinch = useMemo(
-    () =>
-      Gesture.Pinch()
-        .onUpdate((e) => {
-          if (e.scale > 1.35) setOrbital(true);
-        })
-        .onEnd(() => {
-          setOrbital(false);
-        }),
-    [],
-  );
-
   const cores = snapshot?.cpu?.length ?? 0;
   const totalRamGb = snapshot?.memory ? snapshot.memory.totalRam / (1024 ** 3) : 0;
   const storageGb = snapshot?.storage ? snapshot.storage.totalBytes / (1024 ** 3) : 0;
@@ -122,9 +141,9 @@ export function SiliconScreen() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <GestureDetector gesture={pinch}>
+      <GestureDetector gesture={composedGesture}>
         <View style={styles.flex}>
-          <WorldEngine entryProgress={entryProgress} orbital={orbital} />
+          <WorldEngine entryProgress={entryProgress} />
 
           {showEntryText && entryProgress < 1 ? (
             <View style={styles.entryOverlay} pointerEvents="none">
@@ -149,7 +168,7 @@ export function SiliconScreen() {
           </View>
 
           <View style={styles.hint} pointerEvents="none">
-            <Text style={styles.hintText}>Tilt to fly · pinch out for orbital</Text>
+            <Text style={styles.hintText}>Drag to pan · pinch to zoom</Text>
           </View>
         </View>
       </GestureDetector>

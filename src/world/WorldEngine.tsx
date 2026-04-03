@@ -4,9 +4,8 @@ import type { ExpoWebGLRenderingContext } from 'expo-gl';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
-import { Accelerometer, Gyroscope, Magnetometer } from 'expo-sensors';
+import { Accelerometer, Magnetometer } from 'expo-sensors';
 
-import { FlightController } from '../navigation/FlightController';
 import { useWorldStore } from '../store/useWorldStore';
 import { createBatterySun, updateBatterySun } from './batterySunBuild';
 import { createNetworkWeather, updateNetworkWeather } from './networkWeatherBuild';
@@ -14,42 +13,35 @@ import { createProcessorCity, updateProcessorCity } from './processorCityBuild';
 import { createRamOcean, ensureIslands, updateRamOcean } from './ramOceanBuild';
 import { createSensorOutposts, updateSensorOutposts } from './sensorOutpostsBuild';
 import { createStorageMountains, updateStorageMountains } from './storageMountainsBuild';
-import { ENTRY_START_POS, INITIAL_CAMERA_POS, ORBITAL_CAMERA_POS } from './worldConstants';
+import { applyOrbitPanAndZoom } from './orbitCamera';
+import { consumeTouchCameraInput } from './cameraTouchInput';
+import { ENTRY_START_POS, INITIAL_CAMERA_POS } from './worldConstants';
 import { setWorldCameraPosition } from './worldCameraBridge';
+
+const PAN_SENS = 0.004;
 
 type Props = {
   entryProgress: number;
-  orbital: boolean;
 };
 
-export function WorldEngine({ entryProgress, orbital }: Props) {
+export function WorldEngine({ entryProgress }: Props) {
   const storeRef = useRef(useWorldStore.getState());
-  const flightRef = useRef(new FlightController());
-  const gyroRef = useRef({ x: 0, y: 0, z: 0 });
   const accRef = useRef({ x: 0, y: 0, z: 0 });
   const magRef = useRef({ x: 0, y: 0, z: 0 });
   const entryRef = useRef(entryProgress);
-  const orbitalRef = useRef(orbital);
   const disposeRef = useRef<(() => void) | null>(null);
   const aliveRef = useRef(true);
 
   useEffect(() => {
     entryRef.current = entryProgress;
   }, [entryProgress]);
-  useEffect(() => {
-    orbitalRef.current = orbital;
-  }, [orbital]);
 
   useEffect(() => {
     const unsub = useWorldStore.subscribe((s) => {
       storeRef.current = s;
     });
-    Gyroscope.setUpdateInterval(16);
     Accelerometer.setUpdateInterval(16);
     Magnetometer.setUpdateInterval(32);
-    const gSub = Gyroscope.addListener((e) => {
-      gyroRef.current = { x: e.x, y: e.y, z: e.z };
-    });
     const aSub = Accelerometer.addListener((e) => {
       accRef.current = { x: e.x, y: e.y, z: e.z };
     });
@@ -58,7 +50,6 @@ export function WorldEngine({ entryProgress, orbital }: Props) {
     });
     return () => {
       unsub();
-      gSub.remove();
       aSub.remove();
       mSub.remove();
       aliveRef.current = false;
@@ -66,10 +57,6 @@ export function WorldEngine({ entryProgress, orbital }: Props) {
       disposeRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    flightRef.current.setOrbital(orbital);
-  }, [orbital]);
 
   const onContextCreate = (gl: ExpoWebGLRenderingContext) => {
     const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
@@ -152,29 +139,23 @@ export function WorldEngine({ entryProgress, orbital }: Props) {
       const tx = snap?.network.txBytesPerSecond ?? 0;
       updateNetworkWeather(netH, rx, tx, now);
 
-      updateSensorOutposts(sensH, magRef.current, gyroRef.current, accRef.current);
+      updateSensorOutposts(sensH, magRef.current, null, accRef.current);
 
-      const dt = 1 / 60;
       const entryT = ease(Math.max(0, Math.min(1, entryRef.current)));
-      const orb = orbitalRef.current;
 
-      if (orb) {
-        flightRef.current.setOrbital(true);
-        camera.position.lerp(ORBITAL_CAMERA_POS, 0.08);
+      if (entryT < 1) {
+        camera.position.lerpVectors(ENTRY_START_POS, INITIAL_CAMERA_POS, entryT);
         camera.lookAt(0, 0, 0);
       } else {
-        flightRef.current.setOrbital(false);
-        if (entryT < 1) {
-          camera.position.lerpVectors(ENTRY_START_POS, INITIAL_CAMERA_POS, entryT);
-          camera.lookAt(0, 0, 0);
-        } else {
-          if (!entryDone) {
-            camera.position.copy(INITIAL_CAMERA_POS);
-            entryDone = true;
-          }
-          flightRef.current.update(gyroRef.current, dt);
-          flightRef.current.applyToCamera(camera, dt, ORBITAL_CAMERA_POS.clone());
+        if (!entryDone) {
+          camera.position.copy(INITIAL_CAMERA_POS);
+          entryDone = true;
         }
+        const { panX, panY, zoom } = consumeTouchCameraInput();
+        if (panX !== 0 || panY !== 0 || zoom !== 1) {
+          applyOrbitPanAndZoom(camera.position, panX, panY, zoom, PAN_SENS);
+        }
+        camera.lookAt(0, 0, 0);
       }
 
       setWorldCameraPosition(camera.position.x, camera.position.y, camera.position.z);
