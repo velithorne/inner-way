@@ -16,8 +16,9 @@ import { createStorageMountains, updateStorageMountains } from './storageMountai
 import { createAtmosphere, updateAtmosphere } from './worldAtmosphereBuild';
 import { ENTRY_START_POS, INITIAL_CAMERA_POS, WORLD } from './worldConstants';
 import { setWorldCameraPosition, setWorldCameraQuaternion } from './worldCameraBridge';
-import { setHudBoundary, setHudFps } from './worldHudBridge';
+import { setHudBoundary, setHudFps, setHudForwardDir } from './worldHudBridge';
 import {
+  applyFovLerp,
   applyFreeCamera,
   applyWorldBoundary,
   processQueuedFly,
@@ -29,6 +30,11 @@ import {
 type Props = {
   entryProgress: number;
 };
+
+function entryAlpha(t: number, start: number, end: number): number {
+  if (t >= 1) return 1;
+  return THREE.MathUtils.smoothstep(t, start, end);
+}
 
 export function WorldEngine({ entryProgress }: Props) {
   const storeRef = useRef(useWorldStore.getState());
@@ -125,7 +131,7 @@ export function WorldEngine({ entryProgress }: Props) {
     scene.add(sensH.group);
 
     const atmH = createAtmosphere();
-    scene.add(atmH.stars, atmH.dust, atmH.ground);
+    scene.add(atmH.dust, atmH.ground, atmH.viaDots);
 
     let lastAppsKey = '';
     let raf = 0;
@@ -134,6 +140,7 @@ export function WorldEngine({ entryProgress }: Props) {
     let lastFrame = performance.now();
     let fpsAcc = 0;
     let frameCount = 0;
+    const fwdHud = new THREE.Vector3();
 
     const ease = (t: number) => t * t * (3 - 2 * t);
 
@@ -146,6 +153,7 @@ export function WorldEngine({ entryProgress }: Props) {
       const now = (nowMs - start) / 1000;
       const st = storeRef.current;
       const snap = st.snapshot;
+      const wifi = st.wifiStrength;
 
       const batteryLevel = snap?.battery.level ?? st.batteryLevel;
       const powerW = snap?.battery.powerWatts ?? -1;
@@ -155,14 +163,41 @@ export function WorldEngine({ entryProgress }: Props) {
       const estW =
         powerW >= 0 ? powerW : currentUa !== -1 ? volts * (Math.abs(currentUa) / 1_000_000) : 0;
 
-      updateBatterySun(sunH, batteryLevel, estW, now);
+      const entryT = ease(Math.max(0, Math.min(1, entryRef.current)));
+      const aSun = entryAlpha(entryT, 0, 0.12);
+      const aCity = entryAlpha(entryT, 0.08, 0.28);
+      const aRam = entryAlpha(entryT, 0.15, 0.38);
+      const aStor = entryAlpha(entryT, 0.22, 0.45);
+      const aNet = entryAlpha(entryT, 0.28, 0.5);
+      const aSens = entryAlpha(entryT, 0.32, 0.55);
+      const aAtm = entryAlpha(entryT, 0.35, 0.6);
+
+      sunH.group.visible = aSun > 0.02;
+      procH.group.visible = aCity > 0.02;
+      procH.group.scale.setScalar(Math.max(0.001, aCity));
+      ramH.group.visible = aRam > 0.02;
+      ramH.group.scale.setScalar(Math.max(0.001, aRam));
+      storH.group.visible = aStor > 0.02;
+      storH.group.scale.setScalar(Math.max(0.001, aStor));
+      netH.group.visible = aNet > 0.02;
+      netH.group.scale.setScalar(Math.max(0.001, aNet));
+      sensH.group.visible = aSens > 0.02;
+      sensH.group.scale.setScalar(Math.max(0.001, aSens));
+      atmH.ground.visible = aAtm > 0.02;
+      atmH.dust.visible = aAtm > 0.02;
+      atmH.viaDots.visible = aAtm > 0.02;
+      atmH.ground.scale.setScalar(Math.max(0.001, aAtm));
+      atmH.dust.scale.setScalar(Math.max(0.001, aAtm));
+      atmH.viaDots.scale.setScalar(Math.max(0.001, aAtm));
+
+      updateBatterySun(sunH, batteryLevel, estW, now, aSun);
 
       const cpu = snap?.cpu ?? [];
       const avgCpu = cpu.length ? cpu.reduce((a, c) => a + c.usage, 0) / cpu.length : 0;
       updateProcessorCity(procH, cpu.length ? cpu : [{ usage: 0 }], now);
 
       if (avgCpu > 80) {
-        cpuLight.intensity = ((avgCpu - 80) / 20) * 2.5;
+        cpuLight.intensity = ((avgCpu - 80) / 20) * 2.5 * aCity;
       } else {
         cpuLight.intensity = 0;
       }
@@ -176,7 +211,7 @@ export function WorldEngine({ entryProgress }: Props) {
       }
       const mem = snap?.memory;
       const ramPct = mem ? (mem.usedRam / mem.totalRam) * 100 : st.ramPressure;
-      updateRamOcean(ramH, ramPct, mem?.lowMemory ?? false, now);
+      updateRamOcean(ramH, ramPct, mem?.lowMemory ?? false, now, camera);
 
       const usedFrac = snap?.storage
         ? snap.storage.usedBytes / Math.max(1, snap.storage.totalBytes)
@@ -188,7 +223,7 @@ export function WorldEngine({ entryProgress }: Props) {
 
       const rx = snap?.network.rxBytesPerSecond ?? 0;
       const tx = snap?.network.txBytesPerSecond ?? 0;
-      updateNetworkWeather(netH, rx, tx, now);
+      updateNetworkWeather(netH, rx, tx, now, camera, wifi);
 
       updateSensorOutposts(
         sensH,
@@ -204,10 +239,9 @@ export function WorldEngine({ entryProgress }: Props) {
       const fogD = 0.006 + (avgCpu / 100) * 0.0012 - (batteryLevel / 100) * 0.0008;
       fog.density = THREE.MathUtils.clamp(fogD, 0.004, 0.012);
 
-      const entryT = ease(Math.max(0, Math.min(1, entryRef.current)));
-
       if (entryT < 1) {
-        camera.position.lerpVectors(ENTRY_START_POS, INITIAL_CAMERA_POS, entryT);
+        const camT = ease(entryT);
+        camera.position.lerpVectors(ENTRY_START_POS, INITIAL_CAMERA_POS, camT);
         camera.lookAt(0, 0, 0);
         setNavigationEnabled(false);
         setHudBoundary('ok');
@@ -222,9 +256,13 @@ export function WorldEngine({ entryProgress }: Props) {
         processQueuedFly(camera);
         stepFly(camera, dt);
         applyFreeCamera(camera, dt, { entryComplete: true });
+        applyFovLerp(camera, dt);
         const b = applyWorldBoundary(camera);
         setHudBoundary(b.state);
       }
+
+      camera.getWorldDirection(fwdHud);
+      setHudForwardDir(fwdHud.x, fwdHud.y, fwdHud.z);
 
       setWorldCameraPosition(camera.position.x, camera.position.y, camera.position.z);
       setWorldCameraQuaternion(

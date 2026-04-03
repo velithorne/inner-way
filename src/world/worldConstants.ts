@@ -3,7 +3,8 @@ import * as THREE from 'three';
 /** Fixed world anchors (blueprint) */
 export const WORLD = {
   processor: new THREE.Vector3(-120, 0, -80),
-  ramOcean: new THREE.Vector3(0, -60, 0),
+  /** Ocean surface ~Y=-70 world */
+  ramOcean: new THREE.Vector3(0, -70, 0),
   storage: new THREE.Vector3(0, 0, 120),
   sensors: new THREE.Vector3(80, 20, -40),
   networkSky: new THREE.Vector3(0, 120, 0),
@@ -11,7 +12,8 @@ export const WORLD = {
 } as const;
 
 export const INITIAL_CAMERA_POS = new THREE.Vector3(0, 80, 200);
-export const ENTRY_START_POS = new THREE.Vector3(0, 0, -600);
+/** Far entry — pulled into the phone (Phase 4 cinematic) */
+export const ENTRY_START_POS = new THREE.Vector3(0, 0, -800);
 export const ORBITAL_CAMERA_POS = new THREE.Vector3(0, 300, 400);
 
 /** Deterministic PRNG for layout */

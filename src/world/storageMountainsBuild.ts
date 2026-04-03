@@ -6,7 +6,8 @@ export type StorageMountainsHandles = {
   group: THREE.Group;
   lod: THREE.LOD;
   photoPeakWorld: THREE.Vector3;
-  photoParticles: THREE.Points;
+  photoSprite: THREE.Sprite;
+  photoAntennas: THREE.Mesh[];
   rocks: THREE.InstancedMesh;
   dispose: () => void;
 };
@@ -149,15 +150,40 @@ function makeRockInstancedMesh(rng: () => number, peaks: { x: number; z: number;
   return inst;
 }
 
-function makePhotoIconMesh(): THREE.Mesh {
-  const g = new THREE.PlaneGeometry(6, 6);
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xffb366,
+function makePhotoSprite(): THREE.Sprite {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const cx = x - size / 2;
+      const cy = y - size / 2;
+      const d = Math.hypot(cx, cy);
+      if (d < 26 && d > 20) {
+        data[i] = 255;
+        data[i + 1] = 180;
+        data[i + 2] = 100;
+        data[i + 3] = 255;
+      } else if (d <= 20) {
+        data[i] = 30;
+        data[i + 1] = 40;
+        data[i + 2] = 55;
+        data[i + 3] = 255;
+      } else {
+        data[i] = data[i + 1] = data[i + 2] = data[i + 3] = 0;
+      }
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
     transparent: true,
     opacity: 0.95,
-    side: THREE.DoubleSide,
   });
-  return new THREE.Mesh(g, mat);
+  const spr = new THREE.Sprite(mat);
+  spr.scale.set(14, 14, 1);
+  return spr;
 }
 
 export function createStorageMountains(): StorageMountainsHandles {
@@ -203,12 +229,13 @@ export function createStorageMountains(): StorageMountainsHandles {
       const geo = buildOrganicMountain(rng, ringSeg, fp.baseR, fp.h, jitter);
       const mat = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.88,
-        metalness: 0.08,
+        color: 0x0a0014,
+        roughness: 0.15,
+        metalness: 0.8,
       });
       if (fp.photo) {
         mat.emissive = new THREE.Color(0x4a2818);
-        mat.emissiveIntensity = 0.28;
+        mat.emissiveIntensity = 0.35;
       }
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(fp.x, 0, fp.z);
@@ -231,40 +258,43 @@ export function createStorageMountains(): StorageMountainsHandles {
   const rocks = makeRockInstancedMesh(rng, peakLayouts);
   group.add(rocks);
 
-  const photoIcon = makePhotoIconMesh();
-  photoIcon.position.set(
+  const photoSprite = makePhotoSprite();
+  photoSprite.position.set(
     footprints[photoIdx].x,
-    footprints[photoIdx].h + 5,
+    footprints[photoIdx].h + 8,
     footprints[photoIdx].z,
   );
-  group.add(photoIcon);
+  group.add(photoSprite);
 
-  const pCount = 80;
-  const pGeo = new THREE.BufferGeometry();
-  const pPos = new Float32Array(pCount * 3);
-  for (let i = 0; i < pCount; i++) {
-    pPos[i * 3] = footprints[photoIdx].x + (rng() - 0.5) * 10;
-    pPos[i * 3 + 1] = footprints[photoIdx].h + rng() * 4;
-    pPos[i * 3 + 2] = footprints[photoIdx].z + (rng() - 0.5) * 10;
+  const fpPhoto = footprints[photoIdx];
+  const photoAntennas: THREE.Mesh[] = [];
+  for (let a = 0; a < 5; a++) {
+    const ant = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.2, 3 + rng() * 4, 6),
+      new THREE.MeshStandardMaterial({
+        color: 0x1a1020,
+        emissive: 0xff8844,
+        emissiveIntensity: 0.15,
+        metalness: 0.85,
+        roughness: 0.12,
+      }),
+    );
+    const ang = (a / 5) * Math.PI * 2;
+    ant.position.set(
+      fpPhoto.x + Math.cos(ang) * (fpPhoto.baseR * 0.35),
+      fpPhoto.h + 1.5,
+      fpPhoto.z + Math.sin(ang) * (fpPhoto.baseR * 0.35),
+    );
+    group.add(ant);
+    photoAntennas.push(ant);
   }
-  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-  const photoParticles = new THREE.Points(
-    pGeo,
-    new THREE.PointsMaterial({
-      color: 0xffaa66,
-      size: 1.2,
-      transparent: true,
-      opacity: 0.45,
-      depthWrite: false,
-    }),
-  );
-  group.add(photoParticles);
 
   return {
     group,
     lod,
     photoPeakWorld,
-    photoParticles,
+    photoSprite,
+    photoAntennas,
     rocks,
     dispose: () => {
       const disposeGroup = (gg: THREE.Group) => {
@@ -281,10 +311,13 @@ export function createStorageMountains(): StorageMountainsHandles {
       disposeGroup(low);
       rocks.geometry.dispose();
       (rocks.material as THREE.Material).dispose();
-      pGeo.dispose();
-      (photoParticles.material as THREE.Material).dispose();
-      photoIcon.geometry.dispose();
-      (photoIcon.material as THREE.Material).dispose();
+      const sm = photoSprite.material as THREE.SpriteMaterial;
+      sm.map?.dispose();
+      sm.dispose();
+      photoAntennas.forEach((ant: THREE.Mesh) => {
+        ant.geometry.dispose();
+        (ant.material as THREE.Material).dispose();
+      });
     },
   };
 }
@@ -296,13 +329,7 @@ export function updateStorageMountains(
   camera: THREE.PerspectiveCamera,
 ): void {
   h.lod.update(camera);
-  const t = performance.now() * 0.001;
-  const pos = h.photoParticles.geometry.attributes.position.array as Float32Array;
-  for (let i = 0; i < pos.length / 3; i++) {
-    pos[i * 3 + 1] += 0.15 + Math.sin(t + i) * 0.02;
-    if (pos[i * 3 + 1] > 120) pos[i * 3 + 1] -= 80;
-  }
-  h.photoParticles.geometry.attributes.position.needsUpdate = true;
-  ;(h.photoParticles.material as THREE.PointsMaterial).opacity =
-    0.2 + usedFrac * 0.45 + appDataFrac * 0.15;
+  h.photoSprite.lookAt(camera.position.clone().sub(WORLD.storage));
+  ;(h.photoSprite.material as THREE.SpriteMaterial).opacity =
+    0.75 + usedFrac * 0.2 + appDataFrac * 0.05;
 }

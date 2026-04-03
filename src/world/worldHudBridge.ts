@@ -4,6 +4,7 @@ let boundaryState: BoundaryState = 'ok';
 let fps = 0;
 let drawCalls = 0;
 let fpsOverlay = false;
+let forwardDir = { x: 0, y: 0, z: -1 };
 
 export function setHudBoundary(s: BoundaryState): void {
   boundaryState = s;
@@ -33,4 +34,12 @@ export function getFpsOverlay(): boolean {
 export function toggleFpsOverlay(): boolean {
   fpsOverlay = !fpsOverlay;
   return fpsOverlay;
+}
+
+export function setHudForwardDir(x: number, y: number, z: number): void {
+  forwardDir = { x, y, z };
+}
+
+export function getHudForwardDir(): { x: number; y: number; z: number } {
+  return { ...forwardDir };
 }

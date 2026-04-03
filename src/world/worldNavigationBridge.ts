@@ -11,11 +11,16 @@ let pitch = 0;
 let verticalUp = false;
 let verticalDown = false;
 
+/** Movement speed: 1 or 4 only (double-tap joystick toggles) */
 let speedMult = 1;
+
+const DEFAULT_FOV = 65;
+const MIN_FOV = 25;
+const MAX_FOV = 100;
+let targetFov = DEFAULT_FOV;
 
 const tmpV = new THREE.Vector3();
 const tmpE = new THREE.Euler();
-const tmpQ = new THREE.Quaternion();
 
 const fly = {
   active: false,
@@ -59,7 +64,6 @@ export function getYawPitch(): { yaw: number; pitch: number } {
   return { yaw, pitch };
 }
 
-/** Call when entry animation completes: match current camera orientation */
 export function syncYawPitchFromCamera(camera: THREE.PerspectiveCamera): void {
   tmpE.setFromQuaternion(camera.quaternion, 'YXZ');
   yaw = tmpE.y;
@@ -74,17 +78,35 @@ export function setVerticalDown(v: boolean): void {
   verticalDown = v;
 }
 
-export function multiplySpeedMult(factor: number): void {
-  speedMult = THREE.MathUtils.clamp(speedMult * factor, 0.25, 8);
+export function toggleMovementSpeed(): void {
+  speedMult = speedMult >= 2 ? 1 : 4;
 }
 
 export function getSpeedMult(): number {
   return speedMult;
 }
 
+/** Pinch: spread increases scale → zoom in → lower FOV */
+export function applyPinchToTargetFov(prevScale: number, scale: number): void {
+  if (prevScale <= 0 || scale <= 0) return;
+  const ratio = prevScale / scale;
+  targetFov *= ratio;
+  targetFov = THREE.MathUtils.clamp(targetFov, MIN_FOV, MAX_FOV);
+}
+
+export function getTargetFov(): number {
+  return targetFov;
+}
+
 /**
- * Smooth fly: lerp position and quaternion toward looking at `lookAt` from `toPos`.
+ * Smooth FOV toward target each frame (exponential smoothing).
  */
+export function applyFovLerp(camera: THREE.PerspectiveCamera, dt: number): void {
+  const k = 1 - Math.pow(0.1, Math.min(1, dt * 60));
+  camera.fov += (targetFov - camera.fov) * k;
+  camera.updateProjectionMatrix();
+}
+
 export function startFlyTo(toPos: THREE.Vector3, lookAt: THREE.Vector3, camera: THREE.PerspectiveCamera): void {
   fly.active = true;
   fly.t = 0;
@@ -137,12 +159,7 @@ export function stepFly(
 
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
-const up = new THREE.Vector3(0, 1, 0);
 
-/**
- * Free camera step: joystick moves along camera forward/right; vertical in world Y;
- * applies yaw/pitch to quaternion. Call after stepFly when fly inactive.
- */
 export function applyFreeCamera(
   camera: THREE.PerspectiveCamera,
   dt: number,

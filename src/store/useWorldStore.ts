@@ -33,9 +33,12 @@ type WorldState = {
   anomalies: Anomaly[];
   telemetryState: TelemetryState;
   telemetryMessage: string | null;
+  /** 0–1 WiFi signal strength for sky clouds (NetInfo); null if unknown */
+  wifiStrength: number | null;
   setFromSnapshot: (s: DeviceSnapshot) => void;
   setTelemetryLoading: () => void;
   setTelemetryError: (message: string) => void;
+  setWifiStrength: (v: number | null) => void;
   reset: () => void;
 };
 
@@ -60,6 +63,7 @@ export const useWorldStore = create<WorldState>((set) => ({
   anomalies: [],
   telemetryState: 'idle',
   telemetryMessage: null,
+  wifiStrength: null,
   setFromSnapshot: (s) => {
     const sorted = [...s.apps].sort((a, b) => b.memoryBytes - a.memoryBytes);
     const rx = s.network.rxBytesPerSecond;
@@ -86,6 +90,7 @@ export const useWorldStore = create<WorldState>((set) => ({
       telemetryState: 'error',
       telemetryMessage: message,
     }),
+  setWifiStrength: (v) => set({ wifiStrength: v }),
   reset: () =>
     set({
       snapshot: null,
@@ -97,5 +102,6 @@ export const useWorldStore = create<WorldState>((set) => ({
       anomalies: [],
       telemetryState: 'idle',
       telemetryMessage: null,
+      wifiStrength: null,
     }),
 }));

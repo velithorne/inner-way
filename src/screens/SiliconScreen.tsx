@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
@@ -11,12 +11,18 @@ import { useWorldStore } from '../store/useWorldStore';
 import { WorldEngine } from '../world/WorldEngine';
 
 const ENTRY_KEY = '@silicon_entry_done';
+const ENTRY_MS = 6000;
 
 export function SiliconScreen() {
   const snapshot = useWorldStore((s) => s.snapshot);
+  const batteryLevel = useWorldStore((s) => s.batteryLevel);
 
   const [entryProgress, setEntryProgress] = useState(0);
-  const [showEntryText, setShowEntryText] = useState(true);
+  const [showEntryOverlay, setShowEntryOverlay] = useState(true);
+  const [typewriter, setTypewriter] = useState('');
+  const [chromatic, setChromatic] = useState(false);
+  const [tagline, setTagline] = useState(false);
+  const flashDone = useRef(false);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !isSystemDataAvailable()) return;
@@ -27,23 +33,41 @@ export function SiliconScreen() {
   useEffect(() => {
     let mounted = true;
     let intervalId: ReturnType<typeof setInterval> | null = null;
+    const fullTitle = 'ENTERING SILICON';
     (async () => {
       const done = await AsyncStorage.getItem(ENTRY_KEY);
       if (!mounted) return;
       if (done === '1') {
         setEntryProgress(1);
-        setShowEntryText(false);
+        setShowEntryOverlay(false);
         return;
       }
       const start = Date.now();
+      let tw = 0;
       intervalId = setInterval(() => {
-        const t = Math.min(1, (Date.now() - start) / 4000);
+        const elapsed = Date.now() - start;
+        const t = Math.min(1, elapsed / ENTRY_MS);
         if (mounted) setEntryProgress(t);
+        if (tw < fullTitle.length && elapsed > 400) {
+          tw = Math.min(fullTitle.length, Math.floor((elapsed - 400) / 80));
+          setTypewriter(fullTitle.slice(0, tw));
+        }
+        if (t > 0.42 && t < 0.5 && !flashDone.current) {
+          flashDone.current = true;
+          setChromatic(true);
+          setTimeout(() => mounted && setChromatic(false), 200);
+        }
+        if (t >= 0.92 && mounted) setTagline(true);
         if (t >= 1 && intervalId) {
           clearInterval(intervalId);
           intervalId = null;
           AsyncStorage.setItem(ENTRY_KEY, '1').catch(() => {});
-          setTimeout(() => mounted && setShowEntryText(false), 800);
+          setTimeout(() => {
+            if (mounted) {
+              setShowEntryOverlay(false);
+              setTagline(false);
+            }
+          }, 1200);
         }
       }, 16);
     })();
@@ -72,15 +96,32 @@ export function SiliconScreen() {
       <View style={styles.flex}>
         <WorldEngine entryProgress={entryProgress} />
 
-        {showEntryText && entryProgress < 1 ? (
+        {showEntryOverlay && entryProgress < 1 ? (
           <View style={styles.entryOverlay} pointerEvents="none">
-            <Text style={styles.entryTitle}>ENTERING SILICON</Text>
-            <Text style={styles.entryLine}>
-              DEVICE: {Device.modelName ?? Device.deviceName ?? 'Android'}
-            </Text>
-            <Text style={styles.entryLine}>
-              {cores} CORES · {totalRamGb.toFixed(1)}GB RAM · {storageGb.toFixed(0)}GB STORAGE
-            </Text>
+            <Text style={styles.entryTitle}>{typewriter}</Text>
+            {entryProgress > 0.15 ? (
+              <Text style={styles.entryLine}>
+                {Device.modelName ?? Device.deviceName ?? 'Android'}
+              </Text>
+            ) : null}
+            {entryProgress > 0.22 ? (
+              <Text style={styles.entryLine}>
+                {cores} CORES · {totalRamGb.toFixed(2)}GB RAM · {storageGb.toFixed(2)}GB STORAGE
+              </Text>
+            ) : null}
+            {entryProgress > 0.28 ? (
+              <Text style={styles.entryLine}>BATTERY [{batteryLevel}%]</Text>
+            ) : null}
+            {tagline ? (
+              <Text style={styles.tagline}>YOUR SILICON WORLD — TAKE CONTROL</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {chromatic ? (
+          <View style={styles.chromatic} pointerEvents="none">
+            <View style={[styles.chromaBand, { left: -4, backgroundColor: 'rgba(255,0,0,0.12)' }]} />
+            <View style={[styles.chromaBand, { left: 4, backgroundColor: 'rgba(0,255,100,0.1)' }]} />
           </View>
         ) : null}
 
@@ -97,16 +138,33 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,8,0.35)',
+    backgroundColor: 'rgba(0,0,8,0.55)',
   },
   entryTitle: {
-    color: '#eceff1',
-    fontSize: 22,
+    color: '#00ffe5',
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 4,
+    letterSpacing: 3,
     marginBottom: 16,
+    fontFamily: 'monospace',
   },
-  entryLine: { color: '#90a4ae', fontSize: 13, marginBottom: 6, textAlign: 'center' },
+  entryLine: { color: '#90a4ae', fontSize: 12, marginBottom: 6, textAlign: 'center', fontFamily: 'monospace' },
+  tagline: {
+    marginTop: 24,
+    color: 'rgba(0,255,229,0.55)',
+    fontSize: 11,
+    letterSpacing: 2,
+    fontFamily: 'monospace',
+  },
+  chromatic: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  chromaBand: {
+    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    width: '102%',
+  },
   fallback: {
     flex: 1,
     backgroundColor: '#000008',

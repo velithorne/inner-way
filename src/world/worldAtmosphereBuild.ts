@@ -5,85 +5,98 @@ import { WORLD } from './worldConstants';
 const _stor = WORLD.storage.clone();
 
 export type AtmosphereHandles = {
-  stars: THREE.Points;
-  dust: THREE.Points;
+  dust: THREE.InstancedMesh;
   ground: THREE.Mesh;
+  viaDots: THREE.InstancedMesh;
+  dummy: THREE.Object3D;
+  dustMat: THREE.Matrix4;
+  pos: THREE.Vector3;
+  quat: THREE.Quaternion;
+  scale: THREE.Vector3;
   dispose: () => void;
 };
 
 export function createAtmosphere(): AtmosphereHandles {
-  const starCount = 3000;
-  const starGeo = new THREE.BufferGeometry();
-  const starPos = new Float32Array(starCount * 3);
-  const starOp = new Float32Array(starCount);
-  const rng = () => Math.random();
-  for (let i = 0; i < starCount; i++) {
-    const u = rng();
-    const v = rng();
-    const theta = 2 * Math.PI * u;
-    const phi = Math.acos(2 * v - 1);
-    const r = 580 + rng() * 40;
-    const sinP = Math.sin(phi);
-    starPos[i * 3] = r * sinP * Math.cos(theta);
-    starPos[i * 3 + 1] = r * Math.cos(phi);
-    starPos[i * 3 + 2] = r * sinP * Math.sin(theta);
-    starOp[i] = 0.3 + rng() * 0.7;
-  }
-  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-  const stars = new THREE.Points(
-    starGeo,
-    new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.8,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-    }),
-  );
+  const dummy = new THREE.Object3D();
 
   const dustCount = 1500;
-  const dustGeo = new THREE.BufferGeometry();
-  const dustPos = new Float32Array(dustCount * 3);
+  const dustGeo = new THREE.SphereGeometry(0.12, 4, 4);
+  const dustMat = new THREE.MeshBasicMaterial({
+    color: 0xeeeeee,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+  });
+  const dust = new THREE.InstancedMesh(dustGeo, dustMat, dustCount);
   for (let i = 0; i < dustCount; i++) {
-    dustPos[i * 3] = (rng() - 0.5) * 500;
-    dustPos[i * 3 + 1] = (rng() - 0.5) * 400;
-    dustPos[i * 3 + 2] = (rng() - 0.5) * 500;
+    dummy.position.set((Math.random() - 0.5) * 500, (Math.random() - 0.5) * 400, (Math.random() - 0.5) * 500);
+    const s = 0.8 + Math.random() * 0.4;
+    dummy.scale.setScalar(s);
+    dummy.updateMatrix();
+    dust.setMatrixAt(i, dummy.matrix);
   }
-  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-  const dust = new THREE.Points(
-    dustGeo,
-    new THREE.PointsMaterial({
-      color: 0xeeeeee,
-      size: 0.15,
-      transparent: true,
-      opacity: 0.35,
-      depthWrite: false,
-    }),
-  );
+  dust.instanceMatrix.needsUpdate = true;
+  dust.count = dustCount;
 
+  const groundGeo = new THREE.PlaneGeometry(2000, 2000, 120, 120);
+  const pos = groundGeo.attributes.position.array as Float32Array;
+  for (let i = 0; i < pos.length / 3; i++) {
+    const ix = i * 3;
+    const gx = pos[ix];
+    const gz = pos[ix + 2];
+    const onGrid = Math.abs(gx % 8) < 0.4 || Math.abs(gz % 8) < 0.4;
+    if (onGrid) pos[ix + 1] += 0.06;
+  }
+  groundGeo.computeVertexNormals();
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(2000, 2000, 1, 1),
+    groundGeo,
     new THREE.MeshStandardMaterial({
-      color: 0x000811,
-      emissive: 0x000811,
-      roughness: 1,
-      metalness: 0,
+      color: 0x000408,
+      emissive: 0x000408,
+      roughness: 0.12,
+      metalness: 0.85,
     }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -80;
 
+  const viaN = 2000;
+  const viaGeo = new THREE.SphereGeometry(0.3, 6, 6);
+  const viaMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffe5,
+    transparent: true,
+    opacity: 0.3,
+    depthWrite: false,
+  });
+  const viaDots = new THREE.InstancedMesh(viaGeo, viaMat, viaN);
+  let v = 0;
+  for (let x = -400; x < 400 && v < viaN; x += 16) {
+    for (let z = -400; z < 400 && v < viaN; z += 16) {
+      dummy.position.set(x, -79.5, z);
+      dummy.scale.setScalar(1);
+      dummy.updateMatrix();
+      viaDots.setMatrixAt(v++, dummy.matrix);
+    }
+  }
+  viaDots.count = v;
+  viaDots.instanceMatrix.needsUpdate = true;
+
   return {
-    stars,
     dust,
     ground,
+    viaDots,
+    dummy,
+    dustMat: new THREE.Matrix4(),
+    pos: new THREE.Vector3(),
+    quat: new THREE.Quaternion(),
+    scale: new THREE.Vector3(),
     dispose: () => {
-      starGeo.dispose();
-      (stars.material as THREE.Material).dispose();
       dustGeo.dispose();
-      (dust.material as THREE.Material).dispose();
-      ground.geometry.dispose();
+      dustMat.dispose();
+      groundGeo.dispose();
       (ground.material as THREE.Material).dispose();
+      viaGeo.dispose();
+      viaMat.dispose();
     },
   };
 }
@@ -94,22 +107,25 @@ export function updateAtmosphere(
   camPos: THREE.Vector3,
   batteryLevel: number,
 ): void {
-  const dPos = h.dust.geometry.attributes.position.array as Float32Array;
+  const n = h.dust.count;
   const sunNear = 1 - Math.min(1, camPos.length() / 220);
   const drift = 0.08 + sunNear * 0.35;
-  for (let i = 0; i < dPos.length / 3; i++) {
-    dPos[i * 3] += Math.sin(time * 0.15 + i * 0.01) * drift * 0.01;
-    dPos[i * 3 + 1] += Math.cos(time * 0.12 + i * 0.02) * drift * 0.008;
-    dPos[i * 3 + 2] += Math.sin(time * 0.1 + i * 0.015) * drift * 0.01;
-    if (Math.abs(dPos[i * 3]) > 260) dPos[i * 3] *= -0.95;
-    if (Math.abs(dPos[i * 3 + 1]) > 220) dPos[i * 3 + 1] *= -0.95;
-    if (Math.abs(dPos[i * 3 + 2]) > 260) dPos[i * 3 + 2] *= -0.95;
+  for (let i = 0; i < n; i++) {
+    h.dust.getMatrixAt(i, h.dustMat);
+    h.dustMat.decompose(h.pos, h.quat, h.scale);
+    h.pos.x += Math.sin(time * 0.15 + i * 0.01) * drift * 0.01;
+    h.pos.y += Math.cos(time * 0.12 + i * 0.02) * drift * 0.008;
+    h.pos.z += Math.sin(time * 0.1 + i * 0.015) * drift * 0.01;
+    if (Math.abs(h.pos.x) > 260) h.pos.x *= 0.96;
+    if (Math.abs(h.pos.y) > 220) h.pos.y *= 0.96;
+    if (Math.abs(h.pos.z) > 260) h.pos.z *= 0.96;
+    h.dustMat.compose(h.pos, h.quat, h.scale);
+    h.dust.setMatrixAt(i, h.dustMat);
   }
-  h.dust.geometry.attributes.position.needsUpdate = true;
+  h.dust.instanceMatrix.needsUpdate = true;
   const storNear = camPos.distanceTo(_stor) < 180 ? 0.35 : 1;
-  ;(h.dust.material as THREE.PointsMaterial).opacity = (0.2 + sunNear * 0.25) * storNear;
-
-  const starMat = h.stars.material as THREE.PointsMaterial;
-  starMat.opacity = 0.55 + Math.sin(time * 0.2) * 0.08;
-  if (batteryLevel < 15) starMat.opacity += 0.1;
+  ;(h.dust.material as THREE.MeshBasicMaterial).opacity = (0.2 + sunNear * 0.25) * storNear;
+  if (batteryLevel < 15) {
+    ;(h.dust.material as THREE.MeshBasicMaterial).opacity += 0.08;
+  }
 }

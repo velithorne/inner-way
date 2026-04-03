@@ -6,21 +6,24 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
+import NetInfo from '@react-native-community/netinfo';
 
 import { useWorldStore } from '../store/useWorldStore';
 import { batteryLevelToEmissive } from '../world/batteryColors';
 import { getCameraSpeed, getWorldCameraPosition } from '../world/worldCameraBridge';
-import { getHudBoundary, getHudFps, getFpsOverlay, toggleFpsOverlay } from '../world/worldHudBridge';
+import { getHudBoundary, getHudFps, getFpsOverlay, getHudForwardDir, toggleFpsOverlay } from '../world/worldHudBridge';
 import {
   addLookDelta,
+  applyPinchToTargetFov,
   getSpeedMult,
-  multiplySpeedMult,
   queueFlyTo,
   setJoystick,
   setVerticalDown,
   setVerticalUp,
+  toggleMovementSpeed,
 } from '../world/worldNavigationBridge';
 import { WORLD } from '../world/worldConstants';
 
@@ -31,29 +34,44 @@ const JOYSTICK_MAX = 33;
 const JOYSTICK_SIZE = 110;
 const KNOB = 44;
 
+const HINTS_KEY = '@silicon_control_hints_seen';
 const _look = new THREE.Vector3();
 const _flyPos = new THREE.Vector3();
+const _origin = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _toC = new THREE.Vector3();
+const _closest = new THREE.Vector3();
 
 type Props = {
   entryComplete: boolean;
 };
 
+type InspectZone = 'bat' | 'cpu' | 'ram' | 'stor' | 'net' | 'sen' | null;
+
+function estimateBatteryMinutes(level: number, currentUa: number): string {
+  if (level <= 0 || currentUa >= 0) return '—';
+  const drainMahPerH = Math.abs(currentUa) / 1e6 * 1000;
+  if (drainMahPerH < 1) return '—';
+  const remPct = level / 100;
+  const hours = (remPct * 3000) / drainMahPerH;
+  if (!Number.isFinite(hours) || hours > 48) return '—';
+  return `~${Math.round(hours * 60)} min`;
+}
+
 export function WorldNavigator({ entryComplete }: Props) {
   const snapshot = useWorldStore((s) => s.snapshot);
   const batteryLevel = useWorldStore((s) => s.batteryLevel);
+  const setWifi = useWorldStore((s) => s.setWifiStrength);
 
   const { width: sw, height: sh } = Dimensions.get('window');
-  const rightPad = 80;
-  const lookW = sw * 0.5 - rightPad;
+  const halfH = sh * 0.5;
   const stripTop = sh * 0.28;
 
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [joyBright, setJoyBright] = useState(false);
   const [speedHud, setSpeedHud] = useState('');
   const speedHide = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [multHud, setMultHud] = useState('');
-  const multHide = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [speedToggleHud, setSpeedToggleHud] = useState('◈ 1x');
 
   const [crossBright, setCrossBright] = useState(0.2);
   const lookLast = useRef({ x: 0, y: 0 });
@@ -65,12 +83,128 @@ export function WorldNavigator({ entryComplete }: Props) {
   const [zoneDetail, setZoneDetail] = useState('');
   const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [inspect, setInspect] = useState<{ title: string; body: string } | null>(null);
+  const [inspectLines, setInspectLines] = useState<string[]>([]);
+  const [inspectBorder, setInspectBorder] = useState(CYAN);
   const stillT = useRef(0);
 
   const [nearestDest, setNearestDest] = useState('');
 
   const pinchLast = useRef(1);
+  const joyTapRef = useRef(0);
+
+  const [showHints, setShowHints] = useState(false);
+
+  useEffect(() => {
+    const sub = NetInfo.addEventListener((state) => {
+      if (state.type === 'wifi' && typeof state.details === 'object' && state.details !== null) {
+        const str = (state.details as { strength?: number }).strength;
+        if (typeof str === 'number') setWifi(Math.max(0, Math.min(1, str / 100)));
+        else setWifi(state.isConnected ? 0.75 : 0);
+      } else {
+        setWifi(state.isConnected ? 0.5 : 0);
+      }
+    });
+    return () => sub();
+  }, [setWifi]);
+
+  useEffect(() => {
+    (async () => {
+      const v = await AsyncStorage.getItem(HINTS_KEY);
+      if (v !== '1') setShowHints(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!showHints || !entryComplete) return;
+    const t = setTimeout(() => {
+      setShowHints(false);
+      AsyncStorage.setItem(HINTS_KEY, '1').catch(() => {});
+    }, 10000);
+    return () => clearTimeout(t);
+  }, [showHints, entryComplete]);
+
+  useEffect(() => {
+    setSpeedToggleHud(getSpeedMult() >= 2 ? '◈ 4x' : '◈ 1x');
+  }, [entryComplete]);
+
+  const resolveInspectZone = useCallback((): InspectZone => {
+    _origin.copy(getWorldCameraPosition());
+    const fd = getHudForwardDir();
+    _dir.set(fd.x, fd.y, fd.z).normalize();
+    const zones: { key: InspectZone; pos: THREE.Vector3; r: number }[] = [
+      { key: 'bat', pos: new THREE.Vector3(0, 0, 0), r: 90 },
+      { key: 'cpu', pos: WORLD.processor.clone(), r: 160 },
+      { key: 'ram', pos: WORLD.ramOcean.clone(), r: 240 },
+      { key: 'stor', pos: WORLD.storage.clone(), r: 180 },
+      { key: 'net', pos: WORLD.networkSky.clone(), r: 200 },
+      { key: 'sen', pos: WORLD.sensors.clone(), r: 100 },
+    ];
+    let best: { key: InspectZone; d: number } | null = null;
+    for (const z of zones) {
+      _toC.copy(z.pos).sub(_origin);
+      const t = _toC.dot(_dir);
+      if (t < 0) continue;
+      _closest.copy(_origin).addScaledVector(_dir, t);
+      const dist = _closest.distanceTo(z.pos);
+      if (dist < z.r && (!best || dist < best.d)) best = { key: z.key, d: dist };
+    }
+    return best?.key ?? null;
+  }, []);
+
+  const buildInspector = useCallback((zone: InspectZone) => {
+    const snap = useWorldStore.getState().snapshot;
+    const lines: string[] = [];
+    let border = CYAN;
+    if (zone === 'bat' && snap?.battery) {
+      border = `#${batteryLevelToEmissive(snap.battery.level).getHexString()}`;
+      lines.push('◈ BATTERY REACTOR');
+      lines.push(`Charge: ${snap.battery.level}%`);
+      lines.push(`Draw: ${snap.battery.currentNow} µA`);
+      lines.push(`State: ${snap.battery.isCharging ? 'CHARGING' : 'DISCHARGING'}`);
+      lines.push(`Est. remaining: ${estimateBatteryMinutes(snap.battery.level, snap.battery.currentNow)}`);
+    } else if (zone === 'cpu' && snap?.cpu?.length) {
+      lines.push('◈ PROCESSOR COMPLEX');
+      snap.cpu.slice(0, 8).forEach((c, i) => {
+        const ghz = c.maxFreqKhz ? (c.maxFreqKhz / 1e6).toFixed(2) : '—';
+        lines.push(`Core ${i}: ${c.usage}% @ ${ghz}GHz`);
+      });
+      const avg = snap.cpu.reduce((a, c) => a + c.usage, 0) / snap.cpu.length;
+      lines.push(`Aggregate: ${avg.toFixed(0)}% load`);
+    } else if (zone === 'ram' && snap?.memory) {
+      border = '#8899ff';
+      const u = snap.memory.usedRam / (1024 * 1024);
+      const f = snap.memory.availableRam / (1024 * 1024);
+      const t = snap.memory.totalRam / (1024 * 1024);
+      const pr = u / Math.max(1, t) * 100;
+      lines.push('◈ MEMORY OCEAN');
+      lines.push(`Used: ${u.toFixed(0)} MB`);
+      lines.push(`Free: ${f.toFixed(0)} MB`);
+      lines.push(`Total: ${t.toFixed(0)} MB`);
+      lines.push(`Pressure: ${pr > 80 ? 'HIGH' : pr > 55 ? 'NORMAL' : 'LOW'}`);
+      lines.push(`Islands: ${snap.apps?.length ?? 0} processes mapped`);
+    } else if (zone === 'stor' && snap?.storage) {
+      lines.push('◈ DATA RANGE');
+      const u = snap.storage.usedBytes / (1024 ** 3);
+      const f = snap.storage.freeBytes / (1024 ** 3);
+      const tot = snap.storage.totalBytes / (1024 ** 3);
+      lines.push(`Used: ${u.toFixed(2)} GB`);
+      lines.push(`Free: ${f.toFixed(2)} GB`);
+      lines.push(`Total: ${tot.toFixed(2)} GB`);
+      lines.push(`Fill: ${((u / tot) * 100).toFixed(0)}%`);
+    } else if (zone === 'net' && snap?.network) {
+      lines.push('◈ NETWORK LAYER');
+      lines.push(`Download: ${(snap.network.rxBytesPerSecond / 1024).toFixed(1)} KB/s`);
+      lines.push(`Upload: ${(snap.network.txBytesPerSecond / 1024).toFixed(1)} KB/s`);
+      lines.push(`WiFi: see device status`);
+    } else if (zone === 'sen') {
+      lines.push('◈ SENSOR CLUSTER');
+      lines.push('Magnetometer · Gyro · Accel · Baro');
+    } else {
+      return;
+    }
+    setInspectBorder(border);
+    setInspectLines(lines);
+  }, []);
 
   const updateZoneHud = useCallback(() => {
     const p = getWorldCameraPosition();
@@ -167,34 +301,39 @@ export function WorldNavigator({ entryComplete }: Props) {
     return () => clearInterval(id);
   }, [entryComplete]);
 
-  const zoneForInspect = useRef('');
-  useEffect(() => {
-    if (zoneLabel) zoneForInspect.current = zoneLabel;
-  }, [zoneLabel]);
-
   useEffect(() => {
     if (!entryComplete) return;
     const id = setInterval(() => {
       const sp = getCameraSpeed();
       if (sp < 0.5) {
         stillT.current += 0.2;
-        if (stillT.current >= 2 && zoneForInspect.current) {
-          setInspect({ title: zoneForInspect.current, body: zoneDetail || '—' });
+        if (stillT.current >= 2) {
+          const z = resolveInspectZone();
+          if (z) buildInspector(z);
+          else setInspectLines([]);
         }
       } else {
         stillT.current = 0;
-        setInspect(null);
+        setInspectLines([]);
       }
     }, 200);
     return () => clearInterval(id);
-  }, [entryComplete, zoneDetail]);
+  }, [entryComplete, resolveInspectZone, buildInspector]);
 
   const joyResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => entryComplete,
-        onPanResponderGrant: () => {
+        onPanResponderGrant: (e) => {
           setJoyBright(true);
+          const now = Date.now();
+          if (now - joyTapRef.current < 280) {
+            toggleMovementSpeed();
+            setSpeedToggleHud(getSpeedMult() >= 2 ? '◈ 4x' : '◈ 1x');
+            joyTapRef.current = 0;
+          } else {
+            joyTapRef.current = now;
+          }
         },
         onPanResponderMove: (_e, g) => {
           if (!entryComplete) return;
@@ -254,14 +393,8 @@ export function WorldNavigator({ entryComplete }: Props) {
         .onUpdate((e) => {
           const prev = pinchLast.current;
           const s = e.scale;
-          if (prev > 0 && s > 0) multiplySpeedMult(s / prev);
+          if (prev > 0 && s > 0) applyPinchToTargetFov(prev, s);
           pinchLast.current = s;
-          const m = getSpeedMult();
-          setMultHud(`◈ ${m >= 7.5 ? '8' : m >= 4 ? '4' : m >= 2 ? '2' : m.toFixed(2)}x`);
-          if (multHide.current) clearTimeout(multHide.current);
-        })
-        .onEnd(() => {
-          multHide.current = setTimeout(() => setMultHud(''), 2000);
         }),
     [entryComplete],
   );
@@ -320,12 +453,21 @@ export function WorldNavigator({ entryComplete }: Props) {
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
       </GestureDetector>
 
-      <View
-        style={[styles.lookZone, { width: lookW, height: sh }]}
-        {...lookResponder.panHandlers}
-      />
+      <View style={[styles.lookZone, { width: sw, height: halfH }]} {...lookResponder.panHandlers} />
+
+      {showHints ? (
+        <>
+          <View style={[styles.hintTop, { width: sw - 8, height: halfH - 4 }]} pointerEvents="none">
+            <Text style={styles.hintLabel}>LOOK</Text>
+          </View>
+          <View style={[styles.hintBottom, { width: sw - 8, top: halfH + 4, height: sh - halfH - 8 }]} pointerEvents="none">
+            <Text style={styles.hintLabelMove}>MOVE</Text>
+          </View>
+        </>
+      ) : null}
 
       <View style={styles.joystickWrap} {...joyResponder.panHandlers}>
+        <Text style={styles.speedToggle}>{speedToggleHud}</Text>
         {speedHud ? <Text style={styles.speedAbove}>{speedHud}</Text> : null}
         <View style={[styles.joystickRing, joyBright && styles.joystickRingActive]}>
           <View
@@ -361,6 +503,16 @@ export function WorldNavigator({ entryComplete }: Props) {
         {zoneDetail ? <Text style={styles.zoneDetail}>{zoneDetail}</Text> : null}
       </View>
 
+      {inspectLines.length > 0 ? (
+        <View style={[styles.inspectPanel, { borderLeftColor: inspectBorder }]}>
+          {inspectLines.map((line, i) => (
+            <Text key={i} style={i === 0 ? styles.inspectHead : styles.inspectLine}>
+              {line}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.topRight}>
         <Text style={[styles.bat, { color: batHex }]}>[{batteryLevel}%]</Text>
         <View style={styles.coreBar}>
@@ -378,12 +530,6 @@ export function WorldNavigator({ entryComplete }: Props) {
           })}
         </View>
       </View>
-
-      {multHud ? (
-        <View style={styles.topCenter}>
-          <Text style={styles.multText}>{multHud}</Text>
-        </View>
-      ) : null}
 
       <View style={styles.crosshair} pointerEvents="none">
         <View style={[styles.crossH, { opacity: crossBright }]} />
@@ -422,13 +568,6 @@ export function WorldNavigator({ entryComplete }: Props) {
           <Text style={styles.fpsTxt}>{fpsText}</Text>
         </View>
       ) : null}
-
-      {inspect ? (
-        <View style={styles.inspect}>
-          <Text style={styles.inspectTitle}>{inspect.title}</Text>
-          <Text style={styles.inspectBody}>{inspect.body}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -439,21 +578,62 @@ const styles = StyleSheet.create({
   },
   lookZone: {
     position: 'absolute',
-    right: 0,
+    left: 0,
     top: 0,
     backgroundColor: 'transparent',
+  },
+  hintTop: {
+    position: 'absolute',
+    left: 4,
+    top: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,229,0.2)',
+    borderRadius: 6,
+    justifyContent: 'flex-start',
+    padding: 8,
+  },
+  hintBottom: {
+    position: 'absolute',
+    left: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,229,0.12)',
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    padding: 8,
+    paddingBottom: 120,
+  },
+  hintLabel: {
+    color: CYAN,
+    fontSize: 10,
+    opacity: 0.45,
+    fontFamily: 'monospace',
+  },
+  hintLabelMove: {
+    color: CYAN,
+    fontSize: 10,
+    opacity: 0.35,
+    fontFamily: 'monospace',
   },
   joystickWrap: {
     position: 'absolute',
     left: 24,
     bottom: 24,
     width: JOYSTICK_SIZE,
-    height: JOYSTICK_SIZE + 36,
+    height: JOYSTICK_SIZE + 52,
     justifyContent: 'flex-end',
+  },
+  speedToggle: {
+    position: 'absolute',
+    top: 18,
+    alignSelf: 'center',
+    color: CYAN,
+    fontSize: 11,
+    fontFamily: 'monospace',
+    opacity: 0.75,
   },
   speedAbove: {
     position: 'absolute',
-    top: 0,
+    top: 36,
     alignSelf: 'center',
     color: CYAN,
     fontSize: 10,
@@ -506,7 +686,32 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 48,
     left: 16,
-    maxWidth: '48%',
+    maxWidth: '42%',
+  },
+  inspectPanel: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    width: 220,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,229,0.3)',
+    borderLeftWidth: 3,
+    borderRadius: 4,
+  },
+  inspectHead: {
+    color: CYAN,
+    fontSize: 11,
+    fontFamily: 'monospace',
+    marginBottom: 6,
+    fontWeight: '700',
+  },
+  inspectLine: {
+    color: '#b0c8d0',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    marginBottom: 3,
   },
   zoneTitle: {
     color: CYAN,
@@ -543,17 +748,6 @@ const styles = StyleSheet.create({
     height: 10,
     backgroundColor: CYAN,
     borderRadius: 1,
-  },
-  topCenter: {
-    position: 'absolute',
-    top: 40,
-    alignSelf: 'center',
-  },
-  multText: {
-    color: CYAN,
-    fontSize: 12,
-    fontFamily: 'monospace',
-    opacity: 0.75,
   },
   crosshair: {
     ...StyleSheet.absoluteFillObject,
@@ -622,28 +816,6 @@ const styles = StyleSheet.create({
   fpsTxt: {
     color: CYAN,
     fontSize: 11,
-    fontFamily: 'monospace',
-  },
-  inspect: {
-    position: 'absolute',
-    bottom: 100,
-    alignSelf: 'center',
-    padding: 12,
-    maxWidth: '85%',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,255,229,0.2)',
-  },
-  inspectTitle: {
-    color: '#FFB700',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    marginBottom: 4,
-  },
-  inspectBody: {
-    color: 'rgba(0,255,229,0.65)',
-    fontSize: 10,
     fontFamily: 'monospace',
   },
 });
