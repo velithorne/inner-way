@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "biofield-scanner",
-    "slug": "biofield-scanner",
+    "name": "SILICON",
+    "slug": "silicon",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,13 +10,14 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0a0e14"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.silicon.app"
     },
     "android": {
-      "package": "com.biofieldscanner.app",
+      "package": "com.silicon.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
