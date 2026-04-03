@@ -3,7 +3,6 @@ import { NativeModules, Platform } from 'react-native';
 export type CpuCoreUsage = {
   core: number;
   usage: number;
-  /** kHz — present when native uses cpufreq proxy */
   curFreqKhz?: number;
   maxFreqKhz?: number;
 };

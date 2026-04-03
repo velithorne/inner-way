@@ -1,13 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 
-import { DataValidationScreen } from './src/screens/DataValidationScreen';
+import { SiliconScreen } from './src/screens/SiliconScreen';
 
 export default function App() {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <DataValidationScreen />
+      <SiliconScreen />
     </View>
   );
 }

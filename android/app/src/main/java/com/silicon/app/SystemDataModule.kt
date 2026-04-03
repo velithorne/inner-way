@@ -262,7 +262,14 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
       val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
         status == BatteryManager.BATTERY_STATUS_FULL
 
-      val voltageMv = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+      var voltageMv = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+      // Intent sometimes omits voltage; BatteryManager reports microvolts (API 21+).
+      if (voltageMv <= 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        val uv = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_VOLTAGE)
+        if (uv != Int.MIN_VALUE && uv > 0) {
+          voltageMv = uv / 1000
+        }
+      }
       val tempTenth = batteryStatus.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
 
       val currentRaw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -274,8 +281,9 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
 
       var powerWatts = -1.0
       if (voltageMv > 0 && currentUa != -1) {
+        val volts = voltageMv / 1000.0
         val amps = abs(currentRaw.toDouble()) / 1_000_000.0
-        powerWatts = (voltageMv / 1000.0) * amps
+        powerWatts = volts * amps
       }
 
       val m = Arguments.createMap()

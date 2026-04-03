@@ -4,7 +4,6 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { isSystemDataAvailable } from '../native/systemData';
 import { startPolling, stopPolling } from '../services/systemPoller';
 import { useWorldStore } from '../store/useWorldStore';
-import { BatterySunScene } from '../world/BatterySunScene';
 
 function formatMb(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
@@ -127,7 +126,6 @@ export function DataValidationScreen() {
           : '—'}
       </Text>
 
-      <BatterySunScene />
     </ScrollView>
   );
 }
