@@ -17,10 +17,14 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import java.io.BufferedReader
 import java.io.File
-import java.io.FileReader
+import kotlin.math.abs
 
+/**
+ * System telemetry without /proc/stat (blocked on Android 8+ for apps).
+ * CPU: per-core cpufreq ratio (cur/max) from sysfs — load proxy, no permission.
+ * Apps: own process + "Other processes" aggregate (getRunningAppProcesses is restricted on 11+).
+ */
 class SystemDataModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
 
@@ -28,71 +32,34 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
   private var lastTxTotal: Long = -1L
   private var lastNetAtMs: Long = 0L
 
-  private var prevCpuIdle: LongArray? = null
-  private var prevCpuTotal: LongArray? = null
-
   override fun getName(): String = "SystemData"
 
   @ReactMethod
   fun getCpuCoreUsage(promise: Promise) {
     try {
-      val lines = readProcStatLines()
-      if (lines.isEmpty()) {
-        promise.resolve(Arguments.createArray())
-        return
-      }
-
-      val perCpuLines = lines.filter { it.matches(Regex("^cpu\\d+\\s.*")) }
-      val n = perCpuLines.size
-      if (n == 0) {
-        promise.resolve(Arguments.createArray())
-        return
-      }
-
-      val idle = LongArray(n)
-      val total = LongArray(n)
-      for (i in 0 until n) {
-        val parts = perCpuLines[i].trim().split(Regex("\\s+"))
-        if (parts.size < 5) continue
-        var sum = 0L
-        for (j in 1 until parts.size) {
-          sum += parts[j].toLong()
-        }
-        total[i] = sum
-        idle[i] = parts[4].toLong()
-      }
-
-      val prevIdleArr = prevCpuIdle
-      val prevTotalArr = prevCpuTotal
-      prevCpuIdle = idle.copyOf()
-      prevCpuTotal = total.copyOf()
-
       val out = Arguments.createArray()
-      if (prevIdleArr == null || prevTotalArr == null ||
-        prevIdleArr.size != n || prevTotalArr.size != n
-      ) {
-        for (i in 0 until n) {
-          val m = Arguments.createMap()
-          m.putInt("core", i)
-          m.putInt("usage", 0)
-          out.pushMap(m)
-        }
-        promise.resolve(out)
-        return
-      }
+      var core = 0
+      while (true) {
+        val curFile = File("/sys/devices/system/cpu/cpu$core/cpufreq/scaling_cur_freq")
+        val maxFile = File("/sys/devices/system/cpu/cpu$core/cpufreq/cpuinfo_max_freq")
+        if (!curFile.exists()) break
 
-      for (i in 0 until n) {
-        val dIdle = idle[i] - prevIdleArr[i]
-        val dTotal = total[i] - prevTotalArr[i]
-        val usage = if (dTotal > 0) {
-          (((dTotal - dIdle) * 100.0 / dTotal).coerceIn(0.0, 100.0)).toInt()
+        val cur = curFile.readText().trim().toLongOrNull() ?: 0L
+        val max = if (maxFile.exists()) {
+          maxFile.readText().trim().toLongOrNull() ?: 1L
         } else {
-          0
+          1L
         }
+        val maxSafe = max.coerceAtLeast(1L)
+        val usage = ((cur.toFloat() / maxSafe.toFloat()) * 100f).toInt().coerceIn(0, 100)
+
         val m = Arguments.createMap()
-        m.putInt("core", i)
+        m.putInt("core", core)
         m.putInt("usage", usage)
+        m.putDouble("curFreqKhz", cur.toDouble())
+        m.putDouble("maxFreqKhz", max.toDouble())
         out.pushMap(m)
+        core++
       }
       promise.resolve(out)
     } catch (e: Exception) {
@@ -112,6 +79,7 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
       m.putDouble("usedRam", (info.totalMem - info.availMem).toDouble())
       m.putBoolean("lowMemory", info.lowMemory)
       m.putDouble("threshold", info.threshold.toDouble())
+      m.putInt("memoryClassMb", am.memoryClass)
       promise.resolve(m)
     } catch (e: Exception) {
       promise.reject("E_MEM", e.message, e)
@@ -123,48 +91,46 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
     try {
       val am = reactApplicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
       val pm = reactApplicationContext.packageManager
-      val processes = am.runningAppProcesses ?: run {
-        promise.resolve(Arguments.createArray())
-        return
-      }
+      val ctx = reactApplicationContext
 
-      val pids = IntArray(processes.size)
-      for (i in processes.indices) {
-        pids[i] = processes[i].pid
+      val memInfo = ActivityManager.MemoryInfo()
+      am.getMemoryInfo(memInfo)
+      val usedRamBytes = memInfo.totalMem - memInfo.availMem
+
+      val myPid = Process.myPid()
+      val myPkg = ctx.packageName
+      val pids = intArrayOf(myPid)
+      val procMem = am.getProcessMemoryInfo(pids)
+      val myMi = procMem.getOrNull(0)
+      val myPssKb = myMi?.totalPss?.toLong() ?: 0L
+      val myMemoryBytes = myPssKb * 1024L
+
+      val myLabel = try {
+        val ai = pm.getApplicationInfo(myPkg, 0)
+        pm.getApplicationLabel(ai).toString()
+      } catch (_: Exception) {
+        "SILICON"
       }
-      val memInfos = am.getProcessMemoryInfo(pids)
 
       val out = Arguments.createArray()
-      for (i in processes.indices) {
-        val proc = processes[i]
-        val pkg = proc.processName ?: continue
-        val mi = memInfos.getOrNull(i) ?: continue
-        val pssKb = mi.totalPss.toLong()
-        val memoryBytes = pssKb * 1024L
 
-        val label = try {
-          val appInfo = pm.getApplicationInfo(pkg, 0)
-          pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-          pkg
-        }
+      val selfRow = Arguments.createMap()
+      selfRow.putString("packageName", myPkg)
+      selfRow.putString("appName", myLabel)
+      selfRow.putDouble("memoryBytes", myMemoryBytes.toDouble())
+      selfRow.putInt("pid", myPid)
+      selfRow.putString("importance", "SELF")
+      out.pushMap(selfRow)
 
-        val importance = when (proc.importance) {
-          ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND -> "FOREGROUND"
-          ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> "VISIBLE"
-          ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE -> "SERVICE"
-          ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED -> "CACHED"
-          else -> "OTHER_${proc.importance}"
-        }
+      val otherBytes = (usedRamBytes - myMemoryBytes).coerceAtLeast(0L)
+      val otherRow = Arguments.createMap()
+      otherRow.putString("packageName", "__silicon_aggregate_other__")
+      otherRow.putString("appName", "Other processes")
+      otherRow.putDouble("memoryBytes", otherBytes.toDouble())
+      otherRow.putInt("pid", -1)
+      otherRow.putString("importance", "AGGREGATE")
+      out.pushMap(otherRow)
 
-        val row = Arguments.createMap()
-        row.putString("packageName", pkg)
-        row.putString("appName", label)
-        row.putDouble("memoryBytes", memoryBytes.toDouble())
-        row.putInt("pid", proc.pid)
-        row.putString("importance", importance)
-        out.pushMap(row)
-      }
       promise.resolve(out)
     } catch (e: Exception) {
       promise.reject("E_APPS", e.message, e)
@@ -207,9 +173,18 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun getStorageInfo(promise: Promise) {
     try {
-      val dataStat = StatFs(Environment.getDataDirectory().absolutePath)
-      val totalBytes = dataStat.blockCountLong * dataStat.blockSizeLong
-      val freeBytes = dataStat.availableBytes
+      val dataPath = Environment.getDataDirectory().absolutePath
+      val dataStat = StatFs(dataPath)
+      val totalBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+        dataStat.totalBytes
+      } else {
+        dataStat.blockCountLong * dataStat.blockSizeLong
+      }
+      val freeBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+        dataStat.freeBytes
+      } else {
+        dataStat.availableBlocksLong * dataStat.blockSizeLong
+      }
       val usedBytes = totalBytes - freeBytes
 
       var appDataBytes = 0L
@@ -225,14 +200,26 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
         appDataBytes = folderSize(File(reactApplicationContext.applicationInfo.dataDir))
       }
 
-      var mediaBytes = 0L
+      var extTotal = 0L
+      var extFree = 0L
       try {
         val ext = Environment.getExternalStorageDirectory()
         if (ext != null && ext.exists()) {
-          mediaBytes = folderSize(ext)
+          val extStat = StatFs(ext.absolutePath)
+          extTotal = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            extStat.totalBytes
+          } else {
+            extStat.blockCountLong * extStat.blockSizeLong
+          }
+          extFree = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            extStat.freeBytes
+          } else {
+            extStat.availableBlocksLong * extStat.blockSizeLong
+          }
         }
       } catch (_: Exception) {
-        mediaBytes = 0L
+        extTotal = 0L
+        extFree = 0L
       }
 
       val m = Arguments.createMap()
@@ -240,7 +227,8 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
       m.putDouble("usedBytes", usedBytes.toDouble())
       m.putDouble("freeBytes", freeBytes.toDouble())
       m.putDouble("appDataBytes", appDataBytes.toDouble())
-      m.putDouble("mediaBytes", mediaBytes.toDouble())
+      m.putDouble("externalTotalBytes", extTotal.toDouble())
+      m.putDouble("externalFreeBytes", extFree.toDouble())
       promise.resolve(m)
     } catch (e: Exception) {
       promise.reject("E_STORAGE", e.message, e)
@@ -257,47 +245,50 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
           return
         }
 
-      val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-      val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-      val pct = if (level >= 0 && scale > 0) ((level * 100) / scale) else -1
+      val bm = reactApplicationContext.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+
+      var pct = -1
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        val cap = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        if (cap in 0..100) pct = cap
+      }
+      if (pct < 0) {
+        val level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        pct = if (level >= 0 && scale > 0) ((level * 100) / scale) else -1
+      }
 
       val status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
       val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
         status == BatteryManager.BATTERY_STATUS_FULL
 
-      val voltage = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+      val voltageMv = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
       val tempTenth = batteryStatus.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
 
-      val bm = reactApplicationContext.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-      val currentUa = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      val currentRaw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
         bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
       } else {
-        -1
+        Int.MIN_VALUE
+      }
+      val currentUa = if (currentRaw == Int.MIN_VALUE) -1 else currentRaw
+
+      var powerWatts = -1.0
+      if (voltageMv > 0 && currentUa != -1) {
+        val amps = abs(currentRaw.toDouble()) / 1_000_000.0
+        powerWatts = (voltageMv / 1000.0) * amps
       }
 
       val m = Arguments.createMap()
       m.putInt("level", pct.coerceIn(0, 100))
       m.putBoolean("isCharging", isCharging)
-      m.putInt("voltage", voltage)
+      m.putInt("voltage", voltageMv)
       m.putDouble("temperature", if (tempTenth >= 0) tempTenth / 10.0 else -1.0)
       m.putInt("currentNow", currentUa)
+      m.putDouble("powerWatts", powerWatts)
       promise.resolve(m)
     } catch (e: Exception) {
       promise.reject("E_BATTERY", e.message, e)
     }
-  }
-
-  private fun readProcStatLines(): List<String> {
-    val out = ArrayList<String>()
-    BufferedReader(FileReader("/proc/stat")).use { br ->
-      while (true) {
-        val line = br.readLine() ?: break
-        if (line.startsWith("cpu")) {
-          out.add(line)
-        }
-      }
-    }
-    return out
   }
 
   private fun folderSize(dir: File): Long {

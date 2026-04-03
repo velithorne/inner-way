@@ -69,17 +69,26 @@ export function DataValidationScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.section}>CPU (per core %)</Text>
+      <Text style={styles.section}>CPU (cpufreq proxy %)</Text>
+      <Text style={styles.caption}>cur/max GHz per core — not CPU time; good for world “load” visuals.</Text>
       <Text style={styles.mono}>
         {cpu.length
-          ? cpu.map((c) => `[${c.core}] ${c.usage}%`).join('  ')
+          ? cpu
+              .map((c) => {
+                const ghz =
+                  c.curFreqKhz != null && c.maxFreqKhz != null
+                    ? `${(c.curFreqKhz / 1_000_000).toFixed(2)}/${(c.maxFreqKhz / 1_000_000).toFixed(2)}`
+                    : null;
+                return `[${c.core}] ${c.usage}%${ghz ? ` ${ghz}GHz` : ''}`;
+              })
+              .join('  ')
           : '—'}
       </Text>
 
       <Text style={styles.section}>RAM</Text>
       <Text style={styles.mono}>
         {mem
-          ? `${formatMb(mem.usedRam)} MB / ${formatMb(mem.totalRam)} MB (${formatMb(mem.availableRam)} MB free)${mem.lowMemory ? '  LOW_MEMORY' : ''}`
+          ? `${formatMb(mem.usedRam)} MB / ${formatMb(mem.totalRam)} MB (${formatMb(mem.availableRam)} MB free)${mem.lowMemory ? '  LOW_MEMORY' : ''}${mem.memoryClassMb != null ? ` · memoryClass ${mem.memoryClassMb} MB` : ''}`
           : '—'}
       </Text>
 
@@ -101,14 +110,20 @@ export function DataValidationScreen() {
       <Text style={styles.section}>Battery</Text>
       <Text style={styles.mono}>
         {bat
-          ? `${bat.level}% ${bat.isCharging ? 'charging' : 'discharging'} · ${bat.currentNow !== -1 ? `${bat.currentNow} µA` : 'current n/a'}`
+          ? `${bat.level}% ${bat.isCharging ? 'charging' : 'discharging'} · ${bat.currentNow !== -1 ? `${bat.currentNow} µA` : 'current n/a'}${bat.powerWatts >= 0 ? ` · ~${bat.powerWatts.toFixed(2)} W` : ''}`
           : '—'}
       </Text>
 
       <Text style={styles.section}>Storage</Text>
       <Text style={styles.mono}>
         {storage
-          ? `${formatGb(storage.usedBytes)} / ${formatGb(storage.totalBytes)} GB used · app data ${formatMb(storage.appDataBytes)} MB`
+          ? `${formatGb(storage.usedBytes)} / ${formatGb(storage.totalBytes)} GB (data partition) · app ${formatMb(storage.appDataBytes)} MB${
+              storage.externalTotalBytes != null &&
+              storage.externalTotalBytes > 0 &&
+              storage.externalFreeBytes != null
+                ? ` · ext ${formatGb(storage.externalTotalBytes - storage.externalFreeBytes)} / ${formatGb(storage.externalTotalBytes)} GB used`
+                : ''
+            }`
           : '—'}
       </Text>
 
@@ -140,6 +155,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 20,
+  },
+  caption: {
+    color: '#546e7a',
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 6,
+    marginTop: -8,
   },
   hint: {
     color: '#90a4ae',

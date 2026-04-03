@@ -1,6 +1,12 @@
 import { NativeModules, Platform } from 'react-native';
 
-export type CpuCoreUsage = { core: number; usage: number };
+export type CpuCoreUsage = {
+  core: number;
+  usage: number;
+  /** kHz — present when native uses cpufreq proxy */
+  curFreqKhz?: number;
+  maxFreqKhz?: number;
+};
 
 export type MemoryInfo = {
   totalRam: number;
@@ -8,6 +14,8 @@ export type MemoryInfo = {
   usedRam: number;
   lowMemory: boolean;
   threshold: number;
+  /** Per-app heap limit (MB), from ActivityManager.memoryClass */
+  memoryClassMb?: number;
 };
 
 export type RunningAppRow = {
@@ -30,7 +38,8 @@ export type StorageInfo = {
   usedBytes: number;
   freeBytes: number;
   appDataBytes: number;
-  mediaBytes: number;
+  externalTotalBytes?: number;
+  externalFreeBytes?: number;
 };
 
 export type BatteryDetails = {
@@ -39,6 +48,8 @@ export type BatteryDetails = {
   voltage: number;
   temperature: number;
   currentNow: number;
+  /** Estimated power (W) from voltage × |current|; -1 if unavailable */
+  powerWatts: number;
 };
 
 type SystemDataNative = {
