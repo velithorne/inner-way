@@ -107,7 +107,6 @@ export function createBatterySun(): BatterySunHandles {
 
   const geo = new THREE.SphereGeometry(18, 48, 48);
   const sunCore = new THREE.Mesh(geo, sunMat);
-  sunCore.castShadow = true;
   group.add(sunCore);
 
   const c1 = new THREE.Mesh(
@@ -171,11 +170,6 @@ export function createBatterySun(): BatterySunHandles {
 
   const sunLight = new THREE.PointLight(0xffcc66, 3.5, 600, 1.2);
   sunLight.position.set(0, 0, 0);
-  sunLight.castShadow = true;
-  sunLight.shadow.mapSize.width = 1024;
-  sunLight.shadow.mapSize.height = 1024;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 600;
   group.add(sunLight);
 
   const anchorLights: THREE.PointLight[] = [];

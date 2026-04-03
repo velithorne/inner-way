@@ -19,7 +19,7 @@ export type AtmosphereHandles = {
 export function createAtmosphere(): AtmosphereHandles {
   const dummy = new THREE.Object3D();
 
-  const dustCount = 1500;
+  const dustCount = 500;
   const dustGeo = new THREE.SphereGeometry(0.12, 4, 4);
   const dustMat = new THREE.MeshBasicMaterial({
     color: 0xeeeeee,
@@ -60,7 +60,6 @@ export function createAtmosphere(): AtmosphereHandles {
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -80;
-  ground.receiveShadow = true;
 
   const viaN = 2000;
   const viaGeo = new THREE.SphereGeometry(0.3, 6, 6);

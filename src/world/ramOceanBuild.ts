@@ -84,8 +84,6 @@ function makeIsland(
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = height / 2;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
   g.add(mesh);
 
   const edge = new THREE.Mesh(
@@ -145,7 +143,6 @@ export function createRamOcean(): RamOceanHandles {
   });
   const ocean = new THREE.Mesh(plane, oceanMat);
   ocean.position.y = 0;
-  ocean.receiveShadow = true;
   group.add(ocean);
 
   const sub = new THREE.Mesh(
@@ -175,7 +172,6 @@ export function createRamOcean(): RamOceanHandles {
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -20;
-  floor.receiveShadow = true;
   group.add(floor);
 
   const ridge = new THREE.Mesh(

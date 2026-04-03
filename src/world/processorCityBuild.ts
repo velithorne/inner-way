@@ -15,7 +15,9 @@ export type ProcessorCityHandles = {
   dieEdges: THREE.LineSegments;
   corridors: THREE.Mesh[];
   cacheRings: THREE.Mesh[];
-  pulseData: { mesh: THREE.Mesh; path: THREE.Vector3[]; t: number; speed: number }[];
+  pulseInst: THREE.InstancedMesh;
+  pulseData: { path: THREE.Vector3[]; t: number; speed: number }[];
+  pulseDummy: THREE.Object3D;
   dispose: () => void;
 };
 
@@ -42,8 +44,6 @@ export function createProcessorCity(): ProcessorCityHandles {
   });
   const die = new THREE.Mesh(dieGeo, dieMat);
   die.position.y = 2;
-  die.castShadow = true;
-  die.receiveShadow = true;
   group.add(die);
 
   const dieEdges = new THREE.LineSegments(
@@ -64,7 +64,6 @@ export function createProcessorCity(): ProcessorCityHandles {
   });
   const count = 450;
   const buildings = new THREE.InstancedMesh(boxGeo, mat, count);
-  buildings.castShadow = true;
   const buildingColors = new Float32Array(count * 3);
   const dummy = new THREE.Object3D();
 
@@ -141,13 +140,17 @@ export function createProcessorCity(): ProcessorCityHandles {
     cacheRings.push(ring);
   }
 
-  const pulseGeo = new THREE.SphereGeometry(0.4, 8, 8);
+  const pulseGeo = new THREE.SphereGeometry(0.4, 6, 6);
   const pulseMat = new THREE.MeshBasicMaterial({
     color: 0xaaffff,
     transparent: true,
     opacity: 0.9,
     blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
+  const PULSE_N = 12;
+  const pulseInst = new THREE.InstancedMesh(pulseGeo, pulseMat, PULSE_N);
+  const pulseDummy = new THREE.Object3D();
   const pulseData: ProcessorCityHandles['pulseData'] = [];
   const pathA = [
     new THREE.Vector3(-20, 4.5, 0),
@@ -159,12 +162,15 @@ export function createProcessorCity(): ProcessorCityHandles {
     new THREE.Vector3(-30, 4.5, 40),
     new THREE.Vector3(-50, 4.5, 50),
   ];
-  for (let p = 0; p < 12; p++) {
-    const mesh = new THREE.Mesh(pulseGeo, pulseMat);
+  for (let p = 0; p < PULSE_N; p++) {
     const path = p % 2 === 0 ? pathA : pathB;
-    pulseData.push({ mesh, path: [...path], t: rng(), speed: 0.12 + rng() * 0.12 });
-    group.add(mesh);
+    pulseData.push({ path: [...path], t: rng(), speed: 0.12 + rng() * 0.12 });
+    pulseDummy.position.set(0, 4.5, 0);
+    pulseDummy.updateMatrix();
+    pulseInst.setMatrixAt(p, pulseDummy.matrix);
   }
+  pulseInst.instanceMatrix.needsUpdate = true;
+  group.add(pulseInst);
 
   return {
     group,
@@ -176,7 +182,9 @@ export function createProcessorCity(): ProcessorCityHandles {
     dieEdges,
     corridors,
     cacheRings,
+    pulseInst,
     pulseData,
+    pulseDummy,
     dispose: () => {
       dieGeo.dispose();
       dieMat.dispose();
@@ -230,6 +238,7 @@ export function updateProcessorCity(h: ProcessorCityHandles, cpu: { usage: numbe
     m.opacity = 0.12 + (downtownAvg / 100) * 0.2 - i * 0.04;
   });
 
+  const pdummy = h.pulseDummy;
   h.pulseData.forEach((pd, idx) => {
     pd.t += pd.speed * 0.016;
     if (pd.t >= 1) pd.t = 0;
@@ -237,8 +246,13 @@ export function updateProcessorCity(h: ProcessorCityHandles, cpu: { usage: numbe
     const a = Math.floor(seg);
     const b = Math.min(a + 1, pd.path.length - 1);
     const localT = seg - a;
-    pd.mesh.position.lerpVectors(pd.path[a], pd.path[b], localT);
+    pdummy.position.lerpVectors(pd.path[a], pd.path[b], localT);
     const freq = (cpu[idx % Math.max(1, cpu.length)]?.usage ?? 50) / 100;
-    pd.mesh.position.y += Math.sin(time * 4 + idx * 0.5) * 0.04 * freq;
+    pdummy.position.y += Math.sin(time * 4 + idx * 0.5) * 0.04 * freq;
+    pdummy.scale.setScalar(1);
+    pdummy.rotation.set(0, 0, 0);
+    pdummy.updateMatrix();
+    h.pulseInst.setMatrixAt(idx, pdummy.matrix);
   });
+  h.pulseInst.instanceMatrix.needsUpdate = true;
 }

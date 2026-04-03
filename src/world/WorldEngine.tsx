@@ -55,9 +55,9 @@ export function WorldEngine({ entryProgress }: Props) {
     const unsub = useWorldStore.subscribe((s) => {
       storeRef.current = s;
     });
-    Accelerometer.setUpdateInterval(16);
-    Magnetometer.setUpdateInterval(32);
-    Gyroscope.setUpdateInterval(16);
+    Accelerometer.setUpdateInterval(100);
+    Magnetometer.setUpdateInterval(100);
+    Gyroscope.setUpdateInterval(100);
     let lastP = 1013;
     const aSub = Accelerometer.addListener((e) => {
       accRef.current = { x: e.x, y: e.y, z: e.z };
@@ -70,7 +70,7 @@ export function WorldEngine({ entryProgress }: Props) {
     });
     Barometer.isAvailableAsync().then((ok) => {
       if (!ok || !aliveRef.current) return;
-      Barometer.setUpdateInterval(500);
+      Barometer.setUpdateInterval(100);
       baroSubRef.current = Barometer.addListener((e) => {
         const d = Math.abs(e.pressure - lastP);
         baroRef.current = { pressure: e.pressure, pressureDelta: d };
@@ -96,9 +96,6 @@ export function WorldEngine({ entryProgress }: Props) {
     renderer.setSize(w, h);
     const SKY_BASE = new THREE.Color(0x0a1528);
     renderer.setClearColor(SKY_BASE, 1);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
     const scene = new THREE.Scene();
     const fog = new THREE.FogExp2(0x0a1528, 0.0038);
     scene.fog = fog;
@@ -151,6 +148,8 @@ export function WorldEngine({ entryProgress }: Props) {
     let fpsAcc = 0;
     let frameCount = 0;
     const fwdHud = new THREE.Vector3();
+    const skyTintScratch = new THREE.Color();
+    let hudFrame = 0;
 
     const ease = (t: number) => t * t * (3 - 2 * t);
 
@@ -249,9 +248,9 @@ export function WorldEngine({ entryProgress }: Props) {
       const fogD = 0.0028 + (avgCpu / 100) * 0.0009 - (batteryLevel / 100) * 0.0005;
       fog.density = THREE.MathUtils.clamp(fogD, 0.002, 0.008);
       const sunCol = sunH.sunLight.color;
-      const skyTint = SKY_BASE.clone().lerp(sunCol, 0.12 + (batteryLevel / 100) * 0.08);
-      fog.color.copy(skyTint);
-      renderer.setClearColor(skyTint, 1);
+      skyTintScratch.copy(SKY_BASE).lerp(sunCol, 0.12 + (batteryLevel / 100) * 0.08);
+      fog.color.copy(skyTintScratch);
+      renderer.setClearColor(skyTintScratch, 1);
 
       if (entryT < 1) {
         const camT = ease(entryT);
@@ -275,16 +274,18 @@ export function WorldEngine({ entryProgress }: Props) {
         setHudBoundary(b.state);
       }
 
-      camera.getWorldDirection(fwdHud);
-      setHudForwardDir(fwdHud.x, fwdHud.y, fwdHud.z);
-
-      setWorldCameraPosition(camera.position.x, camera.position.y, camera.position.z);
-      setWorldCameraQuaternion(
-        camera.quaternion.x,
-        camera.quaternion.y,
-        camera.quaternion.z,
-        camera.quaternion.w,
-      );
+      hudFrame += 1;
+      if (hudFrame % 2 === 0) {
+        camera.getWorldDirection(fwdHud);
+        setHudForwardDir(fwdHud.x, fwdHud.y, fwdHud.z);
+        setWorldCameraPosition(camera.position.x, camera.position.y, camera.position.z);
+        setWorldCameraQuaternion(
+          camera.quaternion.x,
+          camera.quaternion.y,
+          camera.quaternion.z,
+          camera.quaternion.w,
+        );
+      }
 
       renderer.render(scene, camera);
       gl.endFrameEXP();

@@ -80,7 +80,7 @@ export function createNetworkWeather(): NetworkWeatherHandles {
   const group = new THREE.Group();
   group.position.copy(WORLD.networkSky);
 
-  const stars = makeStarfieldHemisphere(5000);
+  const stars = makeStarfieldHemisphere(2000);
   const gpsStars = makeGpsStars();
   group.add(stars, gpsStars);
 

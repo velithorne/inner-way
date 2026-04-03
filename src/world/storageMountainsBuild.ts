@@ -128,7 +128,7 @@ function makeRockInstancedMesh(rng: () => number, peaks: { x: number; z: number;
     roughness: 0.9,
     metalness: 0.15,
   });
-  const count = 1000;
+  const count = 300;
   const inst = new THREE.InstancedMesh(box, mat, count);
   inst.castShadow = false;
   const m = new THREE.Matrix4();
@@ -244,21 +244,19 @@ export function createStorageMountains(): StorageMountainsHandles {
       }
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(fp.x, 0, fp.z);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
       g.add(mesh);
     });
     return g;
   };
 
-  const high = buildLodLevel(28);
-  const mid = buildLodLevel(14);
-  const low = buildLodLevel(8);
+  const high = buildLodLevel(18);
+  const mid = buildLodLevel(7);
+  const low = buildLodLevel(4);
 
   const lod = new THREE.LOD();
   lod.addLevel(high, 0);
-  lod.addLevel(mid, 55);
-  lod.addLevel(low, 150);
+  lod.addLevel(mid, 30);
+  lod.addLevel(low, 100);
 
   group.add(lod);
 
