@@ -262,14 +262,9 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
       val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
         status == BatteryManager.BATTERY_STATUS_FULL
 
-      var voltageMv = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
-      // Intent sometimes omits voltage; BatteryManager reports microvolts (API 21+).
-      if (voltageMv <= 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        val uv = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_VOLTAGE)
-        if (uv != Int.MIN_VALUE && uv > 0) {
-          voltageMv = uv / 1000
-        }
-      }
+      val voltageMv = batteryStatus.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
+      // Nominal volts for power math when hardware omits EXTRA_VOLTAGE (still common).
+      val voltsForPower = if (voltageMv > 0) voltageMv / 1000.0 else 3.85
       val tempTenth = batteryStatus.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
 
       val currentRaw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -280,16 +275,15 @@ class SystemDataModule(reactContext: ReactApplicationContext) :
       val currentUa = if (currentRaw == Int.MIN_VALUE) -1 else currentRaw
 
       var powerWatts = -1.0
-      if (voltageMv > 0 && currentUa != -1) {
-        val volts = voltageMv / 1000.0
+      if (currentUa != -1) {
         val amps = abs(currentRaw.toDouble()) / 1_000_000.0
-        powerWatts = volts * amps
+        powerWatts = voltsForPower * amps
       }
 
       val m = Arguments.createMap()
       m.putInt("level", pct.coerceIn(0, 100))
       m.putBoolean("isCharging", isCharging)
-      m.putInt("voltage", voltageMv)
+      m.putInt("voltage", if (voltageMv > 0) voltageMv else -1)
       m.putDouble("temperature", if (tempTenth >= 0) tempTenth / 10.0 else -1.0)
       m.putInt("currentNow", currentUa)
       m.putDouble("powerWatts", powerWatts)
