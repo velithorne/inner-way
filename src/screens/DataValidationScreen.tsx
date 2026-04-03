@@ -4,9 +4,14 @@ import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { isSystemDataAvailable } from '../native/systemData';
 import { startPolling, stopPolling } from '../services/systemPoller';
 import { useWorldStore } from '../store/useWorldStore';
+import { BatterySunScene } from '../world/BatterySunScene';
 
 function formatMb(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1);
+}
+
+function formatGb(bytes: number): string {
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2);
 }
 
 function formatKbPerSec(bytesPerSec: number): string {
@@ -16,6 +21,8 @@ function formatKbPerSec(bytesPerSec: number): string {
 export function DataValidationScreen() {
   const snapshot = useWorldStore((s) => s.snapshot);
   const topApps = useWorldStore((s) => s.topApps);
+  const telemetryState = useWorldStore((s) => s.telemetryState);
+  const telemetryMessage = useWorldStore((s) => s.telemetryMessage);
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !isSystemDataAvailable()) {
@@ -30,8 +37,9 @@ export function DataValidationScreen() {
       <View style={styles.root}>
         <Text style={styles.title}>SILICON — Data validation</Text>
         <Text style={styles.body}>
-          System data collection runs on Android with the native SystemData module. Use a device or
-          emulator with this build installed.
+          System data needs the native SystemData module. This screen does not populate in Expo Go.
+          Install the release APK or run{' '}
+          <Text style={styles.codeInline}>npx expo run:android</Text> for a dev build.
         </Text>
       </View>
     );
@@ -41,6 +49,7 @@ export function DataValidationScreen() {
   const mem = snapshot?.memory;
   const net = snapshot?.network;
   const bat = snapshot?.battery;
+  const storage = snapshot?.storage;
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -48,6 +57,17 @@ export function DataValidationScreen() {
       <Text style={styles.sub}>
         Live readouts (500ms). Compare with Developer Options and system settings.
       </Text>
+
+      {telemetryState === 'loading' && !snapshot ? (
+        <Text style={styles.hint}>Reading device telemetry…</Text>
+      ) : null}
+
+      {telemetryState === 'error' && telemetryMessage ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorTitle}>Telemetry error</Text>
+          <Text style={styles.errorBody}>{telemetryMessage}</Text>
+        </View>
+      ) : null}
 
       <Text style={styles.section}>CPU (per core %)</Text>
       <Text style={styles.mono}>
@@ -84,6 +104,15 @@ export function DataValidationScreen() {
           ? `${bat.level}% ${bat.isCharging ? 'charging' : 'discharging'} · ${bat.currentNow !== -1 ? `${bat.currentNow} µA` : 'current n/a'}`
           : '—'}
       </Text>
+
+      <Text style={styles.section}>Storage</Text>
+      <Text style={styles.mono}>
+        {storage
+          ? `${formatGb(storage.usedBytes)} / ${formatGb(storage.totalBytes)} GB used · app data ${formatMb(storage.appDataBytes)} MB`
+          : '—'}
+      </Text>
+
+      <BatterySunScene />
     </ScrollView>
   );
 }
@@ -111,6 +140,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginBottom: 20,
+  },
+  hint: {
+    color: '#90a4ae',
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  errorBox: {
+    backgroundColor: '#1b1f24',
+    borderWidth: 1,
+    borderColor: '#c62828',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorTitle: {
+    color: '#ef9a9a',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  errorBody: {
+    color: '#ffcdd2',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  codeInline: {
+    fontFamily: 'monospace',
+    color: '#80deea',
   },
   body: {
     color: '#b0bec5',

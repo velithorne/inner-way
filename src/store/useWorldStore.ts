@@ -21,6 +21,8 @@ export type DeviceSnapshot = {
   battery: BatteryDetails;
 };
 
+export type TelemetryState = 'idle' | 'loading' | 'ok' | 'error';
+
 type WorldState = {
   snapshot: DeviceSnapshot | null;
   cpuLoad: number;
@@ -29,7 +31,11 @@ type WorldState = {
   batteryLevel: number;
   topApps: RunningAppRow[];
   anomalies: Anomaly[];
+  telemetryState: TelemetryState;
+  telemetryMessage: string | null;
   setFromSnapshot: (s: DeviceSnapshot) => void;
+  setTelemetryLoading: () => void;
+  setTelemetryError: (message: string) => void;
   reset: () => void;
 };
 
@@ -52,6 +58,8 @@ export const useWorldStore = create<WorldState>((set) => ({
   batteryLevel: 0,
   topApps: [],
   anomalies: [],
+  telemetryState: 'idle',
+  telemetryMessage: null,
   setFromSnapshot: (s) => {
     const sorted = [...s.apps].sort((a, b) => b.memoryBytes - a.memoryBytes);
     const rx = s.network.rxBytesPerSecond;
@@ -64,8 +72,20 @@ export const useWorldStore = create<WorldState>((set) => ({
       batteryLevel: s.battery.level,
       topApps: sorted.slice(0, 10),
       anomalies: [],
+      telemetryState: 'ok',
+      telemetryMessage: null,
     });
   },
+  setTelemetryLoading: () =>
+    set({
+      telemetryState: 'loading',
+      telemetryMessage: null,
+    }),
+  setTelemetryError: (message) =>
+    set({
+      telemetryState: 'error',
+      telemetryMessage: message,
+    }),
   reset: () =>
     set({
       snapshot: null,
@@ -75,5 +95,7 @@ export const useWorldStore = create<WorldState>((set) => ({
       batteryLevel: 0,
       topApps: [],
       anomalies: [],
+      telemetryState: 'idle',
+      telemetryMessage: null,
     }),
 }));
