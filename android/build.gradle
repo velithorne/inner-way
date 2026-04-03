@@ -28,21 +28,5 @@ allprojects {
   }
 }
 
-// AGP 8+ requires compileSdk on every Android module; some Expo libs only set compileSdkVersion.
-subprojects { sub ->
-  sub.afterEvaluate {
-    if (!sub.plugins.hasPlugin("com.android.library") && !sub.plugins.hasPlugin("com.android.application")) {
-      return
-    }
-    def a = sub.extensions.findByName("android")
-    if (a != null) {
-      try {
-        a.compileSdk rootProject.ext.compileSdkVersion
-      } catch (Exception ignored) {
-      }
-    }
-  }
-}
-
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
