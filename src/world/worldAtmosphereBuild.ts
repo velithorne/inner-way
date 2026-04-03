@@ -51,14 +51,16 @@ export function createAtmosphere(): AtmosphereHandles {
   const ground = new THREE.Mesh(
     groundGeo,
     new THREE.MeshStandardMaterial({
-      color: 0x000408,
-      emissive: 0x000408,
-      roughness: 0.12,
-      metalness: 0.85,
+      color: 0x0a1a22,
+      emissive: 0x050a10,
+      emissiveIntensity: 0.08,
+      roughness: 0.9,
+      metalness: 0.2,
     }),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -80;
+  ground.receiveShadow = true;
 
   const viaN = 2000;
   const viaGeo = new THREE.SphereGeometry(0.3, 6, 6);

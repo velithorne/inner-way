@@ -34,14 +34,16 @@ export function createProcessorCity(): ProcessorCityHandles {
 
   const dieGeo = new THREE.BoxGeometry(160, 4, 120);
   const dieMat = new THREE.MeshStandardMaterial({
-    color: 0x050010,
-    emissive: 0x020008,
-    emissiveIntensity: 0.15,
-    metalness: 0.8,
-    roughness: 0.15,
+    color: 0x1a0a2e,
+    emissive: 0x080410,
+    emissiveIntensity: 0.12,
+    metalness: 0.5,
+    roughness: 0.4,
   });
   const die = new THREE.Mesh(dieGeo, dieMat);
   die.position.y = 2;
+  die.castShadow = true;
+  die.receiveShadow = true;
   group.add(die);
 
   const dieEdges = new THREE.LineSegments(
@@ -53,13 +55,16 @@ export function createProcessorCity(): ProcessorCityHandles {
 
   const boxGeo = new THREE.BoxGeometry(UNIT, 1, UNIT);
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x0a0014,
-    metalness: 0.8,
-    roughness: 0.15,
+    color: 0xffffff,
+    emissive: 0x221008,
+    emissiveIntensity: 0.4,
+    metalness: 0.45,
+    roughness: 0.35,
     vertexColors: true,
   });
   const count = 450;
   const buildings = new THREE.InstancedMesh(boxGeo, mat, count);
+  buildings.castShadow = true;
   const buildingColors = new Float32Array(count * 3);
   const dummy = new THREE.Object3D();
 
@@ -101,7 +106,7 @@ export function createProcessorCity(): ProcessorCityHandles {
   const corrMat = new THREE.MeshStandardMaterial({
     color: 0x001122,
     emissive: 0x00ffe5,
-    emissiveIntensity: 0.15,
+    emissiveIntensity: 0.08,
     metalness: 0.6,
     roughness: 0.3,
   });

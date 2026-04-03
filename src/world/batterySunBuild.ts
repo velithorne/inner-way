@@ -3,14 +3,43 @@ import * as THREE from 'three';
 import { WORLD } from './worldConstants';
 import { batteryLevelToEmissive } from './batteryColors';
 
+/** Order: Processor → Display → RAM → Storage → Network → Sensors (brightness priority) */
 const TARGETS = [
   WORLD.processor,
+  WORLD.display,
   WORLD.ramOcean,
   WORLD.storage,
-  WORLD.sensors,
   WORLD.networkSky,
-  WORLD.display,
+  WORLD.sensors,
 ];
+
+const RIVER_BASE_OPACITY = [0.5, 0.4, 0.3, 0.2, 0.25, 0.15];
+
+function sunLightFromBattery(level: number): { color: THREE.Color; intensity: number } {
+  const lvl = Math.max(0, Math.min(100, level));
+  const stops: { t: number; hex: number; i: number }[] = [
+    { t: 0, hex: 0x660000, i: 0.6 },
+    { t: 5, hex: 0x880000, i: 1.0 },
+    { t: 10, hex: 0xcc0000, i: 1.8 },
+    { t: 17, hex: 0xff2200, i: 2.8 },
+    { t: 25, hex: 0xff4400, i: 3.5 },
+    { t: 50, hex: 0xff8800, i: 5.0 },
+    { t: 75, hex: 0xffb700, i: 6.5 },
+    { t: 100, hex: 0xffd700, i: 8.0 },
+  ];
+  for (let k = 0; k < stops.length - 1; k++) {
+    const a = stops[k];
+    const b = stops[k + 1];
+    if (lvl >= a.t && lvl <= b.t) {
+      const u = (lvl - a.t) / Math.max(1e-6, b.t - a.t);
+      const c = new THREE.Color(a.hex).lerp(new THREE.Color(b.hex), u);
+      const intensity = THREE.MathUtils.lerp(a.i, b.i, u);
+      return { color: c, intensity };
+    }
+  }
+  const last = stops[stops.length - 1];
+  return { color: new THREE.Color(last.hex), intensity: last.i };
+}
 
 const plasmaVertex = `
 varying vec3 vNorm;
@@ -54,6 +83,9 @@ export type BatterySunHandles = {
   ring2: THREE.Mesh;
   tendrils: THREE.Mesh[];
   rivers: THREE.Mesh[];
+  riverGlows: THREE.Mesh[];
+  riverCurves: THREE.CatmullRomCurve3[];
+  riverPulses: { mesh: THREE.Mesh; t: number }[];
   sunLight: THREE.PointLight;
   dispose: () => void;
 };
@@ -73,6 +105,7 @@ export function createBatterySun(): BatterySunHandles {
 
   const geo = new THREE.SphereGeometry(18, 48, 48);
   const sunCore = new THREE.Mesh(geo, sunMat);
+  sunCore.castShadow = true;
   group.add(sunCore);
 
   const c1 = new THREE.Mesh(
@@ -134,30 +167,65 @@ export function createBatterySun(): BatterySunHandles {
     group.add(m);
   }
 
-  const sunLight = new THREE.PointLight(0xffcc66, 1.2, 800, 2);
+  const sunLight = new THREE.PointLight(0xffcc66, 3.5, 600, 1.2);
   sunLight.position.set(0, 0, 0);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 1024;
+  sunLight.shadow.mapSize.height = 1024;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 600;
   group.add(sunLight);
 
   const rivers: THREE.Mesh[] = [];
-  const curveMat = new THREE.MeshBasicMaterial({
+  const riverGlows: THREE.Mesh[] = [];
+  const riverCurves: THREE.CatmullRomCurve3[] = [];
+  const riverPulses: { mesh: THREE.Mesh; t: number }[] = [];
+
+  const pulseGeo = new THREE.SphereGeometry(0.8, 12, 12);
+  const pulseMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     transparent: true,
-    opacity: 0.15,
+    opacity: 0.95,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
 
   for (let i = 0; i < TARGETS.length; i++) {
     const end = TARGETS[i];
-    const pts = [
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(end.x * 0.35, end.y * 0.35, end.z * 0.35),
-      end.clone(),
-    ];
+    const mid = new THREE.Vector3(
+      (end.x * 0.5 + 0) / 2,
+      Math.max(40, end.y * 0.5 + 25),
+      (end.z * 0.5 + 0) / 2,
+    );
+    const pts = [new THREE.Vector3(0, 0, 0), mid, end.clone()];
     const curve = new THREE.CatmullRomCurve3(pts);
-    const tube = new THREE.TubeGeometry(curve, 24, 0.3, 8, false);
-    const mesh = new THREE.Mesh(tube, curveMat.clone());
+    riverCurves.push(curve);
+
+    const tube = new THREE.TubeGeometry(curve, 20, 0.6, 8, false);
+    const curveMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: RIVER_BASE_OPACITY[i] * 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(tube, curveMat);
     rivers.push(mesh);
     group.add(mesh);
+
+    const glowTube = new THREE.TubeGeometry(curve, 20, 2.0, 8, false);
+    const glowMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.04,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const glow = new THREE.Mesh(glowTube, glowMat);
+    riverGlows.push(glow);
+    group.add(glow);
+
+    const pulse = new THREE.Mesh(pulseGeo, pulseMat.clone());
+    riverPulses.push({ mesh: pulse, t: i / TARGETS.length });
+    group.add(pulse);
   }
 
   return {
@@ -170,6 +238,9 @@ export function createBatterySun(): BatterySunHandles {
     ring2,
     tendrils,
     rivers,
+    riverGlows,
+    riverCurves,
+    riverPulses,
     sunLight,
     dispose: () => {
       geo.dispose();
@@ -190,6 +261,16 @@ export function createBatterySun(): BatterySunHandles {
         m.geometry.dispose();
         (m.material as THREE.Material).dispose();
       });
+      riverGlows.forEach((m) => {
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      });
+      riverPulses.forEach((p) => {
+        p.mesh.geometry.dispose();
+        (p.mesh.material as THREE.Material).dispose();
+      });
+      pulseGeo.dispose();
+      pulseMat.dispose();
     },
   };
 }
@@ -208,6 +289,7 @@ export function updateBatterySun(
   h.corona2.scale.setScalar((r / 18) * 1.8);
 
   const col = batteryLevelToEmissive(lvl);
+  const sunParams = sunLightFromBattery(lvl);
   h.sunMat.uniforms.uColor.value.copy(col);
   h.sunMat.uniforms.uTime.value = time;
   h.sunMat.uniforms.uIntensity.value = 2;
@@ -222,8 +304,8 @@ export function updateBatterySun(
   h.ring1.rotation.z += 0.01;
   h.ring2.rotation.z -= 0.008;
 
-  h.sunLight.color.copy(col);
-  h.sunLight.intensity = (0.6 + (lvl / 100) * 1.4) * reveal;
+  h.sunLight.color.copy(sunParams.color);
+  h.sunLight.intensity = sunParams.intensity * reveal;
 
   const pulse = (1 + Math.sin(time * Math.PI * 2 * 0.25) * 0.02) * reveal;
   h.group.scale.setScalar(Math.max(0.001, pulse));
@@ -238,11 +320,30 @@ export function updateBatterySun(
   });
 
   const pNorm = powerWatts > 0 ? Math.min(1, powerWatts / 8) : 0.05;
-  const riverBright = 0.08 + pNorm * 0.35;
+  const lowBat = 0.35 + (lvl / 100) * 0.65;
+  const speedMul = 0.15 * lowBat * (0.5 + pNorm * 0.5);
+
   h.rivers.forEach((river, i) => {
     const m = river.material as THREE.MeshBasicMaterial;
     m.color.copy(col);
-    const boost = i === 0 ? 1.25 : i === 5 ? 1.1 : 1;
-    m.opacity = Math.min(0.45, riverBright * boost);
+    const baseOp = RIVER_BASE_OPACITY[i];
+    const netBoost = i === 4 ? 1 + pNorm * 0.4 : 1;
+    m.opacity = Math.min(0.85, baseOp * (0.45 + pNorm * 0.5) * netBoost * reveal);
+  });
+
+  h.riverGlows.forEach((glow, i) => {
+    const m = glow.material as THREE.MeshBasicMaterial;
+    m.color.copy(col);
+    m.opacity = 0.035 * reveal * (0.5 + (lvl / 100) * 0.5);
+  });
+
+  h.riverPulses.forEach((rp, i) => {
+    rp.t = (rp.t + speedMul * (1 / 60)) % 1;
+    const curve = h.riverCurves[i];
+    const pt = curve.getPointAt(rp.t);
+    rp.mesh.position.copy(pt);
+    const pm = rp.mesh.material as THREE.MeshBasicMaterial;
+    pm.color.setHex(0xffffee);
+    pm.opacity = (0.55 + pNorm * 0.4) * (0.4 + (lvl / 100) * 0.6) * reveal;
   });
 }

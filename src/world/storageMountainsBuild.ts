@@ -123,11 +123,14 @@ function makeRockInstancedMesh(rng: () => number, peaks: { x: number; z: number;
   const box = new THREE.BoxGeometry(1, 1, 1);
   const mat = new THREE.MeshStandardMaterial({
     color: 0x2a2038,
-    roughness: 0.95,
-    metalness: 0.05,
+    emissive: 0x0a0a12,
+    emissiveIntensity: 0.08,
+    roughness: 0.9,
+    metalness: 0.15,
   });
   const count = 1000;
   const inst = new THREE.InstancedMesh(box, mat, count);
+  inst.castShadow = false;
   const m = new THREE.Matrix4();
   const pos = new THREE.Vector3();
   const quat = new THREE.Quaternion();
@@ -229,16 +232,20 @@ export function createStorageMountains(): StorageMountainsHandles {
       const geo = buildOrganicMountain(rng, ringSeg, fp.baseR, fp.h, jitter);
       const mat = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        color: 0x0a0014,
-        roughness: 0.15,
-        metalness: 0.8,
+        color: 0x1a3322,
+        emissive: 0x0a1a11,
+        emissiveIntensity: 0.2,
+        roughness: 0.7,
+        metalness: 0.3,
       });
       if (fp.photo) {
-        mat.emissive = new THREE.Color(0x4a2818);
-        mat.emissiveIntensity = 0.35;
+        mat.emissive = new THREE.Color(0x2a1810);
+        mat.emissiveIntensity = 0.28;
       }
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(fp.x, 0, fp.z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       g.add(mesh);
     });
     return g;

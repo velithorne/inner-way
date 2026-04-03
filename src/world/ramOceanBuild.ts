@@ -34,12 +34,18 @@ precision mediump float;
 uniform vec3 uDeep;
 uniform vec3 uEdge;
 uniform vec3 uCamPos;
+uniform vec3 uSunPos;
+uniform vec3 uSunCol;
+uniform float uSunInt;
 varying vec3 vPos;
 varying vec3 vNorm;
 void main() {
   vec3 viewDir = normalize(uCamPos - vPos);
   float fresnel = pow(1.0 - max(dot(vNorm, viewDir), 0.0), 2.5);
   vec3 col = mix(uDeep, uEdge, fresnel * 0.85 + 0.1);
+  vec3 L = normalize(uSunPos - vPos);
+  float spec = pow(max(dot(reflect(-viewDir, vNorm), L), 0.0), 48.0);
+  col += uSunCol * spec * uSunInt * 0.35;
   gl_FragColor = vec4(col, 0.92);
 }
 `;
@@ -72,12 +78,14 @@ function makeIsland(
   const mat = new THREE.MeshStandardMaterial({
     color,
     emissive,
-    emissiveIntensity: 0.25,
+    emissiveIntensity: 0.12,
     metalness: 0.8,
-    roughness: 0.15,
+    roughness: 0.2,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = height / 2;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   g.add(mesh);
 
   const edge = new THREE.Mesh(
@@ -95,7 +103,13 @@ function makeIsland(
   for (let b = 0; b < 10; b++) {
     const bx = new THREE.Mesh(
       new THREE.BoxGeometry(1.2, 2 + rng() * 2, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0x0a0014, emissive: 0x001122, metalness: 0.7, roughness: 0.2 }),
+      new THREE.MeshStandardMaterial({
+        color: 0x0a0014,
+        emissive: 0x001122,
+        emissiveIntensity: 0.1,
+        metalness: 0.7,
+        roughness: 0.2,
+      }),
     );
     bx.position.set((rng() - 0.5) * radius * 1.4, height + 1 + rng() * 2, (rng() - 0.5) * radius * 1.4);
     g.add(bx);
@@ -117,9 +131,12 @@ export function createRamOcean(): RamOceanHandles {
     uniforms: {
       uTime: { value: 0 },
       uWaveH: { value: 1.5 },
-      uDeep: { value: new THREE.Color(0x001833) },
+      uDeep: { value: new THREE.Color(0x001a33) },
       uEdge: { value: new THREE.Color(0x00ffe5) },
       uCamPos: { value: new THREE.Vector3() },
+      uSunPos: { value: new THREE.Vector3() },
+      uSunCol: { value: new THREE.Color(0xff4400) },
+      uSunInt: { value: 3.5 },
     },
     vertexShader: oceanVert,
     fragmentShader: oceanFrag,
@@ -128,6 +145,7 @@ export function createRamOcean(): RamOceanHandles {
   });
   const ocean = new THREE.Mesh(plane, oceanMat);
   ocean.position.y = 0;
+  ocean.receiveShadow = true;
   group.add(ocean);
 
   const sub = new THREE.Mesh(
@@ -135,7 +153,7 @@ export function createRamOcean(): RamOceanHandles {
     new THREE.MeshStandardMaterial({
       color: 0x000d22,
       emissive: 0x000d22,
-      emissiveIntensity: 0.4,
+      emissiveIntensity: 0.15,
       transparent: true,
       opacity: 0.65,
       side: THREE.DoubleSide,
@@ -150,12 +168,14 @@ export function createRamOcean(): RamOceanHandles {
     new THREE.MeshStandardMaterial({
       color: 0x000408,
       emissive: 0x000408,
+      emissiveIntensity: 0.05,
       metalness: 0.85,
       roughness: 0.12,
     }),
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -20;
+  floor.receiveShadow = true;
   group.add(floor);
 
   const ridge = new THREE.Mesh(
@@ -227,12 +247,15 @@ export function ensureIslands(h: RamOceanHandles, apps: { packageName: string; a
   }
 }
 
+const _sunWorld = new THREE.Vector3();
+
 export function updateRamOcean(
   h: RamOceanHandles,
   ramPressurePct: number,
   lowMemory: boolean,
   time: number,
   camera: THREE.PerspectiveCamera,
+  sunLightWorld?: THREE.PointLight,
 ): void {
   const pressure = Math.max(0, Math.min(100, ramPressurePct)) / 100;
   const waveH = 0.5 + pressure * 3.5 + (lowMemory ? 0.4 : 0);
@@ -241,6 +264,12 @@ export function updateRamOcean(
   const wp = new THREE.Vector3();
   camera.getWorldPosition(wp);
   h.oceanMat.uniforms.uCamPos.value.copy(wp).sub(WORLD.ramOcean);
+  if (sunLightWorld) {
+    sunLightWorld.getWorldPosition(_sunWorld);
+    h.oceanMat.uniforms.uSunPos.value.copy(_sunWorld).sub(WORLD.ramOcean);
+    h.oceanMat.uniforms.uSunCol.value.copy(sunLightWorld.color);
+    h.oceanMat.uniforms.uSunInt.value = sunLightWorld.intensity;
+  }
 
   h.islands.forEach((g) => {
     const bob = Math.sin(time * 1.2 + g.position.x * 0.01) * 0.08;

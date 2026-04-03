@@ -48,6 +48,10 @@ type Props = {
 
 type InspectZone = 'bat' | 'cpu' | 'ram' | 'stor' | 'net' | 'sen' | null;
 
+type InspectLine =
+  | { kind: 'text'; text: string; isHead?: boolean }
+  | { kind: 'core'; index: number; usage: number; ghz: string };
+
 function estimateBatteryMinutes(level: number, currentUa: number): string {
   if (level <= 0 || currentUa >= 0) return '—';
   const drainMahPerH = Math.abs(currentUa) / 1e6 * 1000;
@@ -83,7 +87,7 @@ export function WorldNavigator({ entryComplete }: Props) {
   const [zoneDetail, setZoneDetail] = useState('');
   const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [inspectLines, setInspectLines] = useState<string[]>([]);
+  const [inspectContent, setInspectContent] = useState<InspectLine[]>([]);
   const [inspectBorder, setInspectBorder] = useState(CYAN);
   const stillT = useRef(0);
 
@@ -153,57 +157,68 @@ export function WorldNavigator({ entryComplete }: Props) {
 
   const buildInspector = useCallback((zone: InspectZone) => {
     const snap = useWorldStore.getState().snapshot;
-    const lines: string[] = [];
+    const lines: InspectLine[] = [];
     let border = CYAN;
     if (zone === 'bat' && snap?.battery) {
       border = `#${batteryLevelToEmissive(snap.battery.level).getHexString()}`;
-      lines.push('◈ BATTERY REACTOR');
-      lines.push(`Charge: ${snap.battery.level}%`);
-      lines.push(`Draw: ${snap.battery.currentNow} µA`);
-      lines.push(`State: ${snap.battery.isCharging ? 'CHARGING' : 'DISCHARGING'}`);
-      lines.push(`Est. remaining: ${estimateBatteryMinutes(snap.battery.level, snap.battery.currentNow)}`);
+      lines.push({ kind: 'text', text: '◈ BATTERY REACTOR', isHead: true });
+      lines.push({ kind: 'text', text: `Charge: ${snap.battery.level}%` });
+      lines.push({ kind: 'text', text: `Draw: ${snap.battery.currentNow} µA` });
+      lines.push({ kind: 'text', text: `State: ${snap.battery.isCharging ? 'CHARGING' : 'DISCHARGING'}` });
+      lines.push({
+        kind: 'text',
+        text: `Est. remaining: ${estimateBatteryMinutes(snap.battery.level, snap.battery.currentNow)}`,
+      });
     } else if (zone === 'cpu' && snap?.cpu?.length) {
-      lines.push('◈ PROCESSOR COMPLEX');
+      lines.push({ kind: 'text', text: '◈ PROCESSOR COMPLEX', isHead: true });
       snap.cpu.slice(0, 8).forEach((c, i) => {
         const ghz = c.maxFreqKhz ? (c.maxFreqKhz / 1e6).toFixed(2) : '—';
-        lines.push(`Core ${i}: ${c.usage}% @ ${ghz}GHz`);
+        lines.push({ kind: 'core', index: i, usage: c.usage, ghz });
+      });
+      const perf = snap.cpu.slice(0, 4);
+      const eff = snap.cpu.slice(4, 8);
+      const perfAvg = perf.length ? perf.reduce((a, c) => a + c.usage, 0) / perf.length : 0;
+      const effAvg = eff.length ? eff.reduce((a, c) => a + c.usage, 0) / eff.length : 0;
+      lines.push({
+        kind: 'text',
+        text: `PERFORMANCE (0-3): ${perfAvg.toFixed(0)}% · EFFICIENCY (4-7): ${effAvg.toFixed(0)}%`,
       });
       const avg = snap.cpu.reduce((a, c) => a + c.usage, 0) / snap.cpu.length;
-      lines.push(`Aggregate: ${avg.toFixed(0)}% load`);
+      lines.push({ kind: 'text', text: `Aggregate: ${avg.toFixed(0)}% load` });
     } else if (zone === 'ram' && snap?.memory) {
       border = '#8899ff';
       const u = snap.memory.usedRam / (1024 * 1024);
       const f = snap.memory.availableRam / (1024 * 1024);
       const t = snap.memory.totalRam / (1024 * 1024);
       const pr = u / Math.max(1, t) * 100;
-      lines.push('◈ MEMORY OCEAN');
-      lines.push(`Used: ${u.toFixed(0)} MB`);
-      lines.push(`Free: ${f.toFixed(0)} MB`);
-      lines.push(`Total: ${t.toFixed(0)} MB`);
-      lines.push(`Pressure: ${pr > 80 ? 'HIGH' : pr > 55 ? 'NORMAL' : 'LOW'}`);
-      lines.push(`Islands: ${snap.apps?.length ?? 0} processes mapped`);
+      lines.push({ kind: 'text', text: '◈ MEMORY OCEAN', isHead: true });
+      lines.push({ kind: 'text', text: `Used: ${u.toFixed(0)} MB` });
+      lines.push({ kind: 'text', text: `Free: ${f.toFixed(0)} MB` });
+      lines.push({ kind: 'text', text: `Total: ${t.toFixed(0)} MB` });
+      lines.push({ kind: 'text', text: `Pressure: ${pr > 80 ? 'HIGH' : pr > 55 ? 'NORMAL' : 'LOW'}` });
+      lines.push({ kind: 'text', text: `Islands: ${snap.apps?.length ?? 0} processes mapped` });
     } else if (zone === 'stor' && snap?.storage) {
-      lines.push('◈ DATA RANGE');
+      lines.push({ kind: 'text', text: '◈ DATA RANGE', isHead: true });
       const u = snap.storage.usedBytes / (1024 ** 3);
       const f = snap.storage.freeBytes / (1024 ** 3);
       const tot = snap.storage.totalBytes / (1024 ** 3);
-      lines.push(`Used: ${u.toFixed(2)} GB`);
-      lines.push(`Free: ${f.toFixed(2)} GB`);
-      lines.push(`Total: ${tot.toFixed(2)} GB`);
-      lines.push(`Fill: ${((u / tot) * 100).toFixed(0)}%`);
+      lines.push({ kind: 'text', text: `Used: ${u.toFixed(2)} GB` });
+      lines.push({ kind: 'text', text: `Free: ${f.toFixed(2)} GB` });
+      lines.push({ kind: 'text', text: `Total: ${tot.toFixed(2)} GB` });
+      lines.push({ kind: 'text', text: `Fill: ${((u / tot) * 100).toFixed(0)}%` });
     } else if (zone === 'net' && snap?.network) {
-      lines.push('◈ NETWORK LAYER');
-      lines.push(`Download: ${(snap.network.rxBytesPerSecond / 1024).toFixed(1)} KB/s`);
-      lines.push(`Upload: ${(snap.network.txBytesPerSecond / 1024).toFixed(1)} KB/s`);
-      lines.push(`WiFi: see device status`);
+      lines.push({ kind: 'text', text: '◈ NETWORK LAYER', isHead: true });
+      lines.push({ kind: 'text', text: `Download: ${(snap.network.rxBytesPerSecond / 1024).toFixed(1)} KB/s` });
+      lines.push({ kind: 'text', text: `Upload: ${(snap.network.txBytesPerSecond / 1024).toFixed(1)} KB/s` });
+      lines.push({ kind: 'text', text: 'WiFi: see device status' });
     } else if (zone === 'sen') {
-      lines.push('◈ SENSOR CLUSTER');
-      lines.push('Magnetometer · Gyro · Accel · Baro');
+      lines.push({ kind: 'text', text: '◈ SENSOR CLUSTER', isHead: true });
+      lines.push({ kind: 'text', text: 'Magnetometer · Gyro · Accel · Baro' });
     } else {
       return;
     }
     setInspectBorder(border);
-    setInspectLines(lines);
+    setInspectContent(lines);
   }, []);
 
   const updateZoneHud = useCallback(() => {
@@ -310,11 +325,11 @@ export function WorldNavigator({ entryComplete }: Props) {
         if (stillT.current >= 2) {
           const z = resolveInspectZone();
           if (z) buildInspector(z);
-          else setInspectLines([]);
+          else setInspectContent([]);
         }
       } else {
         stillT.current = 0;
-        setInspectLines([]);
+          setInspectContent([]);
       }
     }, 200);
     return () => clearInterval(id);
@@ -503,13 +518,36 @@ export function WorldNavigator({ entryComplete }: Props) {
         {zoneDetail ? <Text style={styles.zoneDetail}>{zoneDetail}</Text> : null}
       </View>
 
-      {inspectLines.length > 0 ? (
+      {inspectContent.length > 0 ? (
         <View style={[styles.inspectPanel, { borderLeftColor: inspectBorder }]}>
-          {inspectLines.map((line, i) => (
-            <Text key={i} style={i === 0 ? styles.inspectHead : styles.inspectLine}>
-              {line}
-            </Text>
-          ))}
+          {inspectContent.map((item, i) =>
+            item.kind === 'text' ? (
+              <Text key={i} style={item.isHead ? styles.inspectHead : styles.inspectLine}>
+                {item.text}
+              </Text>
+            ) : (
+              <View key={i} style={styles.coreInspectRow}>
+                <Text style={styles.inspectLine}>
+                  Core {item.index}:{' '}
+                </Text>
+                <View style={styles.coreInspectTrack}>
+                  <View
+                    style={[
+                      styles.coreInspectFill,
+                      {
+                        width: `${Math.max(2, item.usage)}%`,
+                        backgroundColor: item.index < 4 ? '#FF4400' : '#FF8800',
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.inspectLine}>
+                  {' '}
+                  {item.usage}% @ {item.ghz}GHz
+                </Text>
+              </View>
+            ),
+          )}
         </View>
       ) : null}
 
@@ -712,6 +750,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'monospace',
     marginBottom: 3,
+  },
+  coreInspectRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 5,
+    maxWidth: 210,
+  },
+  coreInspectTrack: {
+    width: 80,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginHorizontal: 4,
+  },
+  coreInspectFill: {
+    height: 4,
+    borderRadius: 2,
   },
   zoneTitle: {
     color: CYAN,

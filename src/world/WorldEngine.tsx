@@ -95,17 +95,23 @@ export function WorldEngine({ entryProgress }: Props) {
     const renderer = new Renderer({ gl }) as THREE.WebGLRenderer;
     renderer.setSize(w, h);
     renderer.setClearColor(0x000008, 1);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = new THREE.Scene();
-    const fog = new THREE.FogExp2(0x000008, 0.006);
+    const fog = new THREE.FogExp2(0x050814, 0.0055);
     scene.fog = fog;
 
     const camera = new THREE.PerspectiveCamera(65, w / h, 0.1, 2500);
     camera.position.copy(ENTRY_START_POS);
     camera.lookAt(0, 0, 0);
 
-    const ambient = new THREE.AmbientLight(0x112233, 0.3);
+    const ambient = new THREE.AmbientLight(0x223355, 1.5);
     scene.add(ambient);
+
+    const fillLight = new THREE.PointLight(0x112244, 1.2, 800, 1.0);
+    fillLight.position.set(0, 50, 200);
+    scene.add(fillLight);
 
     const cpuLight = new THREE.PointLight(0xff6600, 0, 420);
     cpuLight.position.copy(WORLD.processor);
@@ -211,7 +217,7 @@ export function WorldEngine({ entryProgress }: Props) {
       }
       const mem = snap?.memory;
       const ramPct = mem ? (mem.usedRam / mem.totalRam) * 100 : st.ramPressure;
-      updateRamOcean(ramH, ramPct, mem?.lowMemory ?? false, now, camera);
+      updateRamOcean(ramH, ramPct, mem?.lowMemory ?? false, now, camera, sunH.sunLight);
 
       const usedFrac = snap?.storage
         ? snap.storage.usedBytes / Math.max(1, snap.storage.totalBytes)
