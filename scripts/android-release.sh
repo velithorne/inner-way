@@ -32,7 +32,7 @@ if [[ -z "$APK_URL" || "$APK_URL" == "null" ]]; then
   exit 1
 fi
 
-OUT="${1:-$ROOT/biofield-scanner.apk}"
+OUT="${1:-$ROOT/decode.apk}"
 echo "==> Download APK → $OUT"
 curl -fsSL -L -o "$OUT" "$APK_URL"
 ls -la "$OUT"
@@ -49,7 +49,7 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   read -r -p "Create GitHub Release with this APK? [y/N] " ans
   if [[ "${ans:-}" =~ ^[yY]$ ]]; then
     TAG="android-$(date +%Y%m%d-%H%M%S)"
-    gh release create "$TAG" "$OUT" --title "Biofield Scanner $TAG" --notes "Android APK (EAS). Expo: $BUILD_PAGE"
+    gh release create "$TAG" "$OUT" --title "DECODE $TAG" --notes "Android APK (EAS). Expo: $BUILD_PAGE"
     echo "Release: $(gh repo view --json url -q .url)/releases/tag/$TAG"
   fi
 else

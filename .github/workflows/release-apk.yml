@@ -2,8 +2,8 @@
 # No EXPO_TOKEN — only GITHUB_TOKEN (automatic).
 #
 # Release:
-#   git tag v1.0.0-biofield
-#   git push origin v1.0.0-biofield
+#   git tag v1.0.0-decode
+#   git push origin v1.0.0-decode
 #
 # Download: https://github.com/velithorne/inner-way/releases/latest
 
@@ -65,12 +65,12 @@ jobs:
       - name: Prepare release asset
         run: |
           cp "android/app/build/outputs/apk/release/app-release.apk" \
-            "BiofieldScanner-${{ github.ref_name }}-release.apk"
+            "DECODE-${{ github.ref_name }}-release.apk"
 
       - name: Create GitHub Release and upload APK
         uses: softprops/action-gh-release@v2
         with:
-          files: BiofieldScanner-${{ github.ref_name }}-release.apk
+          files: DECODE-${{ github.ref_name }}-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

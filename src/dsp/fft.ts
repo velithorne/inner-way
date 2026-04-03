@@ -115,3 +115,58 @@ export function peakFrequencyHz(peaks: FrequencyPeak[], sampleRate: number, fftS
   }
   return (best.binIndex * sampleRate) / fftSize;
 }
+
+/** Next power of two >= n */
+export function nextPowerOfTwo(n: number): number {
+  let p = 1;
+  while (p < n) p <<= 1;
+  return p;
+}
+
+/**
+ * Inverse FFT in-place (un-normalized forward FFT → scaled inverse).
+ * After call, `re` + i`im` is the time-domain signal (real output if input was Hermitian-symmetric).
+ */
+export function ifftComplex(re: Float32Array, im: Float32Array): void {
+  const n = re.length;
+  for (let i = 0; i < n; i++) im[i] = -im[i];
+  fftComplex(re, im);
+  const inv = 1 / n;
+  for (let i = 0; i < n; i++) {
+    re[i] *= inv;
+    im[i] *= -inv;
+  }
+}
+
+/**
+ * Frequency-domain deconvolution: IR ≈ IFFT( FFT(recorded) / (FFT(sweep) + eps) ).
+ * Arrays must be the same length (power of 2).
+ */
+export function deconvolveToImpulseResponse(
+  sweep: Float32Array,
+  recorded: Float32Array,
+  eps = 1e-6
+): { irTime: Float32Array; irImag: Float32Array } {
+  const n = sweep.length;
+  const reX = new Float32Array(n);
+  const imX = new Float32Array(n);
+  const reY = new Float32Array(n);
+  const imY = new Float32Array(n);
+  reX.set(sweep);
+  reY.set(recorded);
+  fftComplex(reX, imX);
+  fftComplex(reY, imY);
+  const reH = new Float32Array(n);
+  const imH = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    const denom = reX[k] * reX[k] + imX[k] * imX[k] + eps;
+    const numRe = reY[k] * reX[k] + imY[k] * imX[k];
+    const numIm = imY[k] * reX[k] - reY[k] * imX[k];
+    reH[k] = numRe / denom;
+    imH[k] = numIm / denom;
+  }
+  const reOut = new Float32Array(reH);
+  const imOut = new Float32Array(imH);
+  ifftComplex(reOut, imOut);
+  return { irTime: reOut, irImag: imOut };
+}
