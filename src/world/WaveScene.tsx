@@ -7,10 +7,11 @@ import * as THREE from 'three';
 import type { RouterEstimate } from '../services/routerTriangulator';
 import type { WifiNetwork } from '../types/wifi';
 import { estimateToWorldPosition } from './space';
+import { SignalLineStream } from './SignalLineStream';
 import { WaveEmitter } from './WaveEmitter';
 
 const MAX_NETWORKS = 12;
-const BG_PARTICLES = 150;
+const MAX_LINE_STREAMS = 6;
 const CONFLICT_PARTICLES = 24;
 
 type Props = {
@@ -30,46 +31,8 @@ function topNetworks(nets: WifiNetwork[]): WifiNetwork[] {
   return [...nets].sort((a, b) => b.rssi - a.rssi).slice(0, MAX_NETWORKS);
 }
 
-function makeBackgroundParticles(): THREE.Points {
-  const positions = new Float32Array(BG_PARTICLES * 3);
-  const velocities: THREE.Vector3[] = [];
-  for (let i = 0; i < BG_PARTICLES; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * 6;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 6;
-    positions[i * 3 + 2] = -2 - Math.random() * 8;
-    velocities.push(
-      new THREE.Vector3((Math.random() - 0.5) * 0.002, (Math.random() - 0.5) * 0.002, (Math.random() - 0.5) * 0.002)
-    );
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 0.3,
-    transparent: true,
-    opacity: 0.06,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    sizeAttenuation: true,
-  });
-  const pts = new THREE.Points(geo, mat);
-  (pts.userData as { vel: THREE.Vector3[] }).vel = velocities;
-  return pts;
-}
-
-function updateBackgroundParticles(pts: THREE.Points) {
-  const pos = pts.geometry.attributes.position.array as Float32Array;
-  const vel = (pts.userData as { vel: THREE.Vector3[] }).vel;
-  for (let i = 0; i < BG_PARTICLES; i++) {
-    const v = vel[i];
-    pos[i * 3] += v.x;
-    pos[i * 3 + 1] += v.y;
-    pos[i * 3 + 2] += v.z;
-    if (Math.abs(pos[i * 3]) > 3) pos[i * 3] = (Math.random() - 0.5) * 6;
-    if (Math.abs(pos[i * 3 + 1]) > 3) pos[i * 3 + 1] = (Math.random() - 0.5) * 6;
-    if (pos[i * 3 + 2] > -0.5 || pos[i * 3 + 2] < -12) pos[i * 3 + 2] = -2 - Math.random() * 8;
-  }
-  pts.geometry.attributes.position.needsUpdate = true;
+function topNetworksForLines(nets: WifiNetwork[]): WifiNetwork[] {
+  return [...nets].sort((a, b) => b.rssi - a.rssi).slice(0, MAX_LINE_STREAMS);
 }
 
 function makeConflictCloud(mid: THREE.Vector3, color: THREE.Color): THREE.Points {
@@ -103,7 +66,7 @@ export function WaveScene({
   const mountedRef = useRef(true);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const emittersRef = useRef<Map<string, WaveEmitter>>(new Map());
-  const bgParticlesRef = useRef<THREE.Points | null>(null);
+  const lineStreamsRef = useRef<Map<string, SignalLineStream>>(new Map());
   const conflictRefs = useRef<THREE.Points[]>([]);
   const networksRef = useRef(networks);
   const estimatesRef = useRef(estimates);
@@ -157,6 +120,37 @@ export function WaveScene({
     }
   }, []);
 
+  const syncLineStreams = useCallback((scene: THREE.Scene) => {
+    const list = topNetworksForLines(networksRef.current);
+    const want = new Set(list.map((n) => n.bssid));
+    const map = lineStreamsRef.current;
+    const estMap = estimatesRef.current;
+
+    for (const [id, stream] of map) {
+      if (!want.has(id)) {
+        scene.remove(stream.group);
+        stream.dispose();
+        map.delete(id);
+      }
+    }
+
+    for (const n of list) {
+      const est = estMap.get(n.bssid) ?? {
+        bearing: 0,
+        distance: 1,
+        confidence: 10,
+      };
+      let stream = map.get(n.bssid);
+      if (!stream) {
+        stream = new SignalLineStream(n, est);
+        map.set(n.bssid, stream);
+        scene.add(stream.group);
+      } else {
+        stream.syncNetwork(n);
+      }
+    }
+  }, []);
+
   const syncConflictParticles = useCallback((scene: THREE.Scene) => {
     for (const p of conflictRefs.current) {
       scene.remove(p);
@@ -188,12 +182,11 @@ export function WaveScene({
           em.dispose();
         }
         emittersRef.current.clear();
-        if (bgParticlesRef.current) {
-          scene.remove(bgParticlesRef.current);
-          bgParticlesRef.current.geometry.dispose();
-          (bgParticlesRef.current.material as THREE.PointsMaterial).dispose();
-          bgParticlesRef.current = null;
+        for (const ls of lineStreamsRef.current.values()) {
+          scene.remove(ls.group);
+          ls.dispose();
         }
+        lineStreamsRef.current.clear();
         for (const p of conflictRefs.current) {
           scene.remove(p);
           p.geometry.dispose();
@@ -208,8 +201,9 @@ export function WaveScene({
     const scene = sceneRef.current;
     if (scene) {
       syncEmitters(scene);
+      syncLineStreams(scene);
     }
-  }, [networks, estimates, highlightBssid, syncEmitters]);
+  }, [networks, estimates, highlightBssid, syncEmitters, syncLineStreams]);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -238,11 +232,8 @@ export function WaveScene({
       renderer.setClearColor(0x000000, 0);
       renderer.autoClear = true;
 
-      const bg = makeBackgroundParticles();
-      scene.add(bg);
-      bgParticlesRef.current = bg;
-
       syncEmitters(scene);
+      syncLineStreams(scene);
       syncConflictParticles(scene);
 
       let frames = 0;
@@ -256,8 +247,8 @@ export function WaveScene({
         const deltaSec = Math.min(0.1, (wall - lastFrame) / 1000);
         lastFrame = wall;
 
-        if (bgParticlesRef.current) {
-          updateBackgroundParticles(bgParticlesRef.current);
+        for (const ls of lineStreamsRef.current.values()) {
+          ls.update(deltaSec);
         }
 
         for (const em of emittersRef.current.values()) {
@@ -277,7 +268,7 @@ export function WaveScene({
       };
       rafRef.current = requestAnimationFrame(loop);
     },
-    [onFps, syncEmitters, syncConflictParticles]
+    [onFps, syncEmitters, syncLineStreams, syncConflictParticles]
   );
 
   return (

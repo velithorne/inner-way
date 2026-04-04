@@ -52,6 +52,7 @@ export class WaveEmitter {
     this.targetPos = options.position.clone();
 
     this.group = new THREE.Group();
+    this.group.renderOrder = 1;
     this.group.position.copy(this.currentPos);
     this.group.rotation.y = options.bearingRad;
 
