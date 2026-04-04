@@ -1,11 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
+import { Magnetometer } from 'expo-sensors';
+import { FieldMapScreen } from '../screens/FieldMapScreen';
+import { PhantomCityScreen } from '../screens/PhantomCityScreen';
 import { SignalScreen } from '../screens/SignalScreen';
 import { ValidationScreen } from '../screens/ValidationScreen';
-import { PlaceholderScreen } from '../screens/PlaceholderScreen';
+import { RouterTriangulator } from '../services/routerTriangulator';
 import { WifiScanner } from '../services/wifiScanner';
 import { useWifiStore } from '../store/useWifiStore';
+import { haversineM } from '../utils/geo';
 
 type TabId = 'signal' | 'networks' | 'city' | 'field';
 
@@ -16,10 +20,53 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'field', label: 'FIELD' },
 ];
 
+function headingFromMag(x: number, y: number): number {
+  let deg = (Math.atan2(y, x) * 180) / Math.PI;
+  deg = (deg + 360) % 360;
+  return deg;
+}
+
+function headingDelta(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 export function AppShell() {
   const [tab, setTab] = useState<TabId>('signal');
   const scannerRef = useRef(new WifiScanner());
-  const { setFromScan, setScanning } = useWifiStore();
+  const triRef = useRef(new RouterTriangulator());
+  const { networks, lastScan, setFromScan, setScanning, setRouterEstimates } = useWifiStore();
+
+  const headingDegRef = useRef(0);
+  const prevHeadingRef = useRef<number | null>(null);
+  const lastLocRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  const refreshEstimates = useCallback(() => {
+    const nets = useWifiStore.getState().networks;
+    const rec: Record<string, ReturnType<RouterTriangulator['estimatePosition']>> = {};
+    for (const n of nets) {
+      rec[n.bssid] = triRef.current.estimatePosition(n.bssid, n.rssi, n.frequency);
+    }
+    setRouterEstimates(rec);
+  }, [setRouterEstimates]);
+
+  const pushObservationsForNetworks = useCallback(
+    (nets: typeof networks, t: number) => {
+      const pos = lastLocRef.current ?? undefined;
+      for (const n of nets) {
+        triRef.current.addObservation({
+          bssid: n.bssid,
+          rssi: n.rssi,
+          bearing: headingDegRef.current,
+          timestamp: t,
+          frequencyMHz: n.frequency,
+          userPosition: pos,
+        });
+      }
+      refreshEstimates();
+    },
+    [refreshEstimates]
+  );
 
   useEffect(() => {
     (async () => {
@@ -28,6 +75,61 @@ export function AppShell() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    Magnetometer.setUpdateInterval(200);
+    const sub = Magnetometer.addListener((m) => {
+      const h = headingFromMag(m.x, m.y);
+      headingDegRef.current = h;
+      if (prevHeadingRef.current === null) prevHeadingRef.current = h;
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      sub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 2,
+          timeInterval: 4000,
+        },
+        (loc) => {
+          const p = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          const prev = lastLocRef.current;
+          lastLocRef.current = p;
+          if (!prev) return;
+          const d = haversineM(prev, p);
+          if (d < 2) return;
+          pushObservationsForNetworks(useWifiStore.getState().networks, Date.now());
+        }
+      );
+    })();
+    return () => {
+      void sub?.remove();
+    };
+  }, [pushObservationsForNetworks]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const prev = prevHeadingRef.current;
+      if (prev == null) return;
+      const cur = headingDegRef.current;
+      if (headingDelta(prev, cur) > 15) {
+        prevHeadingRef.current = cur;
+        pushObservationsForNetworks(useWifiStore.getState().networks, Date.now());
+      }
+    }, 400);
+    return () => clearInterval(id);
+  }, [pushObservationsForNetworks]);
+
+  useEffect(() => {
+    if (!lastScan) return;
+    pushObservationsForNetworks(networks, Date.now());
+  }, [lastScan, networks, pushObservationsForNetworks]);
 
   useEffect(() => {
     setScanning(true);
@@ -45,12 +147,8 @@ export function AppShell() {
       <View style={styles.body}>
         {tab === 'signal' ? <SignalScreen /> : null}
         {tab === 'networks' ? <ValidationScreen /> : null}
-        {tab === 'city' ? (
-          <PlaceholderScreen title="Phantom City" phase="Phase 5 — 3D buildings (next)" />
-        ) : null}
-        {tab === 'field' ? (
-          <PlaceholderScreen title="Field Map" phase="Phase 7 — voxel heatmap (next)" />
-        ) : null}
+        {tab === 'city' ? <PhantomCityScreen /> : null}
+        {tab === 'field' ? <FieldMapScreen /> : null}
       </View>
       <View style={styles.tabBar}>
         {TABS.map((t) => (

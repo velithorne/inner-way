@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { RouterEstimate } from '../services/routerTriangulator';
 import type { WifiNetwork } from '../types/wifi';
 
 export interface WifiStore {
@@ -7,8 +8,10 @@ export interface WifiStore {
   strongestNetwork: WifiNetwork | null;
   lastScan: number;
   isScanning: boolean;
+  routerEstimates: Record<string, RouterEstimate>;
   setFromScan: (nets: WifiNetwork[], scannedAt: number) => void;
   setScanning: (v: boolean) => void;
+  setRouterEstimates: (e: Record<string, RouterEstimate>) => void;
 }
 
 export const useWifiStore = create<WifiStore>((set) => ({
@@ -17,6 +20,7 @@ export const useWifiStore = create<WifiStore>((set) => ({
   strongestNetwork: null,
   lastScan: 0,
   isScanning: false,
+  routerEstimates: {},
   setFromScan: (nets, scannedAt) =>
     set({
       networks: nets,
@@ -25,4 +29,5 @@ export const useWifiStore = create<WifiStore>((set) => ({
       lastScan: scannedAt,
     }),
   setScanning: (isScanning) => set({ isScanning }),
+  setRouterEstimates: (routerEstimates) => set({ routerEstimates }),
 }));

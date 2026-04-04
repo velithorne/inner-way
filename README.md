@@ -1,6 +1,6 @@
 # PHANTOM — The Invisible City
 
-React Native (Expo) app that visualizes WiFi as a 3D world. This repo implements **Phase 0** (production-first pipeline + dev client defaults), **Phase 1** (Android WiFi scanner + validation list), and **Phase 2** (SIGNAL tab: AR camera + expanding wave rings) from the PHANTOM blueprint.
+React Native (Expo) app that visualizes WiFi as a 3D world. Implemented through **Phase 3**: spherical wavefronts, magnetometer/GPS-assisted router estimation, Phantom City (buildings + dual-band + solar heuristics), Field Map session recording (SQLite), and channel-conflict HUD on SIGNAL.
 
 ## Run (never use Expo Go for performance work)
 
@@ -30,9 +30,11 @@ Open the **development build** on device, not Expo Go.
 
 - `expo-dev-client`, `eas.json` profiles (`development` / `preview` / `production`)
 - Native Android `WifiScanModule` (`WifiManager.scanResults`) + JS `WifiScanner` with 2s polling
-- **Tabs:** SIGNAL (AR waves), NETWORKS (Phase 1 validation + cube FPS), CITY / FIELD placeholders
-- **SIGNAL:** `react-native-vision-camera` + transparent `expo-gl` overlay; up to **20** strongest networks as additive ring wavefronts (`WaveEmitter` / `WaveScene`); triple-tap HUD for FPS
-- **NETWORKS:** live list (RSSI, band, channel, FSPL distance), spinning cube, triple-tap title for FPS
+- **Tabs:** SIGNAL · NETWORKS · CITY · FIELD
+- **SIGNAL:** wireframe **sphere shells** (not flat rings), particle field + channel-conflict clouds; legend panel (tap to highlight); `RouterTriangulator` + compass/GPS observations in `AppShell`
+- **NETWORKS:** validation list + cube FPS
+- **CITY:** `CityScene` — buildings from RSSI/channel, dual-band pairs + bridges, solar SSID → hex towers; ORBIT / RESET / NEAREST / FIND; inspector when close
+- **FIELD:** START/STOP mapping, GPS accuracy, SQLite sessions + points
 - Package id: `com.phantom.app`
 
 ## Android release APK (no Metro on device)

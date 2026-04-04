@@ -3,108 +3,147 @@ import { networkColour } from '../services/colourFromBssid';
 import { rssiToDistance } from '../services/rssiToDistance';
 import type { WifiNetwork } from '../types/wifi';
 
-const RINGS_PER_NETWORK = 6;
-const THETA_SEGMENTS = 48;
+const SHELLS = 5;
+const SHELL_OFFSETS = [0, 0.2, 0.4, 0.6, 0.8];
 
-export function baseOpacityFromRssi(rssi: number): number {
+/** Spec: -30 dBm → 0.5, -90 → 0.08 */
+export function shellBaseOpacity(rssi: number): number {
   const t = Math.max(0, Math.min(1, (rssi + 90) / 60));
-  return 0.08 + t * 0.52;
+  return 0.08 + t * 0.42;
 }
 
-export function ringSpacingForFrequency(freqMHz: number): number {
-  return freqMHz > 4000 ? 1.2 : 2.0;
+function sphereSegments(freqMHz: number): [number, number] {
+  return freqMHz > 4000 ? [16, 12] : [12, 6];
 }
 
-export function placeholderEmitterPosition(bssid: string): THREE.Vector3 {
-  const hex = bssid.replace(/:/g, '');
-  let h = 0;
-  for (let i = 0; i < hex.length; i++) {
-    h = (h * 31 + hex.charCodeAt(i)) % 9973;
-  }
-  const ang = (h / 9973) * Math.PI * 2;
-  const rad = 0.8 + (h % 100) / 100;
-  return new THREE.Vector3(Math.cos(ang) * rad, Math.sin(ang) * rad * 0.6, -4.2);
-}
-
-/**
- * Expanding additive wave rings per WiFi network (Phase 2).
- * Rings reuse one RingGeometry; scale + opacity animate each frame.
- */
 export class WaveEmitter {
   readonly bssid: string;
   readonly group: THREE.Group;
   readonly colour: THREE.Color;
+  private readonly shells: THREE.Mesh[];
+  private readonly geometries: THREE.SphereGeometry[];
+  private readonly anchor: THREE.Mesh | null;
   maxRadius: number;
   baseOpacity: number;
-  readonly ringSpacing: number;
-  readonly phase: number;
-  private readonly rings: THREE.Mesh[];
-  private readonly ringGeometry: THREE.RingGeometry;
+  private wavePhase = 0;
+  private rssiNorm = 0.5;
+  readonly currentPos: THREE.Vector3;
+  private readonly targetPos: THREE.Vector3;
+  confidence: number;
+  private highlight = 1;
 
-  constructor(net: WifiNetwork) {
+  constructor(
+    net: WifiNetwork,
+    options: {
+      position: THREE.Vector3;
+      bearingRad: number;
+      confidence: number;
+    }
+  ) {
     this.bssid = net.bssid;
     this.colour = networkColour(net.bssid, net.frequency);
-    this.maxRadius = Math.max(1.2, Math.min(40, rssiToDistance(net.rssi, net.frequency)));
-    this.baseOpacity = baseOpacityFromRssi(net.rssi);
-    this.ringSpacing = ringSpacingForFrequency(net.frequency);
-    let h = 0;
-    for (const c of net.bssid) {
-      h = (h * 31 + c.charCodeAt(0)) % 1000;
-    }
-    this.phase = h / 1000;
+    this.confidence = options.confidence;
+    const rawMax = rssiToDistance(net.rssi, net.frequency);
+    this.maxRadius = Math.max(0.15, rawMax * 0.08);
+    this.baseOpacity = shellBaseOpacity(net.rssi);
+    this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
+
+    this.currentPos = options.position.clone();
+    this.targetPos = options.position.clone();
 
     this.group = new THREE.Group();
-    this.group.position.copy(placeholderEmitterPosition(net.bssid));
+    this.group.position.copy(this.currentPos);
+    this.group.rotation.y = options.bearingRad;
 
-    this.ringGeometry = new THREE.RingGeometry(0.96, 1.0, THETA_SEGMENTS);
-    this.rings = [];
-    for (let i = 0; i < RINGS_PER_NETWORK; i++) {
+    const [wSeg, hSeg] = sphereSegments(net.frequency);
+    this.geometries = [];
+    this.shells = [];
+    for (let i = 0; i < SHELLS; i++) {
+      const geo = new THREE.SphereGeometry(1, wSeg, hSeg);
+      this.geometries.push(geo);
       const mat = new THREE.MeshBasicMaterial({
         color: this.colour.clone(),
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.2,
+        wireframe: true,
+        side: THREE.FrontSide,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        side: THREE.DoubleSide,
       });
-      const mesh = new THREE.Mesh(this.ringGeometry, mat);
-      mesh.rotation.x = -Math.PI / 2;
-      this.rings.push(mesh);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.scale.setScalar(0.1);
+      this.shells.push(mesh);
       this.group.add(mesh);
     }
+
+    const ag = new THREE.SphereGeometry(0.06, 8, 8);
+    const am = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const anchorMesh = new THREE.Mesh(ag, am);
+    anchorMesh.visible = this.confidence > 60;
+    this.group.add(anchorMesh);
+    this.anchor = anchorMesh;
   }
 
-  update(timeSec: number) {
-    const maxR = this.maxRadius;
-    const spacing = this.ringSpacing;
-    const speed = 1.0;
-    const cycle = (maxR - 0.5) / speed;
+  setTargetPosition(pos: THREE.Vector3) {
+    this.targetPos.copy(pos);
+  }
 
-    for (let k = 0; k < this.rings.length; k++) {
-      const mesh = this.rings[k];
+  setConfidence(c: number) {
+    this.confidence = c;
+    if (this.anchor) this.anchor.visible = c > 60;
+  }
+
+  setHighlight(on: boolean) {
+    this.highlight = on ? 1.75 : 1;
+  }
+
+  update(_timeSec: number, deltaSec: number) {
+    this.currentPos.lerp(this.targetPos, Math.min(1, deltaSec * 12));
+    this.group.position.copy(this.currentPos);
+
+    const expansionSpeed = 0.08 + this.rssiNorm * 0.06;
+    this.wavePhase = (this.wavePhase + deltaSec * expansionSpeed) % 1;
+
+    const maxR = this.maxRadius;
+    for (let k = 0; k < SHELLS; k++) {
+      const mesh = this.shells[k];
       const mat = mesh.material as THREE.MeshBasicMaterial;
-      const offset = (k * spacing) / Math.max(maxR, 0.01);
-      const u = (timeSec * speed + this.phase * cycle + offset) % cycle;
-      const t = u / cycle;
-      const rMid = 0.5 + t * (maxR - 0.5);
-      mesh.scale.set(rMid, rMid, rMid);
-      mesh.rotation.x = -Math.PI / 2;
-      const fade = 1 - t;
-      mat.opacity = fade * this.baseOpacity;
+      const ph = (this.wavePhase + SHELL_OFFSETS[k]) % 1;
+      const radius = ph * maxR;
+      mesh.scale.setScalar(Math.max(0.05, radius));
+      let op = (1 - ph) * this.baseOpacity * this.highlight;
+      if (this.confidence < 30) op *= 0.55;
+      mat.opacity = Math.min(1, op);
       mat.color.copy(this.colour);
+    }
+
+    if (this.anchor) {
+      this.anchor.visible = this.confidence > 60;
     }
   }
 
   syncNetwork(net: WifiNetwork) {
     this.colour.copy(networkColour(net.bssid, net.frequency));
-    this.maxRadius = Math.max(1.2, Math.min(40, rssiToDistance(net.rssi, net.frequency)));
-    this.baseOpacity = baseOpacityFromRssi(net.rssi);
+    const rawMax = rssiToDistance(net.rssi, net.frequency);
+    this.maxRadius = Math.max(0.15, rawMax * 0.08);
+    this.baseOpacity = shellBaseOpacity(net.rssi);
+    this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
   }
 
   dispose() {
-    this.ringGeometry.dispose();
-    for (const m of this.rings) {
+    for (const g of this.geometries) g.dispose();
+    for (const m of this.shells) {
       (m.material as THREE.MeshBasicMaterial).dispose();
+    }
+    if (this.anchor) {
+      this.anchor.geometry.dispose();
+      (this.anchor.material as THREE.MeshBasicMaterial).dispose();
     }
   }
 }
