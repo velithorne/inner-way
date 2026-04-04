@@ -6,14 +6,14 @@ import type { WifiNetwork } from '../types/wifi';
 const SHELLS = 5;
 const SHELL_OFFSETS = [0, 0.2, 0.4, 0.6, 0.8];
 
-/** Spec: -30 dBm → 0.5, -90 → 0.08 */
+/** Strongest ~0.08, weakest ~0.02 — keeps camera visible through stacked shells. */
 export function shellBaseOpacity(rssi: number): number {
-  const t = Math.max(0, Math.min(1, (rssi + 90) / 60));
-  return 0.08 + t * 0.42;
+  const norm = Math.max(0, Math.min(1, (rssi + 90) / 60));
+  return 0.02 + norm * 0.06;
 }
 
 function sphereSegments(freqMHz: number): [number, number] {
-  return freqMHz > 4000 ? [16, 12] : [12, 6];
+  return freqMHz > 4000 ? [10, 8] : [8, 6];
 }
 
 export class WaveEmitter {
@@ -44,7 +44,7 @@ export class WaveEmitter {
     this.colour = networkColour(net.bssid, net.frequency);
     this.confidence = options.confidence;
     const rawMax = rssiToDistance(net.rssi, net.frequency);
-    this.maxRadius = Math.max(0.15, rawMax * 0.08);
+    this.maxRadius = Math.max(0.5, rawMax * 0.12);
     this.baseOpacity = shellBaseOpacity(net.rssi);
     this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
 
@@ -64,7 +64,7 @@ export class WaveEmitter {
       const mat = new THREE.MeshBasicMaterial({
         color: this.colour.clone(),
         transparent: true,
-        opacity: 0.2,
+        opacity: 0.12,
         wireframe: true,
         side: THREE.FrontSide,
         blending: THREE.AdditiveBlending,
@@ -76,11 +76,11 @@ export class WaveEmitter {
       this.group.add(mesh);
     }
 
-    const ag = new THREE.SphereGeometry(0.06, 8, 8);
+    const ag = new THREE.SphereGeometry(0.05, 6, 6);
     const am = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.65,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
@@ -100,7 +100,7 @@ export class WaveEmitter {
   }
 
   setHighlight(on: boolean) {
-    this.highlight = on ? 1.75 : 1;
+    this.highlight = on ? 1.3 : 1;
   }
 
   update(_timeSec: number, deltaSec: number) {
@@ -117,9 +117,9 @@ export class WaveEmitter {
       const ph = (this.wavePhase + SHELL_OFFSETS[k]) % 1;
       const radius = ph * maxR;
       mesh.scale.setScalar(Math.max(0.05, radius));
-      let op = (1 - ph) * this.baseOpacity * this.highlight;
+      let op = this.baseOpacity * (1 - ph) * this.highlight;
       if (this.confidence < 30) op *= 0.55;
-      mat.opacity = Math.min(1, op);
+      mat.opacity = Math.min(0.25, op);
       mat.color.copy(this.colour);
     }
 
@@ -131,7 +131,7 @@ export class WaveEmitter {
   syncNetwork(net: WifiNetwork) {
     this.colour.copy(networkColour(net.bssid, net.frequency));
     const rawMax = rssiToDistance(net.rssi, net.frequency);
-    this.maxRadius = Math.max(0.15, rawMax * 0.08);
+    this.maxRadius = Math.max(0.5, rawMax * 0.12);
     this.baseOpacity = shellBaseOpacity(net.rssi);
     this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
   }

@@ -15,7 +15,7 @@ import { securityLabel } from '../utils/wifiDisplay';
 import { CityScene, type ScreenLabel } from '../world/CityScene';
 import { layoutCityBuildings, type CityBuilding } from '../world/cityLayout';
 
-const SPAWN = new THREE.Vector3(0, 80, 200);
+const SPAWN = new THREE.Vector3(0, 60, 180);
 const LOOK = new THREE.Vector3(0, 0, 0);
 
 export function PhantomCityScreen() {
@@ -68,7 +68,7 @@ export function PhantomCityScreen() {
       }
     }
     const dir = best.position.clone().sub(camPos).normalize();
-    setCamPos(best.position.clone().sub(dir.multiplyScalar(35)));
+    setCamPos(best.position.clone().sub(dir.multiplyScalar(25)));
     setCamTgt(best.position.clone());
     setInspector(best);
   };
@@ -81,7 +81,7 @@ export function PhantomCityScreen() {
     );
     if (b) {
       const dir = b.position.clone().sub(camPos).normalize();
-      setCamPos(b.position.clone().sub(dir.multiplyScalar(28)));
+      setCamPos(b.position.clone().sub(dir.multiplyScalar(25)));
       setCamTgt(b.position.clone());
       setInspector(b);
     }
@@ -200,7 +200,7 @@ export function PhantomCityScreen() {
       ) : null}
 
       <View style={styles.hint}>
-        <Text style={styles.hintText}>PHANTOM CITY · drag joystick (coming) — use destination pills</Text>
+        <Text style={styles.hintText}>PHANTOM CITY · ORBIT / RESET / NEAREST / FIND</Text>
       </View>
     </View>
   );

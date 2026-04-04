@@ -99,10 +99,10 @@ export function CityScene({
         const nc = networkColour(b.bssid, b.frequency);
         const is5 = b.frequency > 4000;
         const mat = new THREE.MeshStandardMaterial({
-          color: is5 ? new THREE.Color(0x001425) : new THREE.Color(0x2d1500),
+          color: is5 ? new THREE.Color(0x002244) : new THREE.Color(0x6b3300),
           emissive: nc.clone(),
-          emissiveIntensity: is5 ? 0.5 : 0.4,
-          roughness: is5 ? 0.1 : 0.8,
+          emissiveIntensity: is5 ? 0.4 : 0.3,
+          roughness: is5 ? 0.1 : 0.7,
           metalness: is5 ? 0.9 : 0.2,
           transparent: is5,
           opacity: is5 ? 0.88 : 1,
@@ -169,17 +169,31 @@ export function CityScene({
       sizeRef.current = { w, h };
 
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x05080c);
+      scene.background = new THREE.Color(0x080d18);
       sceneRef.current = scene;
 
-      const grid = new THREE.GridHelper(400, 40, 0x004455, 0x001820);
-      scene.add(grid);
+      const ambient = new THREE.AmbientLight(0x334455, 2.0);
+      scene.add(ambient);
+      const mainLight = new THREE.PointLight(0x4488ff, 3.0, 600, 1.2);
+      mainLight.position.set(0, 100, 0);
+      scene.add(mainLight);
+      const fillLight = new THREE.PointLight(0x224433, 1.5, 400);
+      fillLight.position.set(0, -20, 0);
+      scene.add(fillLight);
+
       const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(400, 400),
-        new THREE.MeshBasicMaterial({ color: 0x0a1018 })
+        new THREE.PlaneGeometry(600, 600),
+        new THREE.MeshStandardMaterial({
+          color: 0x080d18,
+          roughness: 0.95,
+          metalness: 0.05,
+        })
       );
       ground.rotation.x = -Math.PI / 2;
       scene.add(ground);
+      const grid = new THREE.GridHelper(600, 60, 0x001133, 0x000d22);
+      grid.position.y = 0.1;
+      scene.add(grid);
 
       const camera = new THREE.PerspectiveCamera(55, w / Math.max(h, 1), 0.5, 500);
       camera.position.copy(camPosRef.current);
@@ -188,7 +202,7 @@ export function CityScene({
 
       const renderer = new Renderer({ gl });
       renderer.setSize(w, h);
-      renderer.setClearColor(0x05080c, 1);
+      renderer.setClearColor(0x080d18, 1);
 
       rebuildScene(scene);
 

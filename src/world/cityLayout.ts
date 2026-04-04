@@ -20,9 +20,42 @@ export type CityBuilding = {
 };
 
 const MAX_BUILDINGS = 24;
+const DISTANCE_SCALE = 1.5;
+const MIN_SEP = 12;
 
 function channelWidthHint(freq: number): number {
   return freq > 4000 ? 80 : 20;
+}
+
+function radialPosition(est: RouterEstimate | undefined, rssi: number, freq: number): THREE.Vector3 {
+  const br = ((est?.bearing ?? 0) * Math.PI) / 180;
+  const d = est?.distance ?? rssiToDistance(rssi, freq);
+  const r = Math.max(20, d * DISTANCE_SCALE);
+  return new THREE.Vector3(Math.sin(br) * r, 0, -Math.cos(br) * r);
+}
+
+function separateBuildings(buildings: CityBuilding[]): void {
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < buildings.length; i++) {
+      for (let j = i + 1; j < buildings.length; j++) {
+        const bi = buildings[i];
+        const bj = buildings[j];
+        const dx = bj.position.x - bi.position.x;
+        const dz = bj.position.z - bi.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < 1e-3 || dist >= MIN_SEP) continue;
+        const angle = Math.atan2(dz, dx);
+        const push = (MIN_SEP - dist) / 2;
+        bi.position.x -= Math.cos(angle) * push;
+        bi.position.z -= Math.sin(angle) * push;
+        bj.position.x += Math.cos(angle) * push;
+        bj.position.z += Math.sin(angle) * push;
+      }
+    }
+  }
+  for (const b of buildings) {
+    b.position.y = b.height / 2;
+  }
 }
 
 export function layoutCityBuildings(
@@ -38,15 +71,16 @@ export function layoutCityBuildings(
     paired.add(b.bssid);
     const estA = estimates.get(a.bssid);
     const estB = estimates.get(b.bssid);
-    const brA = ((estA?.bearing ?? 0) * Math.PI) / 180;
-    const distA = (estA?.distance ?? rssiToDistance(a.rssi, a.frequency)) * 0.15;
-    const baseX = Math.sin(brA) * distA;
-    const baseZ = -Math.cos(brA) * distA;
-    const sep = 5;
+    const base = radialPosition(estA, a.rssi, a.frequency);
+    const sep = 14;
     const ha = buildingHeight(a.rssi);
     const hb = buildingHeight(b.rssi);
     const wa = 8 + channelWidthHint(a.frequency) * 0.005;
     const wb = 8 + channelWidthHint(b.frequency) * 0.005;
+    const perpDir = new THREE.Vector3(-base.z, 0, base.x);
+    if (perpDir.lengthSq() < 1e-6) perpDir.set(1, 0, 0);
+    perpDir.normalize().multiplyScalar(sep * 0.5);
+    const off = perpDir;
     out.push({
       bssid: a.bssid,
       ssid: a.ssid,
@@ -54,7 +88,7 @@ export function layoutCityBuildings(
       frequency: a.frequency,
       channel: a.channel,
       capabilities: a.capabilities,
-      position: new THREE.Vector3(baseX - sep * 0.5, ha / 2, baseZ),
+      position: new THREE.Vector3(base.x - off.x, ha / 2, base.z - off.z),
       height: ha,
       width: wa,
       depth: 8,
@@ -68,7 +102,7 @@ export function layoutCityBuildings(
       frequency: b.frequency,
       channel: b.channel,
       capabilities: b.capabilities,
-      position: new THREE.Vector3(baseX + sep * 0.5, hb / 2, baseZ),
+      position: new THREE.Vector3(base.x + off.x, hb / 2, base.z + off.z),
       height: hb,
       width: wb,
       depth: 8,
@@ -82,10 +116,7 @@ export function layoutCityBuildings(
     if (paired.has(n.bssid)) continue;
     if (out.length >= MAX_BUILDINGS) break;
     const est = estimates.get(n.bssid);
-    const br = ((est?.bearing ?? 0) * Math.PI) / 180;
-    const dist = (est?.distance ?? rssiToDistance(n.rssi, n.frequency)) * 0.15;
-    const x = Math.sin(br) * dist;
-    const z = -Math.cos(br) * dist;
+    const p = radialPosition(est, n.rssi, n.frequency);
     const h = buildingHeight(n.rssi);
     const w = 8 + channelWidthHint(n.frequency) * 0.005;
     const solar = isLikelySolarInverter(n);
@@ -96,7 +127,7 @@ export function layoutCityBuildings(
       frequency: n.frequency,
       channel: n.channel,
       capabilities: n.capabilities,
-      position: new THREE.Vector3(x, h / 2, z),
+      position: new THREE.Vector3(p.x, h / 2, p.z),
       height: h,
       width: w,
       depth: 8,
@@ -104,6 +135,7 @@ export function layoutCityBuildings(
     });
   }
 
+  separateBuildings(out);
   return out;
 }
 

@@ -13,6 +13,7 @@ import { rssiToDistance } from '../services/rssiToDistance';
 import { networkColour } from '../services/colourFromBssid';
 import { useSignalStore } from '../store/useSignalStore';
 import { useWifiStore } from '../store/useWifiStore';
+import { estimateToWorldPosition } from '../world/space';
 import { WaveScene } from '../world/WaveScene';
 
 function signalBarWidth(rssi: number): `${number}%` {
@@ -47,12 +48,8 @@ export function SignalScreen() {
       const ea = estimatesMap.get(c.a.bssid);
       const eb = estimatesMap.get(c.b.bssid);
       if (!ea || !eb) continue;
-      const brA = (ea.bearing * Math.PI) / 180;
-      const brB = (eb.bearing * Math.PI) / 180;
-      const dA = ea.distance * 0.05;
-      const dB = eb.distance * 0.05;
-      const pA = new THREE.Vector3(Math.sin(brA) * dA, 0, -Math.cos(brA) * dA);
-      const pB = new THREE.Vector3(Math.sin(brB) * dB, 0, -Math.cos(brB) * dB);
+      const pA = estimateToWorldPosition(ea, c.a.frequency);
+      const pB = estimateToWorldPosition(eb, c.b.frequency);
       out.push(pA.clone().add(pB).multiplyScalar(0.5));
     }
     return out;
@@ -75,7 +72,7 @@ export function SignalScreen() {
   };
 
   const visibleNets = useMemo(
-    () => [...networks].sort((a, b) => b.rssi - a.rssi).slice(0, 8),
+    () => [...networks].sort((a, b) => b.rssi - a.rssi).slice(0, 12),
     [networks]
   );
 

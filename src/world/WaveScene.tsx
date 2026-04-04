@@ -9,8 +9,8 @@ import type { WifiNetwork } from '../types/wifi';
 import { estimateToWorldPosition } from './space';
 import { WaveEmitter } from './WaveEmitter';
 
-const MAX_NETWORKS = 20;
-const BG_PARTICLES = 300;
+const MAX_NETWORKS = 12;
+const BG_PARTICLES = 150;
 const CONFLICT_PARTICLES = 24;
 
 type Props = {
@@ -45,9 +45,9 @@ function makeBackgroundParticles(): THREE.Points {
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const mat = new THREE.PointsMaterial({
     color: 0xffffff,
-    size: 0.8,
+    size: 0.3,
     transparent: true,
-    opacity: 0.15,
+    opacity: 0.06,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,
@@ -83,9 +83,9 @@ function makeConflictCloud(mid: THREE.Vector3, color: THREE.Color): THREE.Points
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   const mat = new THREE.PointsMaterial({
     color,
-    size: 1.2,
+    size: 0.7,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.28,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
@@ -135,7 +135,7 @@ export function WaveScene({
         distance: 1,
         confidence: 10,
       };
-      const pos = estimateToWorldPosition(est);
+      const pos = estimateToWorldPosition(est, n.frequency);
       const bearingRad = (est.bearing * Math.PI) / 180;
 
       let em = map.get(n.bssid);
