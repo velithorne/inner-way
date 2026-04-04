@@ -26,7 +26,7 @@ export class SignalLineStream {
   private readonly R: THREE.Vector3;
   private readonly perp: THREE.Vector3;
   private readonly bitan: THREE.Vector3;
-  private readonly lines: THREE.Line[];
+  private readonly lines: THREE.LineSegments[];
   private rssiNorm = 0.5;
   private speed = 1.2;
 
@@ -75,7 +75,7 @@ export class SignalLineStream {
         depthWrite: false,
         blending: THREE.NormalBlending,
       });
-      const line = new THREE.Line(geo, mat);
+      const line = new THREE.LineSegments(geo, mat);
       line.renderOrder = 2;
       line.frustumCulled = false;
       (line.userData as { strand: number; off: number }).strand = s;
