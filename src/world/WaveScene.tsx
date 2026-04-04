@@ -11,7 +11,7 @@ import { SignalLineStream } from './SignalLineStream';
 import { WaveEmitter } from './WaveEmitter';
 
 const MAX_NETWORKS = 12;
-const MAX_LINE_STREAMS = 6;
+const MAX_LINE_STREAMS = 7;
 const CONFLICT_PARTICLES = 24;
 
 type Props = {
@@ -146,7 +146,7 @@ export function WaveScene({
         map.set(n.bssid, stream);
         scene.add(stream.group);
       } else {
-        stream.syncNetwork(n);
+        stream.syncNetwork(n, est);
       }
     }
   }, []);
