@@ -1,11 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
-import { ValidationScreen } from './src/screens/ValidationScreen';
+import { AppShell } from './src/components/AppShell';
 
 export default function App() {
   return (
     <>
       <StatusBar style="light" />
-      <ValidationScreen />
+      <AppShell />
     </>
   );
 }

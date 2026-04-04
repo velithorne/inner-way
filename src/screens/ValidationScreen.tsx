@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as Location from 'expo-location';
+import { useCallback, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SpinningCubeScene } from '../components/SpinningCubeScene';
-import { WifiScanner } from '../services/wifiScanner';
+import { networkColour } from '../services/colourFromBssid';
+import { rssiToDistance } from '../services/rssiToDistance';
 import { useWifiStore } from '../store/useWifiStore';
 import type { WifiNetwork } from '../types/wifi';
 
@@ -23,55 +23,26 @@ function hexFromRgb(r: number, g: number, b: number): string {
 }
 
 export function ValidationScreen() {
-  const scannerRef = useRef(new WifiScanner());
-  const { networks, networkCount, strongestNetwork, lastScan, setFromScan, setScanning } =
-    useWifiStore();
+  const { networks, networkCount, strongestNetwork, lastScan } = useWifiStore();
   const [fps, setFps] = useState<number | null>(null);
   const [showFps, setShowFps] = useState(false);
-  const [tapCount, setTapCount] = useState(0);
+  const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onFps = useCallback((v: number) => {
     setFps(v);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (Platform.OS === 'android') {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted' && !cancelled) {
-          setScanning(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [setScanning]);
-
-  useEffect(() => {
-    setScanning(true);
-    scannerRef.current.start((nets) => {
-      setFromScan(nets, Date.now());
-    });
-    return () => {
-      scannerRef.current.stop();
-      setScanning(false);
-    };
-  }, [setFromScan, setScanning]);
-
-  const onTripleTapRegion = () => {
-    setTapCount((c) => {
-      const next = c + 1;
-      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = setTimeout(() => setTapCount(0), 400);
-      if (next >= 3) {
-        setShowFps((s) => !s);
-        return 0;
-      }
-      return next;
-    });
+  const onTripleTapTitle = () => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 400);
+    if (tapCountRef.current >= 3) {
+      setShowFps((s) => !s);
+      tapCountRef.current = 0;
+    }
   };
 
   const formatTime = (ts: number) => {
@@ -82,7 +53,7 @@ export function ValidationScreen() {
   return (
     <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={onTripleTapRegion}>
+        <Pressable onPress={onTripleTapTitle}>
           <Text style={styles.title}>PHANTOM — WiFi Scanner</Text>
         </Pressable>
         <Text style={styles.sub}>
@@ -92,17 +63,17 @@ export function ValidationScreen() {
         <Text style={styles.meta}>Last scan: {formatTime(lastScan)}</Text>
         {showFps ? (
           <Text style={styles.fps}>
-            FPS: {fps != null ? fps.toFixed(0) : '…'} (triple-tap to hide)
+            FPS: {fps != null ? fps.toFixed(0) : '…'} (triple-tap title to hide)
           </Text>
         ) : (
-          <Text style={styles.hint}>Triple-tap anywhere to toggle FPS</Text>
+          <Text style={styles.hint}>Triple-tap title for FPS</Text>
         )}
 
         <SpinningCubeScene height={160} onFps={onFps} />
 
         <Text style={styles.section}>Networks (strongest first)</Text>
         {networks.map((n: WifiNetwork) => (
-          <NetworkRow key={n.bssid} net={n} scanner={scannerRef.current} />
+          <NetworkRow key={n.bssid} net={n} />
         ))}
         {networks.length === 0 ? (
           <Text style={styles.empty}>
@@ -114,10 +85,10 @@ export function ValidationScreen() {
   );
 }
 
-function NetworkRow({ net, scanner }: { net: WifiNetwork; scanner: WifiScanner }) {
-  const c = scanner.getColour(net.bssid, net.frequency);
+function NetworkRow({ net }: { net: WifiNetwork }) {
+  const c = networkColour(net.bssid, net.frequency);
   const hex = hexFromRgb(Math.round(c.r * 255), Math.round(c.g * 255), Math.round(c.b * 255));
-  const dist = scanner.getDistance(net.rssi, net.frequency);
+  const dist = rssiToDistance(net.rssi, net.frequency);
 
   return (
     <View style={styles.card}>

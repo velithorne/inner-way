@@ -1,6 +1,6 @@
 # PHANTOM — The Invisible City
 
-React Native (Expo) app that visualizes WiFi as a 3D world. This repo implements **Phase 0** (production-first pipeline + dev client defaults) and **Phase 1** (Android WiFi scanner + validation UI) from the PHANTOM blueprint.
+React Native (Expo) app that visualizes WiFi as a 3D world. This repo implements **Phase 0** (production-first pipeline + dev client defaults), **Phase 1** (Android WiFi scanner + validation list), and **Phase 2** (SIGNAL tab: AR camera + expanding wave rings) from the PHANTOM blueprint.
 
 ## Run (never use Expo Go for performance work)
 
@@ -30,7 +30,9 @@ Open the **development build** on device, not Expo Go.
 
 - `expo-dev-client`, `eas.json` profiles (`development` / `preview` / `production`)
 - Native Android `WifiScanModule` (`WifiManager.scanResults`) + JS `WifiScanner` with 2s polling
-- `ValidationScreen`: live network list (RSSI, band, channel, distance estimate), spinning Three.js cube for FPS baseline, triple-tap title to toggle FPS counter
+- **Tabs:** SIGNAL (AR waves), NETWORKS (Phase 1 validation + cube FPS), CITY / FIELD placeholders
+- **SIGNAL:** `react-native-vision-camera` + transparent `expo-gl` overlay; up to **20** strongest networks as additive ring wavefronts (`WaveEmitter` / `WaveScene`); triple-tap HUD for FPS
+- **NETWORKS:** live list (RSSI, band, channel, FSPL distance), spinning cube, triple-tap title for FPS
 - Package id: `com.phantom.app`
 
 ## Android release APK (no Metro on device)
