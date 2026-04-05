@@ -20,10 +20,21 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'field', label: 'FIELD' },
 ];
 
-function headingFromMag(x: number, y: number): number {
+/** Compass bearing ° from magnetometer (0 = north, 90 = east). Matches device rotation with AR overlay. */
+function compassHeadingFromMag(x: number, y: number): number {
   let deg = (Math.atan2(y, x) * 180) / Math.PI;
   deg = (deg + 360) % 360;
-  return deg;
+  return (90 - deg + 360) % 360;
+}
+
+const HEADING_SMOOTH = 0.15;
+
+function smoothCompassHeading(prev: number, raw: number, alpha: number): number {
+  const delta = raw - prev;
+  const wrappedDelta = ((delta + 180) % 360) - 180;
+  let next = prev + wrappedDelta * alpha;
+  next = (next + 360) % 360;
+  return next;
 }
 
 function headingDelta(a: number, b: number): number {
@@ -38,6 +49,7 @@ export function AppShell() {
   const { networks, lastScan, setFromScan, setScanning, setRouterEstimates } = useWifiStore();
 
   const headingDegRef = useRef(0);
+  const smoothHeadingRef = useRef<number | null>(null);
   const prevHeadingRef = useRef<number | null>(null);
   const lastLocRef = useRef<{ lat: number; lng: number } | null>(null);
 
@@ -77,11 +89,20 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    Magnetometer.setUpdateInterval(200);
+    Magnetometer.setUpdateInterval(100);
     const sub = Magnetometer.addListener((m) => {
-      const h = headingFromMag(m.x, m.y);
-      headingDegRef.current = h;
-      if (prevHeadingRef.current === null) prevHeadingRef.current = h;
+      const raw = compassHeadingFromMag(m.x, m.y);
+      let s = smoothHeadingRef.current;
+      if (s === null) {
+        s = raw;
+        smoothHeadingRef.current = raw;
+      } else {
+        s = smoothCompassHeading(s, raw, HEADING_SMOOTH);
+        smoothHeadingRef.current = s;
+      }
+      headingDegRef.current = s;
+      useWifiStore.setState({ phoneHeading: s });
+      if (prevHeadingRef.current === null) prevHeadingRef.current = s;
     });
     return () => sub.remove();
   }, []);

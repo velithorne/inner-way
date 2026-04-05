@@ -8,6 +8,8 @@ export interface WifiStore {
   strongestNetwork: WifiNetwork | null;
   lastScan: number;
   isScanning: boolean;
+  /** Smoothed compass heading °, 0 = north; used to rotate AR overlay with phone. */
+  phoneHeading: number;
   routerEstimates: Record<string, RouterEstimate>;
   setFromScan: (nets: WifiNetwork[], scannedAt: number) => void;
   setScanning: (v: boolean) => void;
@@ -20,6 +22,7 @@ export const useWifiStore = create<WifiStore>((set) => ({
   strongestNetwork: null,
   lastScan: 0,
   isScanning: false,
+  phoneHeading: 0,
   routerEstimates: {},
   setFromScan: (nets, scannedAt) =>
     set({

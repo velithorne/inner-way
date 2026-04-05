@@ -5,6 +5,7 @@ import type { ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import type { RouterEstimate } from '../services/routerTriangulator';
+import { useWifiStore } from '../store/useWifiStore';
 import type { WifiNetwork } from '../types/wifi';
 import { estimateToWorldPosition } from './space';
 import { SignalLineStream } from './SignalLineStream';
@@ -65,6 +66,8 @@ export function WaveScene({
   const rafRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  /** World content rotates with compass so router bearings align with camera. */
+  const worldGroupRef = useRef<THREE.Group | null>(null);
   const emittersRef = useRef<Map<string, WaveEmitter>>(new Map());
   const lineStreamsRef = useRef<Map<string, SignalLineStream>>(new Map());
   const conflictRefs = useRef<THREE.Points[]>([]);
@@ -78,7 +81,7 @@ export function WaveScene({
   highlightRef.current = highlightBssid;
   conflictsRef.current = conflictMidpoints;
 
-  const syncEmitters = useCallback((scene: THREE.Scene) => {
+  const syncEmitters = useCallback((parent: THREE.Object3D) => {
     const list = topNetworks(networksRef.current);
     const want = new Set(list.map((n) => n.bssid));
     const map = emittersRef.current;
@@ -86,7 +89,7 @@ export function WaveScene({
 
     for (const [id, em] of map) {
       if (!want.has(id)) {
-        scene.remove(em.group);
+        parent.remove(em.group);
         em.dispose();
         map.delete(id);
       }
@@ -109,7 +112,7 @@ export function WaveScene({
           confidence: est.confidence,
         });
         map.set(n.bssid, em);
-        scene.add(em.group);
+        parent.add(em.group);
       } else {
         em.syncNetwork(n);
         em.setConfidence(est.confidence);
@@ -120,7 +123,7 @@ export function WaveScene({
     }
   }, []);
 
-  const syncLineStreams = useCallback((scene: THREE.Scene) => {
+  const syncLineStreams = useCallback((parent: THREE.Object3D) => {
     const list = topNetworksForLines(networksRef.current);
     const want = new Set(list.map((n) => n.bssid));
     const map = lineStreamsRef.current;
@@ -128,34 +131,33 @@ export function WaveScene({
 
     for (const [id, stream] of map) {
       if (!want.has(id)) {
-        scene.remove(stream.group);
+        parent.remove(stream.group);
         stream.dispose();
         map.delete(id);
       }
     }
 
-    const proximityBurst = networksRef.current.some((x) => x.rssi > -45);
     for (const n of list) {
       const est = estMap.get(n.bssid) ?? {
         bearing: 0,
         distance: 1,
         confidence: 10,
       };
-      const opts = { proximityBurst };
+      const opts = { proximityBurst: n.rssi > -45 };
       let stream = map.get(n.bssid);
       if (!stream) {
         stream = new SignalLineStream(n, est, opts);
         map.set(n.bssid, stream);
-        scene.add(stream.group);
+        parent.add(stream.group);
       } else {
         stream.syncNetwork(n, est, opts);
       }
     }
   }, []);
 
-  const syncConflictParticles = useCallback((scene: THREE.Scene) => {
+  const syncConflictParticles = useCallback((parent: THREE.Object3D) => {
     for (const p of conflictRefs.current) {
-      scene.remove(p);
+      parent.remove(p);
       p.geometry.dispose();
       (p.material as THREE.PointsMaterial).dispose();
     }
@@ -164,7 +166,7 @@ export function WaveScene({
     for (const mid of mids) {
       const c = new THREE.Color(0xffaa66).lerp(new THREE.Color(0xaa66ff), 0.35);
       const cloud = makeConflictCloud(mid, c);
-      scene.add(cloud);
+      parent.add(cloud);
       conflictRefs.current.push(cloud);
     }
   }, []);
@@ -177,20 +179,20 @@ export function WaveScene({
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      const scene = sceneRef.current;
-      if (scene) {
+      const world = worldGroupRef.current;
+      if (world) {
         for (const em of emittersRef.current.values()) {
-          scene.remove(em.group);
+          world.remove(em.group);
           em.dispose();
         }
         emittersRef.current.clear();
         for (const ls of lineStreamsRef.current.values()) {
-          scene.remove(ls.group);
+          world.remove(ls.group);
           ls.dispose();
         }
         lineStreamsRef.current.clear();
         for (const p of conflictRefs.current) {
-          scene.remove(p);
+          world.remove(p);
           p.geometry.dispose();
           (p.material as THREE.PointsMaterial).dispose();
         }
@@ -200,17 +202,17 @@ export function WaveScene({
   }, []);
 
   useEffect(() => {
-    const scene = sceneRef.current;
-    if (scene) {
-      syncEmitters(scene);
-      syncLineStreams(scene);
+    const world = worldGroupRef.current;
+    if (world) {
+      syncEmitters(world);
+      syncLineStreams(world);
     }
   }, [networks, estimates, highlightBssid, syncEmitters, syncLineStreams]);
 
   useEffect(() => {
-    const scene = sceneRef.current;
-    if (scene) {
-      syncConflictParticles(scene);
+    const world = worldGroupRef.current;
+    if (world) {
+      syncConflictParticles(world);
     }
   }, [conflictMidpoints, syncConflictParticles]);
 
@@ -220,6 +222,10 @@ export function WaveScene({
 
       const scene = new THREE.Scene();
       sceneRef.current = scene;
+
+      const worldGroup = new THREE.Group();
+      worldGroupRef.current = worldGroup;
+      scene.add(worldGroup);
 
       const camera = new THREE.PerspectiveCamera(58, width / Math.max(height, 1), 0.1, 120);
       camera.position.set(0, 0, 0);
@@ -234,9 +240,9 @@ export function WaveScene({
       renderer.setClearColor(0x000000, 0);
       renderer.autoClear = true;
 
-      syncEmitters(scene);
-      syncLineStreams(scene);
-      syncConflictParticles(scene);
+      syncEmitters(worldGroup);
+      syncLineStreams(worldGroup);
+      syncConflictParticles(worldGroup);
 
       let frames = 0;
       let lastTick = nowMs();
@@ -256,6 +262,10 @@ export function WaveScene({
         for (const em of emittersRef.current.values()) {
           em.update(wall / 1000, deltaSec);
         }
+
+        const heading = useWifiStore.getState().phoneHeading;
+        const headingRad = (heading * Math.PI) / 180;
+        worldGroup.rotation.y = -headingRad;
 
         renderer.render(scene, camera);
         gl.endFrameEXP();

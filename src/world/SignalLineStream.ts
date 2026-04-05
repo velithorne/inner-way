@@ -3,9 +3,10 @@ import { networkColour } from '../services/colourFromBssid';
 import type { RouterEstimate } from '../services/routerTriangulator';
 import type { WifiNetwork } from '../types/wifi';
 
-/** Max segments per stream (proximity burst uses full allocation) */
+/** Max segments per stream (proximity uses 60) */
 export const MAX_LINES_PER_NETWORK = 75;
 const BASE_LINES = 25;
+const PROXIMITY_LINE_COUNT = 60;
 const SPREAD_W = 2.0;
 const SPREAD_H = 3.0;
 const SPAWN_D_MIN = 4.0;
@@ -16,6 +17,7 @@ const RESET_NEAR = 0.35;
 
 const PROXIMITY_RSSI = -45;
 const FORWARD_OVERRIDE_RSSI = -40;
+const PROXIMITY_SPEED_MUL = 3.0;
 
 function bssidElevationRad(bssid: string): number {
   let h = 0;
@@ -55,7 +57,7 @@ export type LineStreamOptions = {
 
 /**
  * Single-strand + glow duplicate (additive, offset) for perf.
- * Proximity: 3× lines, 2.5× speed, 1.8× opacity; forward override when RSSI > -40 dBm.
+ * Proximity (RSSI > -45): 60 lines, 3× speed, opacity ~0.8; forward override when RSSI > -40 dBm.
  */
 export class SignalLineStream {
   readonly group: THREE.Group;
@@ -123,7 +125,7 @@ export class SignalLineStream {
 
   private applyOptions(net: WifiNetwork, options: LineStreamOptions) {
     this.proximityBurst = options.proximityBurst && net.rssi > PROXIMITY_RSSI;
-    this.lineCount = this.proximityBurst ? MAX_LINES_PER_NETWORK : BASE_LINES;
+    this.lineCount = this.proximityBurst ? PROXIMITY_LINE_COUNT : BASE_LINES;
     this.forwardOverride = net.rssi > FORWARD_OVERRIDE_RSSI;
   }
 
@@ -137,7 +139,7 @@ export class SignalLineStream {
     this.right.copy(basis.right);
     this.up.copy(basis.up);
     let sp = speedFromRssi(net.rssi);
-    if (this.proximityBurst) sp *= 2.5;
+    if (this.proximityBurst) sp *= PROXIMITY_SPEED_MUL;
     this.speed = sp;
   }
 
@@ -174,7 +176,6 @@ export class SignalLineStream {
     const inc = this.incomingDir;
     const nActive = this.lineCount;
     const move = this.speed * deltaSec;
-    const opMul = this.proximityBurst ? 1.8 : 1;
     const wobble = Math.sin(this.phase) * 0.006;
 
     for (let i = 0; i < nActive; i++) {
@@ -237,8 +238,8 @@ export class SignalLineStream {
 
     const mMain = this.mainLine.material as THREE.LineBasicMaterial;
     const mGlow = this.glowLine.material as THREE.LineBasicMaterial;
-    mMain.opacity = Math.min(1, 0.55 * opMul);
-    mGlow.opacity = Math.min(1, 0.3 * opMul);
+    mMain.opacity = this.proximityBurst ? 0.8 : 0.55;
+    mGlow.opacity = this.proximityBurst ? 0.38 : 0.2;
     mMain.color.copy(this.colour);
     mGlow.color.copy(this.colour);
     const posMain = this.mainLine.geometry.attributes.position.array as Float32Array;
