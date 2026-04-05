@@ -3,33 +3,20 @@ import { networkColour } from '../services/colourFromBssid';
 import { rssiToDistance } from '../services/rssiToDistance';
 import type { WifiNetwork } from '../types/wifi';
 
-const SHELLS = 5;
-const SHELL_OFFSETS = [0, 0.2, 0.4, 0.6, 0.8];
-
-/** Strongest ~0.08, weakest ~0.02 — keeps camera visible through stacked shells. */
-export function shellBaseOpacity(rssi: number): number {
-  const norm = Math.max(0, Math.min(1, (rssi + 90) / 60));
-  return 0.02 + norm * 0.06;
-}
-
-function sphereSegments(freqMHz: number): [number, number] {
-  return freqMHz > 4000 ? [10, 8] : [8, 6];
-}
-
+/**
+ * Placeholder group for per-network AR state (position, bearing, highlight).
+ * Spherical wavefront shells are disabled — signal lines are the primary visual;
+ * filled/wireframe shells were tinting the camera and hurting FPS.
+ */
 export class WaveEmitter {
   readonly bssid: string;
   readonly group: THREE.Group;
   readonly colour: THREE.Color;
-  private readonly shells: THREE.Mesh[];
-  private readonly geometries: THREE.SphereGeometry[];
   maxRadius: number;
   baseOpacity: number;
-  private wavePhase = 0;
-  private rssiNorm = 0.5;
   readonly currentPos: THREE.Vector3;
   private readonly targetPos: THREE.Vector3;
   confidence: number;
-  private highlight = 1;
 
   constructor(
     net: WifiNetwork,
@@ -44,8 +31,7 @@ export class WaveEmitter {
     this.confidence = options.confidence;
     const rawMax = rssiToDistance(net.rssi, net.frequency);
     this.maxRadius = Math.max(0.5, rawMax * 0.12);
-    this.baseOpacity = shellBaseOpacity(net.rssi);
-    this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
+    this.baseOpacity = opacityFromRssi(net.rssi);
 
     this.currentPos = options.position.clone();
     this.targetPos = options.position.clone();
@@ -54,27 +40,6 @@ export class WaveEmitter {
     this.group.renderOrder = 1;
     this.group.position.copy(this.currentPos);
     this.group.rotation.y = options.bearingRad;
-
-    const [wSeg, hSeg] = sphereSegments(net.frequency);
-    this.geometries = [];
-    this.shells = [];
-    for (let i = 0; i < SHELLS; i++) {
-      const geo = new THREE.SphereGeometry(1, wSeg, hSeg);
-      this.geometries.push(geo);
-      const mat = new THREE.MeshBasicMaterial({
-        color: this.colour.clone(),
-        transparent: true,
-        opacity: 0.12,
-        wireframe: true,
-        side: THREE.FrontSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.scale.setScalar(0.1);
-      this.shells.push(mesh);
-      this.group.add(mesh);
-    }
   }
 
   setTargetPosition(pos: THREE.Vector3) {
@@ -85,43 +50,28 @@ export class WaveEmitter {
     this.confidence = c;
   }
 
-  setHighlight(on: boolean) {
-    this.highlight = on ? 1.3 : 1;
+  setHighlight(_on: boolean) {
+    /* no-op: shells removed; lines use highlight via SignalStore elsewhere */
   }
 
   update(_timeSec: number, deltaSec: number) {
     this.currentPos.lerp(this.targetPos, Math.min(1, deltaSec * 12));
     this.group.position.copy(this.currentPos);
-
-    const expansionSpeed = 0.08 + this.rssiNorm * 0.06;
-    this.wavePhase = (this.wavePhase + deltaSec * expansionSpeed) % 1;
-
-    const maxR = this.maxRadius;
-    for (let k = 0; k < SHELLS; k++) {
-      const mesh = this.shells[k];
-      const mat = mesh.material as THREE.MeshBasicMaterial;
-      const ph = (this.wavePhase + SHELL_OFFSETS[k]) % 1;
-      const radius = ph * maxR;
-      mesh.scale.setScalar(Math.max(0.05, radius));
-      let op = this.baseOpacity * (1 - ph) * this.highlight;
-      if (this.confidence < 30) op *= 0.55;
-      mat.opacity = Math.min(0.25, op);
-      mat.color.copy(this.colour);
-    }
   }
 
   syncNetwork(net: WifiNetwork) {
     this.colour.copy(networkColour(net.bssid, net.frequency));
     const rawMax = rssiToDistance(net.rssi, net.frequency);
     this.maxRadius = Math.max(0.5, rawMax * 0.12);
-    this.baseOpacity = shellBaseOpacity(net.rssi);
-    this.rssiNorm = Math.max(0, Math.min(1, (net.rssi + 90) / 60));
+    this.baseOpacity = opacityFromRssi(net.rssi);
   }
 
   dispose() {
-    for (const g of this.geometries) g.dispose();
-    for (const m of this.shells) {
-      (m.material as THREE.MeshBasicMaterial).dispose();
-    }
+    /* no GPU resources */
   }
+}
+
+function opacityFromRssi(rssi: number): number {
+  const norm = Math.max(0, Math.min(1, (rssi + 90) / 60));
+  return 0.02 + norm * 0.06;
 }
