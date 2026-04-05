@@ -29,6 +29,8 @@ object StateExporter {
                 put("nervousLoad", environment.nervousLoad.toDouble())
                 put("storageFreeRatio", environment.storageFreeRatio.toDouble())
                 put("motionEnergy", environment.motionEnergy.toDouble())
+                put("motionMagnitude", environment.motionMagnitude.toDouble())
+                put("motionDelta", environment.motionDelta.toDouble())
                 put("networkOpenness", environment.networkOpenness.toDouble())
                 put("circadianPhase", environment.circadianPhase.toDouble())
                 put("isNightWindow", environment.isNightWindow)

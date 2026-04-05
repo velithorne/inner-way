@@ -4,9 +4,9 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.velithorne.innerway.VelithorneApplication
 import com.velithorne.innerway.body.BatteryBloodSystem
 import com.velithorne.innerway.body.CircadianRhythmSystem
-import com.velithorne.innerway.body.MotionMuscleSystem
 import com.velithorne.innerway.body.NervousSystem
 import com.velithorne.innerway.body.SignalRespirationSystem
 import com.velithorne.innerway.body.StorageSkeletonSystem
@@ -22,7 +22,6 @@ import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.EvolutionEngine
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
-import com.velithorne.innerway.mind.InternalStateEngine
 import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.perception.SensorFusion
@@ -42,16 +41,23 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
 
     private val repository = MemoryRepository(MemoryDatabase.get(application).memoryDao())
     private val evolutionEngine = EvolutionEngine(repository)
-    private val fusion = SensorFusion(
-        battery = BatteryBloodSystem(application),
-        thermal = ThermalBodySystem(application),
-        nervous = NervousSystem(application),
-        storage = StorageSkeletonSystem(application),
-        motion = MotionMuscleSystem(),
-        signal = SignalRespirationSystem(application),
-        circadian = CircadianRhythmSystem(),
-    )
-    private val stateEngine = InternalStateEngine()
+
+    private val velithorneApp: VelithorneApplication
+        get() = getApplication<VelithorneApplication>()
+
+    private val fusion: SensorFusion
+        get() = SensorFusion(
+            battery = BatteryBloodSystem(velithorneApp),
+            thermal = ThermalBodySystem(velithorneApp),
+            nervous = NervousSystem(velithorneApp),
+            storage = StorageSkeletonSystem(velithorneApp),
+            motion = velithorneApp.motionMuscleSystem,
+            signal = SignalRespirationSystem(velithorneApp),
+            circadian = CircadianRhythmSystem(),
+        )
+
+    private val stateEngine
+        get() = velithorneApp.internalStateEngine
 
     val identity: VelithorneIdentity = VelithorneIdentity.load(application)
     val activeGenome: ActiveGenome = ActiveGenome.load(application)
@@ -80,6 +86,7 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
     private var stillnessSeconds = 0f
     private var motionAlertSeconds = 0f
     private var disturbanceScore = 0f
+    private var stableRecoverySeconds = 0f
     private var lastTickRealtime = SystemClock.elapsedRealtime()
 
     init {
@@ -93,27 +100,44 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 _environment.value = env
 
                 val motion = env.motionEnergy.coerceIn(0f, 1f)
-                val stillThreshold = 0.06f
-                if (motion < stillThreshold) {
-                    stillnessSeconds += dt
-                } else {
+                val motionThreshold = MOTION_STILL_THRESHOLD
+
+                if (motion > motionThreshold) {
                     stillnessSeconds = 0f
+                } else {
+                    stillnessSeconds += dt
                 }
-                if (motion > 0.22f) {
-                    motionAlertSeconds = max(motionAlertSeconds, 2.8f)
+
+                if (motion > MOTION_SPIKE_FOR_ALERT) {
+                    motionAlertSeconds = max(motionAlertSeconds, MOTION_ALERT_HOLD_SECONDS)
                     disturbanceScore = min(1f, disturbanceScore + 0.18f * min(1f, motion))
                 }
                 motionAlertSeconds = max(0f, motionAlertSeconds - dt)
                 disturbanceScore = max(0f, disturbanceScore - 0.018f * dt)
 
+                val energy = env.energyRatio.coerceIn(0f, 1f)
+                val thermal = env.thermalRatio.coerceIn(0f, 1f)
+                val nervous = env.nervousLoad.coerceIn(0f, 1f)
+                val stableFrame =
+                    energy > STABLE_ENERGY_MIN &&
+                        thermal < STABLE_THERMAL_MAX &&
+                        nervous < STABLE_NERVOUS_MAX &&
+                        motion < STABLE_MOTION_MAX
+                if (stableFrame) {
+                    stableRecoverySeconds += dt
+                } else {
+                    stableRecoverySeconds = 0f
+                }
+
                 val hints = SomaticHints(
                     stillnessDurationSeconds = stillnessSeconds,
                     motionAlertSecondsRemaining = motionAlertSeconds,
                     disturbanceScore = disturbanceScore.coerceIn(0f, 1f),
+                    stableRecoverySeconds = stableRecoverySeconds,
                 )
                 _somaticHints.value = hints
 
-                val resolved = stateEngine.resolve(env, hints)
+                val resolved = stateEngine.resolve(env, hints, dt)
                 _internalState.value = resolved
 
                 _bodyExpression.value = BodyExpressionMapper.map(resolved, env, hints)
@@ -143,5 +167,12 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
 
     companion object {
         private const val SAMPLE_MS = 1_000L
+        private const val MOTION_STILL_THRESHOLD = 0.06f
+        private const val MOTION_SPIKE_FOR_ALERT = 0.22f
+        private const val MOTION_ALERT_HOLD_SECONDS = 2.8f
+        private const val STABLE_ENERGY_MIN = 0.35f
+        private const val STABLE_THERMAL_MAX = 0.55f
+        private const val STABLE_NERVOUS_MAX = 0.75f
+        private const val STABLE_MOTION_MAX = 0.12f
     }
 }

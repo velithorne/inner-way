@@ -170,12 +170,17 @@ object BodyExpressionMapper {
             breathDepth = min(1f, breathDepth + still * 0.1f)
         }
 
-        // Motion briefly increases alertness / curiosity pulse.
+        // Motion briefly increases alertness / curiosity pulse (handled state + spike).
         if (hints.motionAlertSecondsRemaining > 0.05f) {
             val alert = (hints.motionAlertSecondsRemaining / 3f).coerceIn(0f, 1f)
             pulseIntensity = min(1f, pulseIntensity + 0.22f * alert)
             breathRate = min(1f, breathRate + 0.12f * alert)
             brightness = min(1f, brightness + 0.08f * alert)
+        }
+        if (state == InternalState.CURIOUS || state == InternalState.ALERT) {
+            val m = motion.coerceIn(0f, 1f)
+            pulseIntensity = min(1f, pulseIntensity + 0.14f * m)
+            brightness = min(1f, brightness + 0.1f * m)
         }
 
         // Motion energy directly nudges openness and breath when not in defensive modes.

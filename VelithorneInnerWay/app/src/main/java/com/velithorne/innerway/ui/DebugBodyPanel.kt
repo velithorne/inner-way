@@ -39,10 +39,12 @@ fun DebugBodyPanel(
             Text("Thermal stress: ${"%.3f".format(environment.thermalRatio)}")
             Text("Nervous load: ${"%.3f".format(environment.nervousLoad)}")
             Text("Storage free: ${"%.3f".format(environment.storageFreeRatio)}")
-            Text("Motion energy: ${"%.3f".format(environment.motionEnergy)}")
+            Text(
+                "Motion: energy=${"%.3f".format(environment.motionEnergy)}  |Δ|=${"%.2f".format(environment.motionDelta)} m/s²  |a|=${"%.2f".format(environment.motionMagnitude)} m/s²",
+            )
             Text("Network openness: ${"%.3f".format(environment.networkOpenness)}")
             Text("Circadian phase: ${"%.3f".format(environment.circadianPhase)}  night=${environment.isNightWindow}")
-            Text("Stillness: ${"%.1f".format(somaticHints.stillnessDurationSeconds)}s  motionAlert: ${"%.2f".format(somaticHints.motionAlertSecondsRemaining)}s  disturbance: ${"%.2f".format(somaticHints.disturbanceScore)}")
+            Text("Stillness: ${"%.1f".format(somaticHints.stillnessDurationSeconds)}s  stableRecovery: ${"%.1f".format(somaticHints.stableRecoverySeconds)}s  motionAlert: ${"%.2f".format(somaticHints.motionAlertSecondsRemaining)}s  disturbance: ${"%.2f".format(somaticHints.disturbanceScore)}")
             Text("Interpreted: ${internalState.name}")
             Text(
                 "Expression → breath=${"%.2f".format(bodyExpression.breathRate)}/${"%.2f".format(bodyExpression.breathDepth)} " +

@@ -11,4 +11,6 @@ data class SomaticHints(
     val motionAlertSecondsRemaining: Float = 0f,
     /** Accumulated disturbance (0..1), decays over time — favors DEFENSIVE when high. */
     val disturbanceScore: Float = 0f,
+    /** Seconds of stable “good” conditions toward CALM (hysteresis / recovery). */
+    val stableRecoverySeconds: Float = 0f,
 )

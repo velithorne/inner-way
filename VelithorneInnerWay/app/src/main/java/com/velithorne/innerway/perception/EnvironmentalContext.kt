@@ -10,6 +10,10 @@ data class EnvironmentalContext(
     val nervousLoad: Float = 0.2f,
     val storageFreeRatio: Float = 0.5f,
     val motionEnergy: Float = 0f,
+    /** Raw accelerometer magnitude (m/s²), for debug. */
+    val motionMagnitude: Float = 9.81f,
+    /** Last frame vector delta magnitude (m/s²), for debug. */
+    val motionDelta: Float = 0f,
     val networkOpenness: Float = 0.5f,
     val circadianPhase: Float = 0.5f,
     /** True during typical sleep window (clock-based; complements circadian phase). */

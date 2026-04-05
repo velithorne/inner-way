@@ -15,10 +15,10 @@ import com.velithorne.innerway.memory.EventLogger
 import com.velithorne.innerway.memory.MemoryDatabase
 import com.velithorne.innerway.memory.MemoryKind
 import com.velithorne.innerway.memory.MemoryRepository
+import com.velithorne.innerway.VelithorneApplication
 import com.velithorne.innerway.mind.InternalState
-import com.velithorne.innerway.mind.InternalStateEngine
-import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.SensorFusion
+import com.velithorne.innerway.perception.StateInterpreter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,22 +42,23 @@ class SensorPollingService : Service() {
         if (pollJob?.isActive == true) return START_STICKY
         val repository = MemoryRepository(MemoryDatabase.get(this).memoryDao())
         val logger = EventLogger(repository)
+        val app = applicationContext as VelithorneApplication
         val fusion = SensorFusion(
             battery = BatteryBloodSystem(this),
             thermal = ThermalBodySystem(this),
             nervous = NervousSystem(this),
             storage = StorageSkeletonSystem(this),
-            motion = MotionMuscleSystem(),
+            motion = app.motionMuscleSystem,
             signal = SignalRespirationSystem(this),
             circadian = CircadianRhythmSystem(),
         )
-        val stateEngine = InternalStateEngine()
+        val interpreter = StateInterpreter()
         var lastState: InternalState? = null
 
         pollJob = scope.launch {
             while (isActive) {
                 val env = fusion.fuse()
-                val state = stateEngine.resolve(env, SomaticHints())
+                val state = interpreter.interpret(env)
                 val shouldLog = lastState == null || state != lastState
                 if (shouldLog) {
                     logger.log(

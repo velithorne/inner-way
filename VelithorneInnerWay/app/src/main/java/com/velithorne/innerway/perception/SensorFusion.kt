@@ -37,6 +37,8 @@ class SensorFusion(
             nervousLoad = strain.cognitivePressure,
             storageFreeRatio = skeleton.freeRatio,
             motionEnergy = muscle.motionIntensity,
+            motionMagnitude = muscle.magnitudeMs2,
+            motionDelta = muscle.deltaMs2,
             networkOpenness = breath.atmosphereOpenness,
             circadianPhase = rhythm.circadianPhase,
             isNightWindow = rhythm.isNightWindow,
