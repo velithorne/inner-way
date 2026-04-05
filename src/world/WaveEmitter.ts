@@ -22,7 +22,6 @@ export class WaveEmitter {
   readonly colour: THREE.Color;
   private readonly shells: THREE.Mesh[];
   private readonly geometries: THREE.SphereGeometry[];
-  private readonly anchor: THREE.Mesh | null;
   maxRadius: number;
   baseOpacity: number;
   private wavePhase = 0;
@@ -76,19 +75,6 @@ export class WaveEmitter {
       this.shells.push(mesh);
       this.group.add(mesh);
     }
-
-    const ag = new THREE.SphereGeometry(0.02, 6, 6);
-    const am = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.4,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const anchorMesh = new THREE.Mesh(ag, am);
-    anchorMesh.visible = this.confidence > 60;
-    this.group.add(anchorMesh);
-    this.anchor = anchorMesh;
   }
 
   setTargetPosition(pos: THREE.Vector3) {
@@ -97,7 +83,6 @@ export class WaveEmitter {
 
   setConfidence(c: number) {
     this.confidence = c;
-    if (this.anchor) this.anchor.visible = c > 60;
   }
 
   setHighlight(on: boolean) {
@@ -123,10 +108,6 @@ export class WaveEmitter {
       mat.opacity = Math.min(0.25, op);
       mat.color.copy(this.colour);
     }
-
-    if (this.anchor) {
-      this.anchor.visible = this.confidence > 60;
-    }
   }
 
   syncNetwork(net: WifiNetwork) {
@@ -141,10 +122,6 @@ export class WaveEmitter {
     for (const g of this.geometries) g.dispose();
     for (const m of this.shells) {
       (m.material as THREE.MeshBasicMaterial).dispose();
-    }
-    if (this.anchor) {
-      this.anchor.geometry.dispose();
-      (this.anchor.material as THREE.MeshBasicMaterial).dispose();
     }
   }
 }

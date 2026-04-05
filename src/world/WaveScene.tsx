@@ -134,19 +134,21 @@ export function WaveScene({
       }
     }
 
+    const proximityBurst = networksRef.current.some((x) => x.rssi > -45);
     for (const n of list) {
       const est = estMap.get(n.bssid) ?? {
         bearing: 0,
         distance: 1,
         confidence: 10,
       };
+      const opts = { proximityBurst };
       let stream = map.get(n.bssid);
       if (!stream) {
-        stream = new SignalLineStream(n, est);
+        stream = new SignalLineStream(n, est, opts);
         map.set(n.bssid, stream);
         scene.add(stream.group);
       } else {
-        stream.syncNetwork(n, est);
+        stream.syncNetwork(n, est, opts);
       }
     }
   }, []);

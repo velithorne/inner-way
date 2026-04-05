@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -16,6 +16,8 @@ import { useWifiStore } from '../store/useWifiStore';
 import { estimateToWorldPosition } from '../world/space';
 import { WaveScene } from '../world/WaveScene';
 
+const PROXIMITY_RSSI = -45;
+
 function signalBarWidth(rssi: number): `${number}%` {
   const t = Math.max(0, Math.min(1, (rssi + 100) / 70));
   return `${Math.round(t * 100)}%`;
@@ -26,8 +28,9 @@ export function SignalScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const { networks, networkCount, routerEstimates } = useWifiStore();
   const { highlightBssid, setHighlightBssid } = useSignalStore();
-  const [showFps, setShowFps] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [fps, setFps] = useState<number | null>(null);
+  const [pulsePhase, setPulsePhase] = useState(0);
   const tapCount = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,6 +58,17 @@ export function SignalScreen() {
     return out;
   }, [conflicts, estimatesMap]);
 
+  const proximateNet = useMemo(() => {
+    const sorted = [...networks].sort((a, b) => b.rssi - a.rssi);
+    return sorted.find((n) => n.rssi > PROXIMITY_RSSI) ?? null;
+  }, [networks]);
+
+  useEffect(() => {
+    if (!proximateNet) return;
+    const id = setInterval(() => setPulsePhase((p) => (p + 1) % 2), 800);
+    return () => clearInterval(id);
+  }, [proximateNet?.bssid]);
+
   const onFps = useCallback((v: number) => {
     setFps(v);
   }, []);
@@ -66,7 +80,7 @@ export function SignalScreen() {
       tapCount.current = 0;
     }, 450);
     if (tapCount.current >= 3) {
-      setShowFps((s) => !s);
+      setShowDiagnostics((s) => !s);
       tapCount.current = 0;
     }
   };
@@ -108,10 +122,23 @@ export function SignalScreen() {
       <Pressable style={styles.hud} onPress={onTripleTapHeader}>
         <Text style={styles.hudTitle}>SIGNAL</Text>
         <Text style={styles.hudSub}>{networkCount} networks · spherical wavefronts</Text>
-        {showFps ? (
-          <Text style={styles.fps}>FPS {fps != null ? fps.toFixed(0) : '…'}</Text>
+        {showDiagnostics ? (
+          <>
+            <Text style={styles.fps}>FPS {fps != null ? fps.toFixed(0) : '…'}</Text>
+            <Text style={styles.debugHint}>Bearings (°) from routerEstimates</Text>
+            {visibleNets.slice(0, 8).map((n) => {
+              const b = routerEstimates[n.bssid]?.bearing;
+              const label = (n.ssid || n.bssid).slice(0, 14);
+              return (
+                <Text key={n.bssid} style={styles.debugLine}>
+                  {label}: {b != null ? `${b.toFixed(0)}°` : '—'}
+                </Text>
+              );
+            })}
+            <Text style={styles.hint}>Triple-tap to hide</Text>
+          </>
         ) : (
-          <Text style={styles.hint}>Triple-tap for FPS</Text>
+          <Text style={styles.hint}>Triple-tap for FPS + bearing debug</Text>
         )}
       </Pressable>
 
@@ -125,6 +152,19 @@ export function SignalScreen() {
         </View>
       ) : null}
 
+      {proximateNet ? (
+        <View style={styles.proximityBanner}>
+          <Text style={styles.proximityTitle}>◈ ROUTER PROXIMITY DETECTED</Text>
+          <Text style={styles.proximityLine}>
+            {proximateNet.ssid || proximateNet.bssid} · {proximateNet.rssi} dBm · ~
+            {rssiToDistance(proximateNet.rssi, proximateNet.frequency).toFixed(0)}m
+          </Text>
+          <Text style={styles.proximityNote}>
+            Extremely strong signal — you may be next to this router
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.legend}>
         <Text style={styles.legendTitle}>Networks</Text>
         <ScrollView style={styles.legendScroll} nestedScrollEnabled>
@@ -133,6 +173,8 @@ export function SignalScreen() {
             const hex = `#${[c.r, c.g, c.b].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('')}`;
             const est = routerEstimates[n.bssid];
             const dist = est ? rssiToDistance(n.rssi, n.frequency).toFixed(0) : '—';
+            const isProx = n.rssi > PROXIMITY_RSSI;
+            const pulseGold = isProx && pulsePhase === 0;
             return (
               <Pressable
                 key={n.bssid}
@@ -142,13 +184,21 @@ export function SignalScreen() {
                 }
               >
                 <View style={[styles.dot, { backgroundColor: hex }]} />
-                <Text style={styles.legendSsid} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.legendSsid,
+                    isProx && (pulseGold ? styles.legendPulseGold : styles.legendPulseCyan),
+                  ]}
+                  numberOfLines={1}
+                >
                   {n.ssid || '(hidden)'}
                 </Text>
                 <View style={styles.barTrack}>
                   <View style={[styles.barFill, { width: signalBarWidth(n.rssi) }]} />
                 </View>
-                <Text style={styles.legendMeta}>{n.rssi} · ~{dist}m</Text>
+                <Text style={styles.legendMeta}>
+                  {n.rssi} · ~{dist}m
+                </Text>
               </Pressable>
             );
           })}
@@ -190,6 +240,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(0, 255, 229, 0.25)',
+    maxHeight: 280,
   },
   hudTitle: {
     color: '#00ffe5',
@@ -207,6 +258,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginTop: 6,
+  },
+  debugHint: {
+    color: '#78909c',
+    fontSize: 10,
+    marginTop: 6,
+  },
+  debugLine: {
+    color: '#b0bec5',
+    fontSize: 10,
+    marginTop: 2,
   },
   hint: {
     color: '#546e7a',
@@ -226,6 +287,20 @@ const styles = StyleSheet.create({
   },
   conflictText: { color: '#ffcc80', fontWeight: '700', fontSize: 12 },
   conflictDetail: { color: '#ffe0b2', fontSize: 11, marginTop: 4 },
+  proximityBanner: {
+    position: 'absolute',
+    top: 260,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 255, 229, 0.15)',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#00ffe5',
+  },
+  proximityTitle: { color: '#00ffe5', fontWeight: '800', fontSize: 12 },
+  proximityLine: { color: '#b2dfdb', fontSize: 11, marginTop: 4 },
+  proximityNote: { color: '#78909c', fontSize: 10, marginTop: 6, lineHeight: 14 },
   legend: {
     position: 'absolute',
     bottom: 88,
@@ -254,6 +329,8 @@ const styles = StyleSheet.create({
   legendRowHi: { opacity: 1, backgroundColor: 'rgba(0,255,229,0.12)', borderRadius: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   legendSsid: { flex: 1, color: '#eceff1', fontSize: 10 },
+  legendPulseGold: { color: '#ffd54f', fontWeight: '700' },
+  legendPulseCyan: { color: '#00ffe5', fontWeight: '700' },
   barTrack: {
     width: 40,
     height: 4,
