@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.innerway"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.5.1-fullscreen-species"
+        versionCode = 7
+        versionName = "0.6.0-growth-playback"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

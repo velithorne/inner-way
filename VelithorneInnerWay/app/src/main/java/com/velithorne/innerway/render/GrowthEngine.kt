@@ -11,7 +11,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Incremental substrate growth: the graph only grows and ages — structure is not regenerated each frame.
+ * Incremental substrate growth with **visible** time-based construction (edges extend, nodes form, plates crystallize).
  */
 class GrowthEngine(
     private val random: Random = Random.Default,
@@ -34,6 +34,12 @@ class GrowthEngine(
         val caps = stageCaps(stage)
         val gm = growthMultiplier(state, expression)
         val tips = nodeById.values.count { it.type == NodeType.ACTIVE_TIP && it.active }
+        val nodes = nodeById.values.toList()
+        val avgProg = if (nodes.isEmpty()) 0f else nodes.map { it.growthProgress }.average().toFloat()
+        val formingNodes = nodes.count { it.growthPhase != GrowthPhase.MATURE }
+        val matureNodes = nodes.count { it.growthPhase == GrowthPhase.MATURE }
+        val growingEdges = edges.count { it.growthProgress < 0.999f }
+        val matureRatio = if (nodes.isEmpty()) 0f else matureNodes.toFloat() / nodes.size.toFloat()
         return GrowthDebugStats(
             nodeCount = nodeById.size,
             edgeCount = edges.size,
@@ -42,6 +48,10 @@ class GrowthEngine(
             growthRate = gm,
             branchExtensionRate = caps.baseStep * gm,
             maxNodesCap = caps.maxNodes,
+            avgGrowthProgress = avgProg,
+            growingEdgesCount = growingEdges,
+            formingNodesCount = formingNodes,
+            matureVsGrowingRatio = matureRatio,
         )
     }
 
@@ -54,40 +64,104 @@ class GrowthEngine(
         heightPx: Float,
     ) {
         val d = dt.coerceIn(0f, 0.5f)
+        val now = System.currentTimeMillis()
         val aspect = (widthPx / heightPx.coerceAtLeast(1f)).coerceIn(0.45f, 2.2f)
 
         if (!seeded) {
-            seedCore()
+            seedCore(now)
             seeded = true
         }
 
+        val caps = stageCaps(stage)
+        val gMul = growthMultiplier(state, expression)
+        val growthSpeed = baseGrowthSpeed(state, expression, caps) * gMul
+
+        // Age (simulation)
         nodeById.keys.toList().forEach { id ->
             nodeById[id]?.let { n -> nodeById[id] = n.copy(age = n.age + d) }
         }
         for (i in edges.indices) {
             val e = edges[i]
-            edges[i] = e.copy(age = e.age + d, conductivity = min(1f, e.conductivity + d * 0.015f))
+            edges[i] = e.copy(age = e.age + d, conductivity = min(1f, e.conductivity + d * 0.012f))
         }
         for (i in plates.indices) {
             val p = plates[i]
-            plates[i] = p.copy(age = p.age + d, opacity = min(0.42f, p.opacity + d * 0.008f))
+            plates[i] = p.copy(age = p.age + d)
         }
 
-        val caps = stageCaps(stage)
-        val gMul = growthMultiplier(state, expression)
-        val stepScale = d * gMul
+        // Lifecycle: progress advances every frame
+        advanceEdgeGrowth(d, growthSpeed, now)
+        advanceNodeFormation(d, growthSpeed, now)
+        advancePlateCrystallization(d, growthSpeed, now)
 
+        val stepScale = d * gMul
         applyStress(state, d)
         applyRecovering(state, d)
         plateCooldown = (plateCooldown - d).coerceAtLeast(0f)
 
         if (stepScale > 0.025f || state == InternalState.RECOVERING) {
-            extendTips(stage, caps, stepScale, aspect, expression, state, d)
-            maybeBranch(stage, caps, stepScale)
-            maybePlate(stage, caps, state)
+            extendTips(stage, caps, stepScale, aspect, expression, state, d, now, growthSpeed)
+            maybeBranch(stage, caps, stepScale, now)
+            maybePlate(stage, caps, state, now)
         }
 
         enforceCaps(caps)
+    }
+
+    private fun baseGrowthSpeed(state: InternalState, ex: BodyExpressionModel, caps: StageCaps): Float {
+        var s = caps.baseStep * 2.8f
+        when (state) {
+            InternalState.CALM -> s *= 1f
+            InternalState.STRESSED -> s *= 0.08f
+            InternalState.RECOVERING -> s *= 0.55f
+            InternalState.CURIOUS, InternalState.ALERT -> s *= 1.35f
+            InternalState.RESTING, InternalState.DORMANT -> s *= 0.12f
+            InternalState.HUNGRY -> s *= 0.65f
+            InternalState.DEFENSIVE -> s *= 0.4f
+            else -> s *= 0.85f
+        }
+        s *= 0.75f + ex.openness * 0.35f
+        return s.coerceIn(0.02f, 0.45f)
+    }
+
+    private fun advanceEdgeGrowth(d: Float, speed: Float, @Suppress("UNUSED_PARAMETER") now: Long) {
+        for (i in edges.indices) {
+            val e = edges[i]
+            if (e.growthProgress >= 1f) continue
+            val dp = d * speed * 1.15f
+            val np = (e.growthProgress + dp).coerceIn(0f, 1f)
+            val phase = growthPhaseFromProgress(np)
+            edges[i] = e.copy(
+                growthProgress = np,
+                growthPhase = phase,
+            )
+        }
+    }
+
+    private fun advanceNodeFormation(d: Float, speed: Float, @Suppress("UNUSED_PARAMETER") now: Long) {
+        nodeById.keys.toList().forEach { id ->
+            val n = nodeById[id] ?: return@forEach
+            if (n.growthProgress >= 1f && n.growthPhase == GrowthPhase.MATURE) return@forEach
+            val dp = d * speed * 1.25f
+            val np = (n.growthProgress + dp).coerceIn(0f, 1f)
+            nodeById[id] = n.copy(
+                growthProgress = np,
+                growthPhase = growthPhaseFromProgress(np),
+            )
+        }
+    }
+
+    private fun advancePlateCrystallization(d: Float, speed: Float, now: Long) {
+        for (i in plates.indices) {
+            val p = plates[i]
+            if (p.growthProgress >= 1f) continue
+            val dp = d * speed * 0.85f
+            val np = (p.growthProgress + dp).coerceIn(0f, 1f)
+            plates[i] = p.copy(
+                growthProgress = np,
+                growthPhase = growthPhaseFromProgress(np),
+            )
+        }
     }
 
     private fun newId(): String = "n${nextId++}"
@@ -96,26 +170,66 @@ class GrowthEngine(
         nodeById[n.id] = n
     }
 
-    private fun seedCore() {
+    private fun seedCore(now: Long) {
         val cx = 0.5f
         val cy = 0.52f
-        val seed = GrowthNode(newId(), cx, cy, 1f, 0f, NodeType.SEED_CORE, false, 0f)
+        val t0 = now - 60_000L
+        val seed = GrowthNode(
+            newId(), cx, cy, 1f, 0f, NodeType.SEED_CORE, false, 0f,
+            GrowthPhase.MATURE, 1f, t0,
+        )
         addNode(seed)
         val r = 0.038f
-        val r1 = GrowthNode(newId(), cx + r * 1.3f, cy + r * 0.4f, 0.55f, 0f, NodeType.ROOT, false, 0.7f)
-        val r2 = GrowthNode(newId(), cx - r * 1.15f, cy - r * 0.55f, 0.52f, 0f, NodeType.ROOT, false, -2.05f)
+        val r1 = GrowthNode(
+            newId(), cx + r * 1.3f, cy + r * 0.4f, 0.55f, 0f, NodeType.ROOT, false, 0.7f,
+            GrowthPhase.MATURE, 1f, t0,
+        )
+        val r2 = GrowthNode(
+            newId(), cx - r * 1.15f, cy - r * 0.55f, 0.52f, 0f, NodeType.ROOT, false, -2.05f,
+            GrowthPhase.MATURE, 1f, t0,
+        )
         addNode(r1)
         addNode(r2)
-        edges.add(GrowthEdge(seed.id, r1.id, 0.41f, 0.72f, 0f))
-        edges.add(GrowthEdge(seed.id, r2.id, 0.39f, 0.7f, 0f))
+        edges.add(edge(seed.id, r1.id, 0.41f, t0))
+        edges.add(edge(seed.id, r2.id, 0.39f, t0))
 
-        val t1 = GrowthNode(newId(), cx + r * 2.5f, cy + r * 0.75f, 0.8f, 0f, NodeType.ACTIVE_TIP, true, 0.52f)
-        val t2 = GrowthNode(newId(), cx - r * 2.3f, cy - r * 1.05f, 0.78f, 0f, NodeType.ACTIVE_TIP, true, -2.0f)
+        val t1 = GrowthNode(
+            newId(), cx + r * 2.5f, cy + r * 0.75f, 0.8f, 0f, NodeType.ACTIVE_TIP, true, 0.52f,
+            GrowthPhase.MATURE, 1f, t0,
+        )
+        val t2 = GrowthNode(
+            newId(), cx - r * 2.3f, cy - r * 1.05f, 0.78f, 0f, NodeType.ACTIVE_TIP, true, -2.0f,
+            GrowthPhase.MATURE, 1f, t0,
+        )
         addNode(t1)
         addNode(t2)
-        edges.add(GrowthEdge(r1.id, t1.id, 0.35f, 0.64f, 0f))
-        edges.add(GrowthEdge(r2.id, t2.id, 0.33f, 0.62f, 0f))
+        edges.add(edge(r1.id, t1.id, 0.35f, t0))
+        edges.add(edge(r2.id, t2.id, 0.33f, t0))
     }
+
+    private fun edge(from: String, to: String, targetThickness: Float, createdAt: Long): GrowthEdge =
+        GrowthEdge(
+            fromId = from,
+            toId = to,
+            thickness = targetThickness,
+            conductivity = 0.68f,
+            age = 0f,
+            growthPhase = GrowthPhase.MATURE,
+            growthProgress = 1f,
+            createdAt = createdAt,
+        )
+
+    private fun newEdge(from: String, to: String, targetThickness: Float, now: Long): GrowthEdge =
+        GrowthEdge(
+            fromId = from,
+            toId = to,
+            thickness = targetThickness,
+            conductivity = 0.55f,
+            age = 0f,
+            growthPhase = GrowthPhase.GROWING,
+            growthProgress = 0f,
+            createdAt = now,
+        )
 
     private data class StageCaps(
         val maxNodes: Int,
@@ -181,6 +295,8 @@ class GrowthEngine(
         expression: BodyExpressionModel,
         state: InternalState,
         d: Float,
+        now: Long,
+        growthSpeed: Float,
     ) {
         val seed = nodeById.values.find { it.type == NodeType.SEED_CORE } ?: return
         val tips = nodeById.values.filter { it.type == NodeType.ACTIVE_TIP && it.active }.toList()
@@ -219,10 +335,13 @@ class GrowthEngine(
                     type = NodeType.JUNCTION,
                     active = false,
                     directionRad = dir,
+                    growthPhase = GrowthPhase.FORMING,
+                    growthProgress = 0f,
+                    createdAt = now,
                 )
                 addNode(junction)
                 edges.removeAll { it.toId == tip.id }
-                edges.add(GrowthEdge(parentId, junction.id, thick * 0.96f, 0.68f, 0f))
+                edges.add(newEdge(parentId, junction.id, thick * 0.96f, now))
 
                 val newTip = GrowthNode(
                     id = newId(),
@@ -233,21 +352,29 @@ class GrowthEngine(
                     type = NodeType.ACTIVE_TIP,
                     active = true,
                     directionRad = dir,
+                    growthPhase = GrowthPhase.FORMING,
+                    growthProgress = 0f,
+                    createdAt = now,
                 )
                 addNode(newTip)
-                edges.add(GrowthEdge(junction.id, newTip.id, thick * 0.9f, 0.65f, 0f))
+                edges.add(newEdge(junction.id, newTip.id, thick * 0.9f, now))
                 nodeById.remove(tip.id)
             } else {
                 nodeById[tip.id] = tip.copy(x = nx, y = ny, directionRad = dir, age = tip.age + d * 0.5f)
                 val ei = edges.indexOfFirst { it.toId == tip.id }
                 if (ei >= 0) {
-                    edges[ei] = edges[ei].copy(thickness = min(0.58f, thick * 1.002f))
+                    val e = edges[ei]
+                    edges[ei] = e.copy(thickness = min(0.62f, thick * 1.002f))
+                    // Nudge incomplete edge toward completion while tip extends
+                    if (e.growthProgress < 1f) {
+                        edges[ei] = edges[ei].copy(growthProgress = min(1f, edges[ei].growthProgress + d * growthSpeed * 2f))
+                    }
                 }
             }
         }
     }
 
-    private fun maybeBranch(stage: GrowthStage, caps: StageCaps, stepScale: Float) {
+    private fun maybeBranch(stage: GrowthStage, caps: StageCaps, stepScale: Float, now: Long) {
         if (nodeById.size >= caps.maxNodes - 4 || edges.size >= caps.maxEdges - 3) return
         if (random.nextFloat() > caps.branchProb * stepScale * 7f) return
         val juns = nodeById.values.filter { it.type == NodeType.JUNCTION && it.age > 0.8f }
@@ -257,12 +384,15 @@ class GrowthEngine(
         val span = caps.baseStep * 16f
         val nx = (j.x + cos(dir) * span).coerceIn(0.05f, 0.95f)
         val ny = (j.y + sin(dir) * span).coerceIn(0.05f, 0.95f)
-        val tip = GrowthNode(newId(), nx, ny, 0.74f, 0f, NodeType.ACTIVE_TIP, true, dir)
+        val tip = GrowthNode(
+            newId(), nx, ny, 0.74f, 0f, NodeType.ACTIVE_TIP, true, dir,
+            GrowthPhase.FORMING, 0f, now,
+        )
         addNode(tip)
-        edges.add(GrowthEdge(j.id, tip.id, 0.29f, 0.58f, 0f))
+        edges.add(newEdge(j.id, tip.id, 0.29f, now))
     }
 
-    private fun maybePlate(stage: GrowthStage, caps: StageCaps, state: InternalState) {
+    private fun maybePlate(stage: GrowthStage, caps: StageCaps, state: InternalState, now: Long) {
         if (plates.size >= caps.maxPlates || plateCooldown > 0f) return
         if (state == InternalState.STRESSED && random.nextFloat() > 0.18f) return
         if (random.nextFloat() > caps.plateProb * 0.055f) return
@@ -276,7 +406,16 @@ class GrowthEngine(
         if (hypot(b.x - c.x, b.y - c.y) > 0.22f) return
         if (hypot(a.x - c.x, a.y - c.y) > 0.22f) return
 
-        plates.add(GrowthPlate(listOf(a.id, b.id, c.id), 0.09f + random.nextFloat() * 0.14f, 0f))
+        plates.add(
+            GrowthPlate(
+                anchorNodeIds = listOf(a.id, b.id, c.id),
+                opacity = 0.09f + random.nextFloat() * 0.14f,
+                age = 0f,
+                growthPhase = GrowthPhase.FORMING,
+                growthProgress = 0f,
+                createdAt = now,
+            ),
+        )
         plateCooldown = 2.8f
     }
 
@@ -298,4 +437,8 @@ data class GrowthDebugStats(
     val growthRate: Float,
     val branchExtensionRate: Float,
     val maxNodesCap: Int,
+    val avgGrowthProgress: Float,
+    val growingEdgesCount: Int,
+    val formingNodesCount: Int,
+    val matureVsGrowingRatio: Float,
 )

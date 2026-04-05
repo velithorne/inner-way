@@ -44,6 +44,7 @@ fun SubstrateGrowthCanvas(
             pulsePhase = pulse,
             baseTint = tint,
             expression = bodyExpression,
+            nowMillis = System.currentTimeMillis(),
         )
     }
 }

@@ -48,6 +48,11 @@ fun DebugBodyPanel(
                 "Growth dynamics → rate=${"%.3f".format(growthDebug.growthRate)} " +
                     "branchExt=${"%.4f".format(growthDebug.branchExtensionRate)}",
             )
+            Text(
+                "Lifecycle → avgProgress=${"%.2f".format(growthDebug.avgGrowthProgress)} " +
+                    "growingEdges=${growthDebug.growingEdgesCount} formingNodes=${growthDebug.formingNodesCount} " +
+                    "matureRatio=${"%.2f".format(growthDebug.matureVsGrowingRatio)}",
+            )
             Text("Battery ratio: ${"%.3f".format(environment.energyRatio)}  charging=${environment.charging}")
             Text("Thermal stress: ${"%.3f".format(environment.thermalRatio)}")
             Text("Nervous load: ${"%.3f".format(environment.nervousLoad)}")

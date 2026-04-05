@@ -82,7 +82,19 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
     val growthState: StateFlow<GrowthState> = _growthState.asStateFlow()
 
     private val _growthDebug = MutableStateFlow(
-        GrowthDebugStats(0, 0, 0, 0, 0f, 0f, 0),
+        GrowthDebugStats(
+            nodeCount = 0,
+            activeTipCount = 0,
+            edgeCount = 0,
+            plateCount = 0,
+            growthRate = 0f,
+            branchExtensionRate = 0f,
+            maxNodesCap = 0,
+            avgGrowthProgress = 0f,
+            growingEdgesCount = 0,
+            formingNodesCount = 0,
+            matureVsGrowingRatio = 0f,
+        ),
     )
     val growthDebug: StateFlow<GrowthDebugStats> = _growthDebug.asStateFlow()
 
