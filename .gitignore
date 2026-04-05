@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Velithorne Inner Way (native Android module)
+VelithorneInnerWay/.gradle/
+VelithorneInnerWay/**/build/
+VelithorneInnerWay/local.properties
+android-sdk/
