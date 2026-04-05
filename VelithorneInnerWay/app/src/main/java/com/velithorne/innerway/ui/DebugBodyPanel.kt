@@ -15,6 +15,7 @@ import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.identity.SpeciesLaws
 import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.GrowthImprintModel
+import com.velithorne.innerway.mind.TerritoryDebugStats
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
@@ -31,6 +32,7 @@ fun DebugBodyPanel(
     stage: GrowthStage,
     growthDebug: GrowthDebugStats,
     growthImprint: GrowthImprintModel,
+    territoryDebug: TerritoryDebugStats,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -63,6 +65,14 @@ fun DebugBodyPanel(
             Text(
                 "  asym=${"%.2f".format(growthImprint.asymmetryBias)} branch=${"%.2f".format(growthImprint.branchingConfidence)} " +
                     "plate=${"%.2f".format(growthImprint.plateFormationBias)} contractMem=${"%.2f".format(growthImprint.contractionMemory)}",
+            )
+            Text(
+                "Territory → grid=${territoryDebug.gridCols}x${territoryDebug.gridRows} mode=${territoryDebug.preferenceMode.name} " +
+                    "favoredDir=${"%.2f".format(territoryDebug.favoredDirectionRad)} rad",
+            )
+            Text(
+                "  frontierAff=${"%.2f".format(territoryDebug.avgFrontierAffinity)} safeAff=${"%.2f".format(territoryDebug.avgSafeZoneAffinity)} " +
+                    "explored=${territoryDebug.exploredCellCount} matureCells=${territoryDebug.matureTerritoryCells}",
             )
             Text("Battery ratio: ${"%.3f".format(environment.energyRatio)}  charging=${environment.charging}")
             Text("Thermal stress: ${"%.3f".format(environment.thermalRatio)}")

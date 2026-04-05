@@ -26,9 +26,11 @@ import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.perception.SensorFusion
+import com.velithorne.innerway.mind.TerritoryDebugStats
 import com.velithorne.innerway.render.GrowthDebugStats
 import com.velithorne.innerway.render.GrowthEngine
 import com.velithorne.innerway.render.GrowthState
+import com.velithorne.innerway.render.TerritoryMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -84,6 +86,12 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _growthState = MutableStateFlow(GrowthState(emptyList(), emptyList(), emptyList()))
     val growthState: StateFlow<GrowthState> = _growthState.asStateFlow()
+
+    private val _territoryMap = MutableStateFlow(velithorneApp.territoryEngine.snapshot())
+    val territoryMap: StateFlow<TerritoryMap> = _territoryMap.asStateFlow()
+
+    private val _territoryDebug = MutableStateFlow(velithorneApp.territoryEngine.debugStats())
+    val territoryDebug: StateFlow<TerritoryDebugStats> = _territoryDebug.asStateFlow()
 
     private val _growthDebug = MutableStateFlow(
         GrowthDebugStats(
@@ -211,11 +219,27 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 val ex = _bodyExpression.value
                 val imprint = _growthImprint.value
                 val (cw, ch) = _growthCanvasPx.value
-                growthEngine.update(st, stt, ex, imprint, dt, cw, ch)
+                val env = _environment.value
+                val hints = _somaticHints.value
+                growthEngine.update(
+                    st, stt, ex, imprint,
+                    environment = env,
+                    hints = hints,
+                    territory = velithorneApp.territoryEngine,
+                    dt = dt,
+                    widthPx = cw,
+                    heightPx = ch,
+                )
                 _growthState.value = growthEngine.snapshot()
                 _growthDebug.value = growthEngine.debugStats(st, stt, ex, dt, imprint)
+                _territoryMap.value = velithorneApp.territoryEngine.snapshot()
+                _territoryDebug.value = velithorneApp.territoryEngine.debugStats()
             }
         }
+    }
+
+    fun recordSubstrateTouch(normalizedX: Float, normalizedY: Float) {
+        velithorneApp.territoryEngine.recordTouchNormalized(normalizedX, normalizedY)
     }
 
     fun refreshStage() {

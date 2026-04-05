@@ -13,8 +13,8 @@ android {
         applicationId = "com.velithorne.innerway"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.7.0-memory-imprint"
+        versionCode = 9
+        versionName = "0.8.0-environmental-territory"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

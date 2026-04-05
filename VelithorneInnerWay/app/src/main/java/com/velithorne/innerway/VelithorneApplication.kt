@@ -8,6 +8,7 @@ import com.velithorne.innerway.memory.MemoryDatabase
 import com.velithorne.innerway.memory.MemoryRepository
 import com.velithorne.innerway.mind.GrowthImprintEngine
 import com.velithorne.innerway.mind.InternalStateEngine
+import com.velithorne.innerway.mind.TerritoryEngine
 import com.velithorne.innerway.services.SpeciesCycleWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,9 @@ class VelithorneApplication : Application(), Configuration.Provider {
     lateinit var growthImprintEngine: GrowthImprintEngine
         private set
 
+    lateinit var territoryEngine: TerritoryEngine
+        private set
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setMinimumLoggingLevel(android.util.Log.INFO)
@@ -42,6 +46,7 @@ class VelithorneApplication : Application(), Configuration.Provider {
         motionMuscleSystem.start()
         internalStateEngine = InternalStateEngine()
         growthImprintEngine = GrowthImprintEngine(this)
+        territoryEngine = TerritoryEngine(this)
 
         val repository = MemoryRepository(MemoryDatabase.get(this).memoryDao())
         applicationScope.launch {

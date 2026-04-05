@@ -41,6 +41,7 @@ import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.render.GrowthState
+import com.velithorne.innerway.render.TerritoryMap
 
 private const val MIN_SCALE = 0.35f
 private const val MAX_SCALE = 5f
@@ -54,7 +55,10 @@ fun SpeciesFullscreenViewer(
     bodyExpression: BodyExpressionModel,
     growthImprint: GrowthImprintModel,
     growthState: GrowthState,
+    territoryMap: TerritoryMap,
+    showTerritoryDebugOverlay: Boolean = false,
     onCanvasSize: (widthPx: Float, heightPx: Float) -> Unit,
+    onSubstrateTouch: (normalizedX: Float, normalizedY: Float) -> Unit = { _, _ -> },
 ) {
     if (!visible) return
 
@@ -150,7 +154,12 @@ fun SpeciesFullscreenViewer(
                         bodyExpression = bodyExpression,
                         growthImprint = growthImprint,
                         growthState = growthState,
+                        territoryMap = territoryMap,
+                        showTerritoryDebugOverlay = showTerritoryDebugOverlay,
+                        gestureScale = scale,
+                        gestureOffset = offset,
                         onCanvasSize = onCanvasSize,
+                        onSubstrateTouch = onSubstrateTouch,
                     )
                 }
             }

@@ -36,6 +36,8 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
     val bodyExpression by viewModel.bodyExpression.collectAsState()
     val growthState by viewModel.growthState.collectAsState()
     val growthImprint by viewModel.growthImprint.collectAsState()
+    val territoryMap by viewModel.territoryMap.collectAsState()
+    val territoryDebug by viewModel.territoryDebug.collectAsState()
     val growthDebug by viewModel.growthDebug.collectAsState()
     val stage by viewModel.stage.collectAsState()
     val memories by viewModel.memories.collectAsState()
@@ -83,7 +85,10 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             bodyExpression = bodyExpression,
             growthImprint = growthImprint,
             growthState = growthState,
+            territoryMap = territoryMap,
+            showTerritoryDebugOverlay = debug,
             onCanvasSize = { w, h -> viewModel.setGrowthCanvasSize(w, h) },
+            onSubstrateTouch = { nx, ny -> viewModel.recordSubstrateTouch(nx, ny) },
         )
 
         SpeciesFullscreenViewer(
@@ -94,7 +99,10 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             bodyExpression = bodyExpression,
             growthImprint = growthImprint,
             growthState = growthState,
+            territoryMap = territoryMap,
+            showTerritoryDebugOverlay = debug,
             onCanvasSize = { w, h -> viewModel.setGrowthCanvasSize(w, h) },
+            onSubstrateTouch = { nx, ny -> viewModel.recordSubstrateTouch(nx, ny) },
         )
 
         StatusOverlay(
@@ -126,6 +134,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
                 stage = stage,
                 growthDebug = growthDebug,
                 growthImprint = growthImprint,
+                territoryDebug = territoryDebug,
             )
         }
 

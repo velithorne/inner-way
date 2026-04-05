@@ -4,6 +4,9 @@ import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
+import com.velithorne.innerway.mind.SomaticHints
+import com.velithorne.innerway.mind.TerritoryEngine
+import com.velithorne.innerway.perception.EnvironmentalContext
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -67,6 +70,9 @@ class GrowthEngine(
         state: InternalState,
         expression: BodyExpressionModel,
         imprint: GrowthImprintModel,
+        environment: EnvironmentalContext,
+        hints: SomaticHints,
+        territory: TerritoryEngine,
         dt: Float,
         widthPx: Float,
         heightPx: Float,
@@ -74,6 +80,9 @@ class GrowthEngine(
         val d = dt.coerceIn(0f, 0.5f)
         val now = System.currentTimeMillis()
         val aspect = (widthPx / heightPx.coerceAtLeast(1f)).coerceIn(0.45f, 2.2f)
+
+        territory.ensureGridForAspect(aspect)
+        territory.environmentalTick(dt, aspect, state, imprint, environment, hints)
 
         if (!seeded) {
             seedCore(now)
@@ -108,12 +117,15 @@ class GrowthEngine(
         plateCooldown = (plateCooldown - d).coerceAtLeast(0f)
 
         if (stepScale > 0.025f || state == InternalState.RECOVERING) {
-            extendTips(stage, caps, stepScale, aspect, expression, state, d, now, growthSpeed, imprint)
-            maybeBranch(stage, caps, stepScale, now, imprint)
-            maybePlate(stage, caps, state, now, imprint)
+            extendTips(
+                stage, caps, stepScale, aspect, expression, state, d, now, growthSpeed, imprint,
+                environment, hints, territory,
+            )
+            maybeBranch(stage, caps, stepScale, now, state, imprint, environment, hints, territory)
+            maybePlate(stage, caps, state, now, imprint, environment, hints, territory)
         }
 
-        enforceCaps(caps)
+        enforceCaps(caps, territory)
     }
 
     private fun baseGrowthSpeed(
@@ -326,23 +338,55 @@ class GrowthEngine(
         now: Long,
         growthSpeed: Float,
         imprint: GrowthImprintModel,
+        environment: EnvironmentalContext,
+        hints: SomaticHints,
+        territory: TerritoryEngine,
     ) {
         val seed = nodeById.values.find { it.type == NodeType.SEED_CORE } ?: return
         val tips = nodeById.values.filter { it.type == NodeType.ACTIVE_TIP && it.active }.toList()
 
+        val dirOffsets = floatArrayOf(
+            -0.38f, -0.22f, -0.1f, 0f, 0.1f, 0.22f, 0.38f,
+        )
+
         for (tip in tips) {
             if (nodeById.size >= caps.maxNodes - 2) break
 
-            var dir = tip.directionRad
-            val wobble = 0.12f * (1f + imprint.disturbanceBias * 0.6f + imprint.asymmetryBias * 0.4f)
-            dir += (random.nextFloat() - 0.5f) * wobble * (if (state == InternalState.CURIOUS) 1.7f else 1f)
-            dir += (expression.instability - 0.28f) * 0.1f * (1f + imprint.asymmetryBias * 0.5f)
+            val baseDir = tip.directionRad +
+                (random.nextFloat() - 0.5f) * 0.12f * (1f + imprint.disturbanceBias * 0.6f + imprint.asymmetryBias * 0.4f) *
+                (if (state == InternalState.CURIOUS) 1.7f else 1f) +
+                (expression.instability - 0.28f) * 0.1f * (1f + imprint.asymmetryBias * 0.5f)
 
             val reachScale = 1f - imprint.stressLoad * 0.22f - imprint.contractionMemory * 0.12f
             val calmOpen = 1f + imprint.calmReserve * 0.15f
             val step = caps.baseStep * stepScale * 48f * (0.82f + expression.pulseIntensity * 0.28f) * reachScale * calmOpen
-            val nx = (tip.x + cos(dir) * step).coerceIn(0.03f, 0.97f)
-            val ny = (tip.y + sin(dir) * step / aspect).coerceIn(0.03f, 0.97f)
+
+            var bestDir = baseDir
+            var nx = (tip.x + cos(bestDir) * step).coerceIn(0.03f, 0.97f)
+            var ny = (tip.y + sin(bestDir) * step / aspect).coerceIn(0.03f, 0.97f)
+            var totalW = 0f
+            val picks = ArrayList<Triple<Float, Float, Float>>(dirOffsets.size)
+            for (off in dirOffsets) {
+                val dir = baseDir + off
+                val tx = (tip.x + cos(dir) * step).coerceIn(0.03f, 0.97f)
+                val ty = (tip.y + sin(dir) * step / aspect).coerceIn(0.03f, 0.97f)
+                val w = territory.tipExtensionWeight(tip.x, tip.y, tx, ty, state, imprint, environment.charging, hints) *
+                    (0.92f + random.nextFloat() * 0.16f)
+                picks.add(Triple(tx, ty, w))
+                totalW += w
+            }
+            if (totalW > 1e-4f) {
+                var r = random.nextFloat() * totalW
+                for ((tx, ty, w) in picks) {
+                    r -= w
+                    if (r <= 0f) {
+                        nx = tx
+                        ny = ty
+                        bestDir = atan2((ny - tip.y) * aspect, nx - tip.x)
+                        break
+                    }
+                }
+            }
 
             val reach = hypot(nx - seed.x, ny - seed.y)
             if (reach > caps.maxReach * (1f - imprint.stillnessAffinity * 0.08f)) {
@@ -366,7 +410,7 @@ class GrowthEngine(
                     age = 0f,
                     type = NodeType.JUNCTION,
                     active = false,
-                    directionRad = dir,
+                    directionRad = bestDir,
                     growthPhase = GrowthPhase.FORMING,
                     growthProgress = 0f,
                     createdAt = now,
@@ -383,7 +427,7 @@ class GrowthEngine(
                     age = 0f,
                     type = NodeType.ACTIVE_TIP,
                     active = true,
-                    directionRad = dir,
+                    directionRad = bestDir,
                     growthPhase = GrowthPhase.FORMING,
                     growthProgress = 0f,
                     createdAt = now,
@@ -391,27 +435,42 @@ class GrowthEngine(
                 addNode(newTip)
                 edges.add(newEdge(junction.id, newTip.id, thick * 0.9f * (1f + imprint.stressLoad * 0.12f), now))
                 nodeById.remove(tip.id)
+                territory.recordGrowthOutcome(junction.x, junction.y, accreted = true, progressDelta = 0.05f, plateAdded = false, state, imprint)
+                territory.recordGrowthOutcome(newTip.x, newTip.y, accreted = true, progressDelta = 0.06f, plateAdded = false, state, imprint)
             } else {
-                nodeById[tip.id] = tip.copy(x = nx, y = ny, directionRad = dir, age = tip.age + d * 0.5f)
+                nodeById[tip.id] = tip.copy(x = nx, y = ny, directionRad = bestDir, age = tip.age + d * 0.5f)
                 val ei = edges.indexOfFirst { it.toId == tip.id }
+                var progDelta = 0f
                 if (ei >= 0) {
                     val e = edges[ei]
                     edges[ei] = e.copy(thickness = min(0.62f, thick * 1.002f))
                     // Nudge incomplete edge toward completion while tip extends
                     if (e.growthProgress < 1f) {
-                        edges[ei] = edges[ei].copy(growthProgress = min(1f, edges[ei].growthProgress + d * growthSpeed * 2f))
+                        val np = min(1f, e.growthProgress + d * growthSpeed * 2f)
+                        progDelta = np - e.growthProgress
+                        edges[ei] = edges[ei].copy(growthProgress = np)
                     }
                 }
+                territory.recordGrowthOutcome(nx, ny, accreted = false, progressDelta = progDelta.coerceAtLeast(d * 0.004f), plateAdded = false, state, imprint)
             }
         }
     }
 
-    private fun maybeBranch(stage: GrowthStage, caps: StageCaps, stepScale: Float, now: Long, imprint: GrowthImprintModel) {
+    private fun maybeBranch(
+        stage: GrowthStage,
+        caps: StageCaps,
+        stepScale: Float,
+        now: Long,
+        state: InternalState,
+        imprint: GrowthImprintModel,
+        environment: EnvironmentalContext,
+        hints: SomaticHints,
+        territory: TerritoryEngine,
+    ) {
         if (nodeById.size >= caps.maxNodes - 4 || edges.size >= caps.maxEdges - 3) return
         val branchBoost = 1f + imprint.branchingConfidence * 0.45f + imprint.disturbanceBias * 0.25f
         val baseThreshold = caps.branchProb * stepScale * 7f
         val threshold = (baseThreshold / branchBoost).coerceIn(0.001f, 0.95f)
-        if (random.nextFloat() > threshold) return
         val juns = nodeById.values.filter { it.type == NodeType.JUNCTION && it.age > 0.8f }
         if (juns.isEmpty()) return
         val j = juns.random(random)
@@ -419,15 +478,27 @@ class GrowthEngine(
         val span = caps.baseStep * 16f * (1f - imprint.stressLoad * 0.15f)
         val nx = (j.x + cos(dir) * span).coerceIn(0.05f, 0.95f)
         val ny = (j.y + sin(dir) * span).coerceIn(0.05f, 0.95f)
+        val habW = territory.branchDirectionWeight(nx, ny, state, imprint, environment.charging, hints).coerceIn(0.25f, 2f)
+        if (random.nextFloat() > threshold / habW) return
         val tip = GrowthNode(
             newId(), nx, ny, 0.74f, 0f, NodeType.ACTIVE_TIP, true, dir,
             GrowthPhase.FORMING, 0f, now,
         )
         addNode(tip)
         edges.add(newEdge(j.id, tip.id, 0.29f * (1f + imprint.calmReserve * 0.1f), now))
+        territory.recordGrowthOutcome(nx, ny, accreted = true, progressDelta = 0.04f, plateAdded = false, state, imprint)
     }
 
-    private fun maybePlate(stage: GrowthStage, caps: StageCaps, state: InternalState, now: Long, imprint: GrowthImprintModel) {
+    private fun maybePlate(
+        stage: GrowthStage,
+        caps: StageCaps,
+        state: InternalState,
+        now: Long,
+        imprint: GrowthImprintModel,
+        environment: EnvironmentalContext,
+        hints: SomaticHints,
+        territory: TerritoryEngine,
+    ) {
         if (plates.size >= caps.maxPlates || plateCooldown > 0f) return
         if (state == InternalState.STRESSED && random.nextFloat() > 0.18f) return
         val plateChance = caps.plateProb * 0.055f * (1f + imprint.plateFormationBias * 0.9f + imprint.calmReserve * 0.35f) *
@@ -436,9 +507,25 @@ class GrowthEngine(
 
         val pool = nodeById.values.filter { it.type != NodeType.SEED_CORE }.toList()
         if (pool.size < 4) return
-        val a = pool.random(random)
-        val b = pool.filter { it.id != a.id }.random(random)
-        val c = pool.filter { it.id != a.id && it.id != b.id }.random(random)
+        fun weightedPick(exclude: Set<String> = emptySet()): GrowthNode? {
+            val candidates = pool.filter { it.id !in exclude }
+            if (candidates.isEmpty()) return null
+            val weights = candidates.map { n ->
+                val w = territory.branchDirectionWeight(n.x, n.y, state, imprint, environment.charging, hints).coerceIn(0.2f, 2f)
+                n to w
+            }
+            val total = weights.sumOf { it.second.toDouble() }.toFloat()
+            if (total < 1e-4f) return candidates.random(random)
+            var r = random.nextFloat() * total
+            for ((n, w) in weights) {
+                r -= w
+                if (r <= 0f) return n
+            }
+            return weights.last().first
+        }
+        val a = weightedPick() ?: return
+        val b = weightedPick(setOf(a.id)) ?: return
+        val c = weightedPick(setOf(a.id, b.id)) ?: return
         if (hypot(a.x - b.x, a.y - b.y) > 0.22f) return
         if (hypot(b.x - c.x, b.y - c.y) > 0.22f) return
         if (hypot(a.x - c.x, a.y - c.y) > 0.22f) return
@@ -454,12 +541,16 @@ class GrowthEngine(
             ),
         )
         plateCooldown = 2.8f
+        val cx = (a.x + b.x + c.x) / 3f
+        val cy = (a.y + b.y + c.y) / 3f
+        territory.recordGrowthOutcome(cx, cy, accreted = false, progressDelta = 0.03f, plateAdded = true, state, imprint)
     }
 
-    private fun enforceCaps(caps: StageCaps) {
+    private fun enforceCaps(caps: StageCaps, territory: TerritoryEngine) {
         while (nodeById.size > caps.maxNodes) {
             val tip = nodeById.values.filter { it.type == NodeType.ACTIVE_TIP && it.age > 5f }
                 .minByOrNull { it.energy } ?: break
+            territory.recordRetraction(tip.x, tip.y)
             edges.removeAll { it.fromId == tip.id || it.toId == tip.id }
             nodeById.remove(tip.id)
         }

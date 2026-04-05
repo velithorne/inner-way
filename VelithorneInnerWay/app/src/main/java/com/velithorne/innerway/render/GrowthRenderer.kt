@@ -1,6 +1,7 @@
 package com.velithorne.innerway.render
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -205,6 +206,37 @@ fun DrawScope.drawGrowthField(
         topLeft = Offset.Zero,
         size = size,
     )
+}
+
+/**
+ * Debug-only habitat overlay: RGB = growth affinity, disturbance, occupancy (subtle).
+ */
+fun DrawScope.drawTerritoryDebugOverlay(map: TerritoryMap) {
+    if (map.cols <= 0 || map.rows <= 0) return
+    val cw = size.width / map.cols
+    val ch = size.height / map.rows
+    for (cell in map.cells) {
+        val left = cell.xIndex * cw
+        val top = cell.yIndex * ch
+        val c = Color(
+            red = cell.growthAffinity.coerceIn(0f, 1f),
+            green = (1f - cell.disturbance).coerceIn(0f, 1f) * 0.35f + cell.stability * 0.2f,
+            blue = cell.occupancy.coerceIn(0f, 1f),
+            alpha = 0.14f,
+        )
+        drawRect(color = c, topLeft = Offset(left, top), size = Size(cw, ch))
+        val touch = Color(0xFFFFAA66).copy(alpha = cell.touchExposure * 0.12f)
+        drawRect(color = touch, topLeft = Offset(left, top), size = Size(cw, ch))
+    }
+    val grid = Color(0x22FFFFFF)
+    for (xi in 0..map.cols) {
+        val x = xi * cw
+        drawLine(grid, Offset(x, 0f), Offset(x, size.height), strokeWidth = 0.5f)
+    }
+    for (yi in 0..map.rows) {
+        val y = yi * ch
+        drawLine(grid, Offset(0f, y), Offset(size.width, y), strokeWidth = 0.5f)
+    }
 }
 
 /** Deterministic micro-asymmetry from imprint + index (no new Random in draw). */

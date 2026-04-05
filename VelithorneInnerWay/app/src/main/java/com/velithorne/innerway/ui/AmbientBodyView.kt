@@ -12,6 +12,7 @@ import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.render.GrowthState
+import com.velithorne.innerway.render.TerritoryMap
 
 /**
  * Compact strip of the substrate growth field (main screen).
@@ -25,7 +26,10 @@ fun AmbientBodyView(
     bodyExpression: BodyExpressionModel,
     growthImprint: GrowthImprintModel,
     growthState: GrowthState,
+    territoryMap: TerritoryMap,
+    showTerritoryDebugOverlay: Boolean = false,
     onCanvasSize: (widthPx: Float, heightPx: Float) -> Unit = { _, _ -> },
+    onSubstrateTouch: (normalizedX: Float, normalizedY: Float) -> Unit = { _, _ -> },
 ) {
     SubstrateGrowthCanvas(
         modifier = Modifier
@@ -36,6 +40,9 @@ fun AmbientBodyView(
         bodyExpression = bodyExpression,
         growthImprint = growthImprint,
         growthState = growthState,
+        territoryMap = territoryMap,
+        showTerritoryDebugOverlay = showTerritoryDebugOverlay,
         onCanvasSize = onCanvasSize,
+        onSubstrateTouch = onSubstrateTouch,
     )
 }
