@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.identity.SpeciesLaws
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
@@ -29,6 +30,7 @@ fun DebugBodyPanel(
     bodyExpression: BodyExpressionModel,
     stage: GrowthStage,
     growthDebug: GrowthDebugStats,
+    growthImprint: GrowthImprintModel,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -52,6 +54,15 @@ fun DebugBodyPanel(
                 "Lifecycle → avgProgress=${"%.2f".format(growthDebug.avgGrowthProgress)} " +
                     "growingEdges=${growthDebug.growingEdgesCount} formingNodes=${growthDebug.formingNodesCount} " +
                     "matureRatio=${"%.2f".format(growthDebug.matureVsGrowingRatio)}",
+            )
+            Text(
+                "Growth imprint → stress=${"%.2f".format(growthImprint.stressLoad)} calm=${"%.2f".format(growthImprint.calmReserve)} " +
+                    "recovery=${"%.2f".format(growthImprint.recoveryStrength)} disturb=${"%.2f".format(growthImprint.disturbanceBias)} " +
+                    "stillness=${"%.2f".format(growthImprint.stillnessAffinity)} chargeTrust=${"%.2f".format(growthImprint.chargeTrust)}",
+            )
+            Text(
+                "  asym=${"%.2f".format(growthImprint.asymmetryBias)} branch=${"%.2f".format(growthImprint.branchingConfidence)} " +
+                    "plate=${"%.2f".format(growthImprint.plateFormationBias)} contractMem=${"%.2f".format(growthImprint.contractionMemory)}",
             )
             Text("Battery ratio: ${"%.3f".format(environment.energyRatio)}  charging=${environment.charging}")
             Text("Thermal stress: ${"%.3f".format(environment.thermalRatio)}")

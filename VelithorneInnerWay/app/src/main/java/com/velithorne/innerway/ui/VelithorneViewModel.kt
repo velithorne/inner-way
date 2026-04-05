@@ -20,6 +20,7 @@ import com.velithorne.innerway.memory.MemoryRepository
 import com.velithorne.innerway.mind.BodyExpressionMapper
 import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.EvolutionEngine
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
@@ -77,6 +78,9 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _bodyExpression = MutableStateFlow(BodyExpressionModel())
     val bodyExpression: StateFlow<BodyExpressionModel> = _bodyExpression.asStateFlow()
+
+    private val _growthImprint = MutableStateFlow(velithorneApp.growthImprintEngine.current())
+    val growthImprint: StateFlow<GrowthImprintModel> = _growthImprint.asStateFlow()
 
     private val _growthState = MutableStateFlow(GrowthState(emptyList(), emptyList(), emptyList()))
     val growthState: StateFlow<GrowthState> = _growthState.asStateFlow()
@@ -168,6 +172,15 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 val expression = BodyExpressionMapper.map(resolved, env, hints)
                 _bodyExpression.value = expression
 
+                val memSnap = repository.recentSnapshot(48)
+                _growthImprint.value = velithorneApp.growthImprintEngine.tick(
+                    dt,
+                    memSnap,
+                    env,
+                    resolved,
+                    hints,
+                )
+
                 val count = repository.countMemories()
                 _stage.value = evolutionEngine.evaluateCurrentStage()
 
@@ -196,10 +209,11 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 val st = _stage.value
                 val stt = _internalState.value
                 val ex = _bodyExpression.value
+                val imprint = _growthImprint.value
                 val (cw, ch) = _growthCanvasPx.value
-                growthEngine.update(st, stt, ex, dt, cw, ch)
+                growthEngine.update(st, stt, ex, imprint, dt, cw, ch)
                 _growthState.value = growthEngine.snapshot()
-                _growthDebug.value = growthEngine.debugStats(st, stt, ex, dt)
+                _growthDebug.value = growthEngine.debugStats(st, stt, ex, dt, imprint)
             }
         }
     }

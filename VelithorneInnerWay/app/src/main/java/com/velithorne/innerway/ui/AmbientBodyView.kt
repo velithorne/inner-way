@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.perception.EnvironmentalContext
@@ -22,6 +23,7 @@ fun AmbientBodyView(
     stage: GrowthStage,
     law: LawContext,
     bodyExpression: BodyExpressionModel,
+    growthImprint: GrowthImprintModel,
     growthState: GrowthState,
     onCanvasSize: (widthPx: Float, heightPx: Float) -> Unit = { _, _ -> },
 ) {
@@ -32,6 +34,7 @@ fun AmbientBodyView(
         environment = environment,
         law = law,
         bodyExpression = bodyExpression,
+        growthImprint = growthImprint,
         growthState = growthState,
         onCanvasSize = onCanvasSize,
     )

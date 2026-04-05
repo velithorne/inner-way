@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.perception.EnvironmentalContext
 import kotlin.math.cos
 import kotlin.math.max
@@ -29,6 +30,7 @@ fun DrawScope.drawGrowthField(
     pulsePhase: Float,
     baseTint: Color,
     expression: BodyExpressionModel,
+    imprint: GrowthImprintModel = GrowthImprintModel(),
     nowMillis: Long = System.currentTimeMillis(),
 ) {
     val wPx = size.width
@@ -38,9 +40,11 @@ fun DrawScope.drawGrowthField(
     drawRect(brush = Brush.verticalGradient(listOf(Substrate, Color(0xFF0A1018))), topLeft = Offset.Zero, size = size)
 
     val nodeMap = growth.nodes.associateBy { it.id }
-    val stressMul = (1f - expression.contraction * 0.35f).coerceIn(0.55f, 1f)
+    val imprintContract = (expression.contraction * 0.35f + imprint.contractionMemory * 0.25f).coerceIn(0f, 0.65f)
+    val stressMul = (1f - imprintContract).coerceIn(0.5f, 1f)
     val pulseSharp = expression.pulseIntensity * (1f + expression.instability * 0.5f)
-    val brightness = expression.brightness.coerceIn(0.12f, 1f)
+    val brightness = (expression.brightness * (1f + imprint.calmReserve * 0.08f) *
+        (1f + imprint.chargeTrust * 0.06f * if (environment.charging) 1f else 0f)).coerceIn(0.12f, 1f)
 
     fun highlightMix(createdAt: Long): Float {
         val age = (nowMillis - createdAt).coerceAtLeast(0L)
@@ -62,8 +66,12 @@ fun DrawScope.drawGrowthField(
     growth.edges.forEachIndexed { idx, e ->
         val a = nodeMap[e.fromId] ?: return@forEachIndexed
         val b = nodeMap[e.toId] ?: return@forEachIndexed
-        val p0 = px(a.x, a.y)
-        val p1 = px(b.x, b.y)
+        val ax = (a.x + (randomAsym(idx, imprint) * imprint.asymmetryBias * 0.012f)).coerceIn(0f, 1f)
+        val ay = (a.y + (randomAsym(idx + 3, imprint) * imprint.asymmetryBias * 0.012f)).coerceIn(0f, 1f)
+        val bx = (b.x + (randomAsym(idx + 7, imprint) * imprint.asymmetryBias * 0.012f)).coerceIn(0f, 1f)
+        val by = (b.y + (randomAsym(idx + 11, imprint) * imprint.asymmetryBias * 0.012f)).coerceIn(0f, 1f)
+        val p0 = px(ax, ay)
+        val p1 = px(bx, by)
         val t = e.growthProgress.coerceIn(0f, 1f)
         if (t <= 0.001f) return@forEachIndexed
 
@@ -72,9 +80,9 @@ fun DrawScope.drawGrowthField(
             p0.y + (p1.y - p0.y) * t,
         )
 
-        val targetW = (1.2f + e.thickness * 5f) * stressMul
+        val targetW = (1.2f + e.thickness * 5f) * stressMul * (1f + imprint.stressLoad * 0.25f + imprint.contractionMemory * 0.15f)
         val lineW = targetW * t.coerceIn(0.15f, 1f)
-        val dimAlpha = (0.12f + e.conductivity * 0.18f) * brightness * t
+        val dimAlpha = (0.12f + e.conductivity * 0.18f) * brightness * t * (0.92f + imprint.calmReserve * 0.12f)
 
         val hm = highlightMix(e.createdAt)
         val lineColor = lerp(TraceDim, SiliconHot, hm * 0.35f).copy(alpha = (dimAlpha + hm * 0.12f).coerceIn(0.04f, 0.55f))
@@ -141,8 +149,8 @@ fun DrawScope.drawGrowthField(
             lineTo(o2.x, o2.y)
             close()
         }
-        val fillA = plate.opacity * 0.1f * brightness * prog
-        val strokeA = plate.opacity * 0.55f * brightness * prog
+        val fillA = plate.opacity * 0.1f * brightness * prog * (0.85f + imprint.plateFormationBias * 0.25f)
+        val strokeA = plate.opacity * 0.55f * brightness * prog * (0.9f + imprint.plateFormationBias * 0.2f)
         val hm = highlightMix(plate.createdAt)
         drawPath(
             path = p,
@@ -198,3 +206,7 @@ fun DrawScope.drawGrowthField(
         size = size,
     )
 }
+
+/** Deterministic micro-asymmetry from imprint + index (no new Random in draw). */
+private fun randomAsym(seed: Int, imprint: GrowthImprintModel): Float =
+    kotlin.math.sin((seed * 12.9898 + imprint.asymmetryBias * 78.233).toDouble()).toFloat()

@@ -35,6 +35,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
     val state by viewModel.internalState.collectAsState()
     val bodyExpression by viewModel.bodyExpression.collectAsState()
     val growthState by viewModel.growthState.collectAsState()
+    val growthImprint by viewModel.growthImprint.collectAsState()
     val growthDebug by viewModel.growthDebug.collectAsState()
     val stage by viewModel.stage.collectAsState()
     val memories by viewModel.memories.collectAsState()
@@ -80,6 +81,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             stage = stage,
             law = law,
             bodyExpression = bodyExpression,
+            growthImprint = growthImprint,
             growthState = growthState,
             onCanvasSize = { w, h -> viewModel.setGrowthCanvasSize(w, h) },
         )
@@ -90,6 +92,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             environment = environment,
             law = law,
             bodyExpression = bodyExpression,
+            growthImprint = growthImprint,
             growthState = growthState,
             onCanvasSize = { w, h -> viewModel.setGrowthCanvasSize(w, h) },
         )
@@ -122,6 +125,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
                 bodyExpression = bodyExpression,
                 stage = stage,
                 growthDebug = growthDebug,
+                growthImprint = growthImprint,
             )
         }
 

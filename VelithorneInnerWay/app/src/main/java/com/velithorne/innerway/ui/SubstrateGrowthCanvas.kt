@@ -7,6 +7,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.identity.SpeciesLaws
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.render.GrowthState
 import com.velithorne.innerway.render.drawGrowthField
@@ -22,6 +23,7 @@ fun SubstrateGrowthCanvas(
     environment: EnvironmentalContext,
     law: LawContext,
     bodyExpression: BodyExpressionModel,
+    growthImprint: GrowthImprintModel,
     growthState: GrowthState,
     onCanvasSize: (widthPx: Float, heightPx: Float) -> Unit = { _, _ -> },
 ) {
@@ -44,6 +46,7 @@ fun SubstrateGrowthCanvas(
             pulsePhase = pulse,
             baseTint = tint,
             expression = bodyExpression,
+            imprint = growthImprint,
             nowMillis = System.currentTimeMillis(),
         )
     }

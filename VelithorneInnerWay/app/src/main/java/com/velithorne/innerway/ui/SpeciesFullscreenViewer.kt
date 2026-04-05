@@ -38,6 +38,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthImprintModel
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.render.GrowthState
 
@@ -51,6 +52,7 @@ fun SpeciesFullscreenViewer(
     environment: EnvironmentalContext,
     law: LawContext,
     bodyExpression: BodyExpressionModel,
+    growthImprint: GrowthImprintModel,
     growthState: GrowthState,
     onCanvasSize: (widthPx: Float, heightPx: Float) -> Unit,
 ) {
@@ -146,6 +148,7 @@ fun SpeciesFullscreenViewer(
                         environment = environment,
                         law = law,
                         bodyExpression = bodyExpression,
+                        growthImprint = growthImprint,
                         growthState = growthState,
                         onCanvasSize = onCanvasSize,
                     )
