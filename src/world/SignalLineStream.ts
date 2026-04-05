@@ -1,27 +1,51 @@
 import * as THREE from 'three';
+import { networkColour } from '../services/colourFromBssid';
 import type { RouterEstimate } from '../services/routerTriangulator';
 import type { WifiNetwork } from '../types/wifi';
 
-/** Per network; 3 strands × 60 */
-export const LINES_PER_NETWORK = 60;
+/** 40 lines × 3 strands per network */
+export const LINES_PER_NETWORK = 40;
 const STRANDS = 3;
-/** Thick-line fake: offset along perpendicular to segment (horizontal) */
 const OFFSET_STRAND = 0.015;
 const SPREAD_W = 3.0;
-const SPREAD_H = 4.0;
-const SPAWN_MIN = 4.0;
-const SPAWN_MAX = 6.0;
-const LEN_MIN = 2.0;
-const LEN_MAX = 4.0;
+const SPREAD_H = 5.0;
+const SPAWN_D_MIN = 4.0;
+const SPAWN_D_MAX = 6.0;
+const LEN_MIN = 1.5;
+const LEN_MAX = 3.0;
 const RESET_NEAR = 0.35;
 
-const LINE_GREEN = 0x00ff44;
 const STRAND_OPACITY = [0.7, 0.4, 0.4];
 
-/** Unit vector from router (on horizon at compass bearing) toward camera at origin. */
-function streamDirectionFromBearingDeg(bearingDeg: number): THREE.Vector3 {
+function bssidElevationRad(bssid: string): number {
+  let h = 0;
+  for (const c of bssid) h = (h * 31 + c.charCodeAt(0)) % 1000;
+  return ((h % 17) - 8) * 0.04;
+}
+
+/**
+ * 3D unit vector from router toward camera (world space).
+ * Small per-BSSID elevation breaks coplanar "scan line" look on screen.
+ */
+function incomingDirection3D(bearingDeg: number, bssid: string): THREE.Vector3 {
   const b = (bearingDeg * Math.PI) / 180;
-  return new THREE.Vector3(-Math.sin(b), 0, -Math.cos(b)).normalize();
+  const e = bssidElevationRad(bssid);
+  const ce = Math.cos(e);
+  const x = -ce * Math.sin(b);
+  const y = Math.sin(e);
+  const z = -ce * Math.cos(b);
+  return new THREE.Vector3(x, y, z).normalize();
+}
+
+function buildSpawnBasis(incoming: THREE.Vector3): { right: THREE.Vector3; up: THREE.Vector3 } {
+  const worldUp = new THREE.Vector3(0, 1, 0);
+  let right = new THREE.Vector3().crossVectors(incoming, worldUp);
+  if (right.lengthSq() < 1e-8) {
+    right = new THREE.Vector3().crossVectors(incoming, new THREE.Vector3(1, 0, 0));
+  }
+  right.normalize();
+  const up = new THREE.Vector3().crossVectors(right, incoming).normalize();
+  return { right, up };
 }
 
 function speedFromRssi(rssi: number): number {
@@ -30,24 +54,26 @@ function speedFromRssi(rssi: number): number {
 }
 
 /**
- * Lines spawn far along router bearing and flow along streamDir toward the camera.
- * Fixed bright lime green; triple-strand thickness (perp to segment).
+ * Segments lie along incomingDir (bearing + elevation); spawn plane ⟂ incomingDir.
+ * Per-network colour; triple-strand offset in full 3D ⟂ segment.
  */
 export class SignalLineStream {
   readonly group: THREE.Group;
   readonly bssid: string;
-  private streamDir = new THREE.Vector3();
-  private perp1 = new THREE.Vector3();
-  private perp2 = new THREE.Vector3(0, 1, 0);
+  private colour = new THREE.Color();
+  private incomingDir = new THREE.Vector3();
+  private right = new THREE.Vector3();
+  private up = new THREE.Vector3();
   private readonly lines: THREE.LineSegments[];
   private speed = 0.02;
 
-  /** Per line: startPos x,y,z, lineLen */
+  /** start x,y,z, lineLen */
   private readonly state: Float32Array;
 
   constructor(net: WifiNetwork, est: RouterEstimate) {
     this.bssid = net.bssid;
-    this.updateBasisAndSpeed(est.bearing, net.rssi);
+    this.colour.copy(networkColour(net.bssid, net.frequency));
+    this.rebuildBasisAndSpeed(net, est);
 
     this.group = new THREE.Group();
     this.group.renderOrder = 2;
@@ -65,7 +91,7 @@ export class SignalLineStream {
       const posArr = new Float32Array(n * 6);
       geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
       const mat = new THREE.LineBasicMaterial({
-        color: LINE_GREEN,
+        color: this.colour.clone(),
         transparent: true,
         opacity: STRAND_OPACITY[s],
         depthTest: false,
@@ -81,35 +107,38 @@ export class SignalLineStream {
     }
   }
 
-  private updateBasisAndSpeed(bearingDeg: number, rssi: number) {
-    this.streamDir.copy(streamDirectionFromBearingDeg(bearingDeg));
-    const sd = this.streamDir;
-    this.perp1.set(sd.z, 0, -sd.x);
-    if (this.perp1.lengthSq() < 1e-8) this.perp1.set(1, 0, 0);
-    else this.perp1.normalize();
-    this.speed = speedFromRssi(rssi);
+  private rebuildBasisAndSpeed(net: WifiNetwork, est: RouterEstimate) {
+    this.incomingDir.copy(incomingDirection3D(est.bearing, net.bssid));
+    const basis = buildSpawnBasis(this.incomingDir);
+    this.right.copy(basis.right);
+    this.up.copy(basis.up);
+    this.speed = speedFromRssi(net.rssi);
   }
 
   syncNetwork(net: WifiNetwork, est: RouterEstimate) {
-    this.updateBasisAndSpeed(est.bearing, net.rssi);
+    this.colour.copy(networkColour(net.bssid, net.frequency));
+    this.rebuildBasisAndSpeed(net, est);
     for (const line of this.lines) {
-      const mat = line.material as THREE.LineBasicMaterial;
-      mat.color.set(LINE_GREEN);
+      (line.material as THREE.LineBasicMaterial).color.copy(this.colour);
     }
   }
 
   private resetLine(i: number) {
     const base = i * 4;
-    const D = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
+    const D = SPAWN_D_MIN + Math.random() * (SPAWN_D_MAX - SPAWN_D_MIN);
     const u = (Math.random() - 0.5) * SPREAD_W;
-    const v = (Math.random() - 0.5) * SPREAD_H;
+    const v = (Math.random() - 0.5) * SPREAD_H; // vertical spread on spawn plane
     const len = LEN_MIN + Math.random() * (LEN_MAX - LEN_MIN);
 
-    const offset = this.perp1.clone().multiplyScalar(u).add(this.perp2.clone().multiplyScalar(v));
-    const start = this.streamDir
+    const inc = this.incomingDir;
+    const r = this.right;
+    const up = this.up;
+    const start = r
       .clone()
-      .multiplyScalar(-D)
-      .add(offset);
+      .multiplyScalar(u)
+      .add(up.clone().multiplyScalar(v))
+      .add(inc.clone().multiplyScalar(-D));
+
     this.state[base] = start.x;
     this.state[base + 1] = start.y;
     this.state[base + 2] = start.z;
@@ -117,7 +146,7 @@ export class SignalLineStream {
   }
 
   update(deltaSec: number) {
-    const sd = this.streamDir;
+    const inc = this.incomingDir;
     const n = LINES_PER_NETWORK;
     const move = this.speed * deltaSec;
 
@@ -128,9 +157,9 @@ export class SignalLineStream {
       let sz = this.state[base + 2];
       const len = this.state[base + 3];
 
-      sx += sd.x * move;
-      sy += sd.y * move;
-      sz += sd.z * move;
+      sx += inc.x * move;
+      sy += inc.y * move;
+      sz += inc.z * move;
 
       const dist = Math.sqrt(sx * sx + sy * sy + sz * sz);
       if (dist < RESET_NEAR) {
@@ -147,21 +176,22 @@ export class SignalLineStream {
       const ax = sx;
       const ay = sy;
       const az = sz;
-      const bx = sx + sd.x * len;
-      const by = sy + sd.y * len;
-      const bz = sz + sd.z * len;
+      const bx = sx + inc.x * len;
+      const by = sy + inc.y * len;
+      const bz = sz + inc.z * len;
 
-      const dir = new THREE.Vector3(bx - ax, by - ay, bz - az);
-      if (dir.lengthSq() < 1e-10) continue;
-      dir.normalize();
-      const perpLine = new THREE.Vector3(-dir.z, 0, dir.x);
-      if (perpLine.lengthSq() < 1e-10) perpLine.set(0, 1, 0);
-      else perpLine.normalize();
+      const seg = new THREE.Vector3(bx - ax, by - ay, bz - az);
+      if (seg.lengthSq() < 1e-12) continue;
+      const dir = seg.normalize();
+      let ribbon = new THREE.Vector3().crossVectors(dir, this.up);
+      if (ribbon.lengthSq() < 1e-10) ribbon = new THREE.Vector3().crossVectors(dir, this.right);
+      if (ribbon.lengthSq() < 1e-10) ribbon = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+      ribbon.normalize();
 
       for (let si = 0; si < STRANDS; si++) {
         const line = this.lines[si];
         const t = (line.userData as { off: number }).off;
-        const side = perpLine.clone().multiplyScalar(t);
+        const side = ribbon.clone().multiplyScalar(t);
         const p0x = ax + side.x;
         const p0y = ay + side.y;
         const p0z = az + side.z;
@@ -184,7 +214,7 @@ export class SignalLineStream {
       const line = this.lines[si];
       const mat = line.material as THREE.LineBasicMaterial;
       mat.opacity = Math.min(1, STRAND_OPACITY[si]);
-      mat.color.set(LINE_GREEN);
+      mat.color.copy(this.colour);
       line.geometry.attributes.position.needsUpdate = true;
     }
   }

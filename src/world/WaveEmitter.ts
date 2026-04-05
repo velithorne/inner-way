@@ -77,11 +77,11 @@ export class WaveEmitter {
       this.group.add(mesh);
     }
 
-    const ag = new THREE.SphereGeometry(0.05, 6, 6);
+    const ag = new THREE.SphereGeometry(0.02, 6, 6);
     const am = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.4,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
