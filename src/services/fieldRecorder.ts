@@ -16,6 +16,15 @@ export type FieldSessionRow = {
   network_count: number;
 };
 
+export type FieldPointRow = {
+  id: number;
+  lat: number;
+  lng: number;
+  timestamp: number;
+  networks: WifiNetwork[];
+  low_precision: boolean;
+};
+
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
@@ -35,9 +44,17 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
           lng REAL NOT NULL,
           timestamp INTEGER NOT NULL,
           networks_json TEXT NOT NULL,
+          low_precision INTEGER NOT NULL DEFAULT 0,
           FOREIGN KEY(session_id) REFERENCES field_sessions(id)
         );
       `);
+      try {
+        await db.execAsync(
+          'ALTER TABLE field_points ADD COLUMN low_precision INTEGER NOT NULL DEFAULT 0'
+        );
+      } catch {
+        /* column already exists */
+      }
       return db;
     })();
   }
@@ -55,17 +72,66 @@ export async function createSession(name: string): Promise<number> {
   return r.lastInsertRowId;
 }
 
-export async function addFieldPoint(sessionId: number, point: FieldPoint): Promise<void> {
+export async function addFieldPoint(
+  sessionId: number,
+  point: FieldPoint,
+  options?: { lowPrecision?: boolean }
+): Promise<void> {
   const db = await getDb();
   const netsJson = JSON.stringify(point.networks);
+  const low = options?.lowPrecision ? 1 : 0;
   await db.runAsync(
-    'INSERT INTO field_points (session_id, lat, lng, timestamp, networks_json) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO field_points (session_id, lat, lng, timestamp, networks_json, low_precision) VALUES (?, ?, ?, ?, ?, ?)',
     sessionId,
     point.lat,
     point.lng,
     point.timestamp,
-    netsJson
+    netsJson,
+    low
   );
+}
+
+export async function getSessionPoints(sessionId: number): Promise<FieldPointRow[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    id: number;
+    lat: number;
+    lng: number;
+    timestamp: number;
+    networks_json: string;
+    low_precision: number;
+  }>(
+    'SELECT id, lat, lng, timestamp, networks_json, low_precision FROM field_points WHERE session_id = ? ORDER BY timestamp ASC',
+    sessionId
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    lat: r.lat,
+    lng: r.lng,
+    timestamp: r.timestamp,
+    networks: safeParseNetworks(r.networks_json),
+    low_precision: r.low_precision !== 0,
+  }));
+}
+
+function safeParseNetworks(json: string): WifiNetwork[] {
+  try {
+    const n = JSON.parse(json) as WifiNetwork[];
+    return Array.isArray(n) ? n : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getSessionMeta(
+  sessionId: number
+): Promise<{ id: number; name: string; created_at: number } | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ id: number; name: string; created_at: number }>(
+    'SELECT id, name, created_at FROM field_sessions WHERE id = ?',
+    sessionId
+  );
+  return row ?? null;
 }
 
 export async function listSessions(): Promise<FieldSessionRow[]> {
