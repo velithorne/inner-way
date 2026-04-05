@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,6 +19,7 @@ import {
   type FieldSessionRow,
 } from '../services/fieldRecorder';
 import { useWifiStore } from '../store/useWifiStore';
+import { haversineM } from '../utils/geo';
 import { FieldMapScene } from '../world/FieldMapScene';
 import {
   buildVoxels,
@@ -37,7 +38,7 @@ type RawPoint = {
 };
 
 export function FieldMapScreen() {
-  const { networks } = useWifiStore();
+  useWifiStore();
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -59,6 +60,15 @@ export function FieldMapScreen() {
   const [replayPoints, setReplayPoints] = useState<FieldPointRow[]>([]);
   const [recordStartedAt, setRecordStartedAt] = useState<number | null>(null);
 
+  /** Dedupe rapid fires from watch + intervals sampling the same spot */
+  const lastFieldSampleRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
+  const sessionIdRef = useRef<number | null>(null);
+  const recordingRef = useRef(false);
+  const indoorModeRef = useRef(indoorMode);
+  indoorModeRef.current = indoorMode;
+  sessionIdRef.current = sessionId;
+  recordingRef.current = recording;
+
   const refreshSessions = useCallback(async () => {
     const rows = await listSessions();
     setSessions(rows);
@@ -69,60 +79,142 @@ export function FieldMapScreen() {
   }, [refreshSessions]);
 
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      sub = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 1.5 },
-        (loc) => setAccuracy(loc.coords.accuracy ?? null)
-      );
-    })();
-    return () => void sub?.remove();
-  }, []);
-
-  useEffect(() => {
     if (!recording) return;
     const t0 = Date.now();
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
     return () => clearInterval(id);
   }, [recording]);
 
-  const maxAccuracyM = indoorMode ? 15 : 5;
+  const tryCaptureFieldPoint = useCallback(
+    async (
+      coords: { latitude: number; longitude: number; accuracy: number | null | undefined },
+      source: string
+    ) => {
+      const sid = sessionIdRef.current;
+      if (sid == null) {
+        console.log('[FieldMap] tryCapture skipped — no sessionId', { source });
+        return;
+      }
 
-  useEffect(() => {
-    if (!recording || sessionId == null) return;
-    const id = setInterval(async () => {
-      if (accuracy != null && accuracy > maxAccuracyM) return;
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+      const acc = coords.accuracy;
+      const maxAcc = indoorModeRef.current ? 15 : 5;
+      if (acc != null && acc > maxAcc) {
+        console.log('[FieldMap] Point REJECTED because:', `${acc.toFixed(1)} m > ${maxAcc} m (${source})`);
+        return;
+      }
+
+      const now = Date.now();
+      const last = lastFieldSampleRef.current;
+      if (last) {
+        const dt = now - last.t;
+        const dist = haversineM(
+          { lat: last.lat, lng: last.lng },
+          { lat: coords.latitude, lng: coords.longitude }
+        );
+        if (dt < 4000 && dist < 2) {
+          console.log('[FieldMap] duplicate sample skipped', { source, dtMs: dt, distM: dist.toFixed(1) });
+          return;
+        }
+      }
+
+      const nets = useWifiStore.getState().networks;
+      console.log('[FieldMap] recordPoint called', {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        accuracy: acc,
+        networkCount: nets.length,
+        isRecording: true,
+        source,
       });
-      const p = loc.coords;
-      const lowPrecision = indoorMode && (accuracy == null || accuracy > 5);
+
+      const lowPrecision = indoorModeRef.current && (acc == null || acc > 5);
+
       await addFieldPoint(
-        sessionId,
+        sid,
         {
-          lat: p.latitude,
-          lng: p.longitude,
-          timestamp: Date.now(),
-          networks: [...networks],
+          lat: coords.latitude,
+          lng: coords.longitude,
+          timestamp: now,
+          networks: nets,
         },
         { lowPrecision }
       );
+
+      lastFieldSampleRef.current = {
+        lat: coords.latitude,
+        lng: coords.longitude,
+        t: now,
+      };
+
       setPointCount((c) => c + 1);
       setLiveRawPoints((prev) => [
         ...prev,
         {
-          lat: p.latitude,
-          lng: p.longitude,
-          timestamp: Date.now(),
-          networks: [...networks],
+          lat: coords.latitude,
+          lng: coords.longitude,
+          timestamp: now,
+          networks: [...nets],
           low_precision: lowPrecision,
         },
       ]);
+    },
+    []
+  );
+
+  /** One Location.watch for HUD + captures while recording (avoids duplicate subscriptions). */
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      sub = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+          distanceInterval: 1,
+        },
+        (loc) => {
+          setAccuracy(loc.coords.accuracy ?? null);
+          if (recordingRef.current && sessionIdRef.current != null) {
+            void tryCaptureFieldPoint(loc.coords, 'watchPosition');
+          }
+        }
+      );
+    })();
+    return () => void sub?.remove();
+  }, [tryCaptureFieldPoint]);
+
+  /** Time-based fallbacks: 3s + 8s getCurrentPosition (live accuracy per sample). */
+  useEffect(() => {
+    if (!recording || sessionId == null) {
+      lastFieldSampleRef.current = null;
+      return;
+    }
+
+    void (async () => {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      await tryCaptureFieldPoint(loc.coords, 'start-immediate');
+    })();
+
+    const id3 = setInterval(() => {
+      void (async () => {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        await tryCaptureFieldPoint(loc.coords, 'interval-3s');
+      })();
     }, 3000);
-    return () => clearInterval(id);
-  }, [recording, sessionId, networks, accuracy, indoorMode, maxAccuracyM]);
+
+    const id8 = setInterval(() => {
+      void (async () => {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        await tryCaptureFieldPoint(loc.coords, 'interval-8s');
+      })();
+    }, 8000);
+
+    return () => {
+      clearInterval(id3);
+      clearInterval(id8);
+    };
+  }, [recording, sessionId, tryCaptureFieldPoint]);
 
   const activeRawPoints = recording ? liveRawPoints : replayPoints.map(rowToRaw);
 

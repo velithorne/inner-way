@@ -77,8 +77,16 @@ export async function addFieldPoint(
   point: FieldPoint,
   options?: { lowPrecision?: boolean }
 ): Promise<void> {
+  const nets = point.networks ?? [];
+  console.log('[fieldRecorder] addFieldPoint', {
+    sessionId,
+    lat: point.lat,
+    lng: point.lng,
+    networkCount: nets.length,
+    lowPrecision: options?.lowPrecision ?? false,
+  });
   const db = await getDb();
-  const netsJson = JSON.stringify(point.networks);
+  const netsJson = JSON.stringify(nets);
   const low = options?.lowPrecision ? 1 : 0;
   await db.runAsync(
     'INSERT INTO field_points (session_id, lat, lng, timestamp, networks_json, low_precision) VALUES (?, ?, ?, ?, ?, ?)',
