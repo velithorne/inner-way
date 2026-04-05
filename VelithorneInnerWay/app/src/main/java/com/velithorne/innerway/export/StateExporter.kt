@@ -31,6 +31,7 @@ object StateExporter {
                 put("motionEnergy", environment.motionEnergy.toDouble())
                 put("networkOpenness", environment.networkOpenness.toDouble())
                 put("circadianPhase", environment.circadianPhase.toDouble())
+                put("isNightWindow", environment.isNightWindow)
                 put("screenAwake", environment.screenAwake)
                 put("timestampMillis", environment.timestampMillis)
             },

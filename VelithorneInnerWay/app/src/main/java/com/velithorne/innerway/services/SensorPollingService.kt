@@ -16,8 +16,9 @@ import com.velithorne.innerway.memory.MemoryDatabase
 import com.velithorne.innerway.memory.MemoryKind
 import com.velithorne.innerway.memory.MemoryRepository
 import com.velithorne.innerway.mind.InternalState
+import com.velithorne.innerway.mind.InternalStateEngine
+import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.SensorFusion
-import com.velithorne.innerway.perception.StateInterpreter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,13 +51,13 @@ class SensorPollingService : Service() {
             signal = SignalRespirationSystem(this),
             circadian = CircadianRhythmSystem(),
         )
-        val interpreter = StateInterpreter()
+        val stateEngine = InternalStateEngine()
         var lastState: InternalState? = null
 
         pollJob = scope.launch {
             while (isActive) {
                 val env = fusion.fuse()
-                val state = interpreter.interpret(env)
+                val state = stateEngine.resolve(env, SomaticHints())
                 val shouldLog = lastState == null || state != lastState
                 if (shouldLog) {
                     logger.log(

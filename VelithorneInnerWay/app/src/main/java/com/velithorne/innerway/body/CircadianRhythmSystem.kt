@@ -10,6 +10,7 @@ class CircadianRhythmSystem {
 
     data class Sample(
         val circadianPhase: Float,
+        val isNightWindow: Boolean,
         val screenLikelyAwake: Boolean,
         val timestampMillis: Long,
     )
@@ -23,6 +24,7 @@ class CircadianRhythmSystem {
         val awake = !night || uptimeHours < 0.25f
         return Sample(
             circadianPhase = phase,
+            isNightWindow = night,
             screenLikelyAwake = awake,
             timestampMillis = System.currentTimeMillis(),
         )

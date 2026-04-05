@@ -12,6 +12,8 @@ data class EnvironmentalContext(
     val motionEnergy: Float = 0f,
     val networkOpenness: Float = 0.5f,
     val circadianPhase: Float = 0.5f,
+    /** True during typical sleep window (clock-based; complements circadian phase). */
+    val isNightWindow: Boolean = false,
     val screenAwake: Boolean = true,
     val timestampMillis: Long = System.currentTimeMillis(),
 )

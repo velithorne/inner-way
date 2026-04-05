@@ -8,27 +8,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.identity.SpeciesLaws
+import com.velithorne.innerway.mind.BodyExpressionModel
 import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.render.drawSiliconBody
 import com.velithorne.innerway.render.rememberPulsePhase
-import com.velithorne.innerway.render.sleepDimming
-import com.velithorne.innerway.render.stressJitter
 import com.velithorne.innerway.render.thermalTint
 
+/**
+ * Central organism: same infinite pulse/breath substrate as Phase 1; Phase 2 varies duration and
+ * coefficients via [bodyExpression] (physiological state), not a separate animation system.
+ */
 @Composable
 fun AmbientBodyView(
     environment: EnvironmentalContext,
     internalState: InternalState,
     stage: GrowthStage,
     law: LawContext,
+    bodyExpression: BodyExpressionModel,
 ) {
     val lawAllowsAnimation = SpeciesLaws.canAnimate(law)
-    val pulse = rememberPulsePhase(if (lawAllowsAnimation) 3200 else 6000)
-    val contraction = if (SpeciesLaws.shouldContract(law)) 0.65f else 0.2f
-    val jitter = stressJitter(internalState, environment.nervousLoad)
-    val brightness = sleepDimming(internalState) * environment.energyRatio.coerceIn(0.25f, 1f)
+    val baseDurationMs = 3200
+    val breathDurationMs = (baseDurationMs / bodyExpression.breathRate.coerceIn(0.08f, 1f))
+        .toInt()
+        .coerceIn(900, 14_000)
+    val pulse = rememberPulsePhase(if (lawAllowsAnimation) breathDurationMs else breathDurationMs * 2)
+
+    val lawContractionExtra = if (SpeciesLaws.shouldContract(law)) 0.22f else 0f
     val tint = thermalTint(environment.thermalRatio)
 
     Canvas(
@@ -41,9 +48,8 @@ fun AmbientBodyView(
             stage = stage,
             pulsePhase = pulse,
             baseColor = tint,
-            contraction = contraction,
-            jitter = jitter,
-            brightness = brightness,
+            bodyExpression = bodyExpression,
+            lawContractionExtra = lawContractionExtra,
         )
     }
 }

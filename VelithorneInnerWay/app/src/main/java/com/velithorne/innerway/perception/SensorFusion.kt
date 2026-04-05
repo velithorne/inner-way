@@ -39,6 +39,7 @@ class SensorFusion(
             motionEnergy = muscle.motionIntensity,
             networkOpenness = breath.atmosphereOpenness,
             circadianPhase = rhythm.circadianPhase,
+            isNightWindow = rhythm.isNightWindow,
             screenAwake = rhythm.screenLikelyAwake,
             timestampMillis = maxOf(
                 blood.timestampMillis,

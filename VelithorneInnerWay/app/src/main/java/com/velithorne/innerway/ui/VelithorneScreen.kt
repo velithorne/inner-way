@@ -26,9 +26,11 @@ import androidx.compose.ui.unit.sp
 fun VelithorneScreen(viewModel: VelithorneViewModel) {
     val environment by viewModel.environment.collectAsState()
     val state by viewModel.internalState.collectAsState()
+    val bodyExpression by viewModel.bodyExpression.collectAsState()
     val stage by viewModel.stage.collectAsState()
     val memories by viewModel.memories.collectAsState()
     val law by viewModel.lawContext.collectAsState()
+    val somaticHints by viewModel.somaticHints.collectAsState()
     var debug by remember { mutableStateOf(false) }
 
     Column(
@@ -45,7 +47,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             fontFamily = FontFamily.SansSerif,
         )
         Text(
-            text = "Phase 1 — substrate online",
+            text = "Phase 2 — state expression",
             fontSize = 13.sp,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
         )
@@ -55,6 +57,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             internalState = state,
             stage = stage,
             law = law,
+            bodyExpression = bodyExpression,
         )
 
         StatusOverlay(
@@ -81,6 +84,8 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
                 environment = environment,
                 internalState = state,
                 law = law,
+                somaticHints = somaticHints,
+                bodyExpression = bodyExpression,
             )
         }
 
