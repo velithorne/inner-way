@@ -69,8 +69,8 @@ jobs:
       - name: Download APK from EAS
         run: |
           set -euo pipefail
-          curl -fsSL -L -o biofield-scanner.apk "$EAS_APK_URL"
-          ls -la biofield-scanner.apk
+          curl -fsSL -L -o spectra.apk "$EAS_APK_URL"
+          ls -la spectra.apk
 
       - name: Release tag name
         run: |
@@ -84,14 +84,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: Biofield Scanner ${{ env.RELEASE_TAG }}
+          name: Spectra ${{ env.RELEASE_TAG }}
           body: |
             Android APK built with [EAS](https://expo.dev).
 
-            **Download:** attach `biofield-scanner.apk` below and install on your device (sideload).
+            **Download:** attach `spectra.apk` below and install on your device (sideload).
 
             Expo build page (logs): ${{ env.EAS_BUILD_PAGE }}
-          files: biofield-scanner.apk
+          files: spectra.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
