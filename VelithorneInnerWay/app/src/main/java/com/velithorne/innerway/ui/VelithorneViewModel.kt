@@ -25,6 +25,9 @@ import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.EnvironmentalContext
 import com.velithorne.innerway.perception.SensorFusion
+import com.velithorne.innerway.render.GrowthDebugStats
+import com.velithorne.innerway.render.GrowthEngine
+import com.velithorne.innerway.render.GrowthState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,6 +44,7 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
 
     private val repository = MemoryRepository(MemoryDatabase.get(application).memoryDao())
     private val evolutionEngine = EvolutionEngine(repository)
+    private val growthEngine = GrowthEngine()
 
     private val velithorneApp: VelithorneApplication
         get() = getApplication<VelithorneApplication>()
@@ -74,6 +78,16 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
     private val _bodyExpression = MutableStateFlow(BodyExpressionModel())
     val bodyExpression: StateFlow<BodyExpressionModel> = _bodyExpression.asStateFlow()
 
+    private val _growthState = MutableStateFlow(GrowthState(emptyList(), emptyList(), emptyList()))
+    val growthState: StateFlow<GrowthState> = _growthState.asStateFlow()
+
+    private val _growthDebug = MutableStateFlow(
+        GrowthDebugStats(0, 0, 0, 0, 0f, 0f, 0),
+    )
+    val growthDebug: StateFlow<GrowthDebugStats> = _growthDebug.asStateFlow()
+
+    private val _growthCanvasPx = MutableStateFlow(400f to 260f)
+
     private val _stage = MutableStateFlow(GrowthStage.SEED)
     val stage: StateFlow<GrowthStage> = _stage.asStateFlow()
 
@@ -100,9 +114,8 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 _environment.value = env
 
                 val motion = env.motionEnergy.coerceIn(0f, 1f)
-                val motionThreshold = MOTION_STILL_THRESHOLD
 
-                if (motion > motionThreshold) {
+                if (motion > MOTION_STILL_THRESHOLD) {
                     stillnessSeconds = 0f
                 } else {
                     stillnessSeconds += dt
@@ -140,10 +153,12 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 val resolved = stateEngine.resolve(env, hints, dt)
                 _internalState.value = resolved
 
-                _bodyExpression.value = BodyExpressionMapper.map(resolved, env, hints)
+                val expression = BodyExpressionMapper.map(resolved, env, hints)
+                _bodyExpression.value = expression
 
                 val count = repository.countMemories()
                 _stage.value = evolutionEngine.evaluateCurrentStage()
+
                 _lawContext.update {
                     SpeciesLaws.baselineContextForPhase1().copy(
                         memoryCount = count,
@@ -157,6 +172,24 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
                 delay(SAMPLE_MS)
             }
         }
+
+        // Higher-frequency substrate growth (same persistent graph — incremental accretion)
+        viewModelScope.launch {
+            var lastG = SystemClock.elapsedRealtime()
+            while (isActive) {
+                delay(GROWTH_TICK_MS)
+                val now = SystemClock.elapsedRealtime()
+                val dt = ((now - lastG) / 1000f).coerceIn(0f, 0.25f)
+                lastG = now
+                val st = _stage.value
+                val stt = _internalState.value
+                val ex = _bodyExpression.value
+                val (cw, ch) = _growthCanvasPx.value
+                growthEngine.update(st, stt, ex, dt, cw, ch)
+                _growthState.value = growthEngine.snapshot()
+                _growthDebug.value = growthEngine.debugStats(st, stt, ex, dt)
+            }
+        }
     }
 
     fun refreshStage() {
@@ -165,8 +198,17 @@ class VelithorneViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    /** Canvas size in px — keeps growth step aspect aligned with substrate. */
+    fun setGrowthCanvasSize(widthPx: Float, heightPx: Float) {
+        if (widthPx > 10f && heightPx > 10f) {
+            _growthCanvasPx.value = widthPx to heightPx
+        }
+    }
+
     companion object {
         private const val SAMPLE_MS = 1_000L
+        private const val GROWTH_TICK_MS = 48L
+
         private const val MOTION_STILL_THRESHOLD = 0.06f
         private const val MOTION_SPIKE_FOR_ALERT = 0.22f
         private const val MOTION_ALERT_HOLD_SECONDS = 2.8f

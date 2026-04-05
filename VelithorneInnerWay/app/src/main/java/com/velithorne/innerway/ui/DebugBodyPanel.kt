@@ -14,9 +14,11 @@ import androidx.compose.ui.unit.dp
 import com.velithorne.innerway.identity.LawContext
 import com.velithorne.innerway.identity.SpeciesLaws
 import com.velithorne.innerway.mind.BodyExpressionModel
+import com.velithorne.innerway.mind.GrowthStage
 import com.velithorne.innerway.mind.InternalState
 import com.velithorne.innerway.mind.SomaticHints
 import com.velithorne.innerway.perception.EnvironmentalContext
+import com.velithorne.innerway.render.GrowthDebugStats
 
 @Composable
 fun DebugBodyPanel(
@@ -25,6 +27,8 @@ fun DebugBodyPanel(
     law: LawContext,
     somaticHints: SomaticHints,
     bodyExpression: BodyExpressionModel,
+    stage: GrowthStage,
+    growthDebug: GrowthDebugStats,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -35,6 +39,15 @@ fun DebugBodyPanel(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text("Debug — body truth", style = MaterialTheme.typography.titleSmall)
+            Text("Growth stage: ${stage.name}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Substrate graph → nodes=${growthDebug.nodeCount}/${growthDebug.maxNodesCap} " +
+                    "tips=${growthDebug.activeTipCount} edges=${growthDebug.edgeCount} plates=${growthDebug.plateCount}",
+            )
+            Text(
+                "Growth dynamics → rate=${"%.3f".format(growthDebug.growthRate)} " +
+                    "branchExt=${"%.4f".format(growthDebug.branchExtensionRate)}",
+            )
             Text("Battery ratio: ${"%.3f".format(environment.energyRatio)}  charging=${environment.charging}")
             Text("Thermal stress: ${"%.3f".format(environment.thermalRatio)}")
             Text("Nervous load: ${"%.3f".format(environment.nervousLoad)}")

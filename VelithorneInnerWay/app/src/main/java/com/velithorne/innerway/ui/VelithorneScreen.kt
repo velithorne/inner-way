@@ -27,6 +27,8 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
     val environment by viewModel.environment.collectAsState()
     val state by viewModel.internalState.collectAsState()
     val bodyExpression by viewModel.bodyExpression.collectAsState()
+    val growthState by viewModel.growthState.collectAsState()
+    val growthDebug by viewModel.growthDebug.collectAsState()
     val stage by viewModel.stage.collectAsState()
     val memories by viewModel.memories.collectAsState()
     val law by viewModel.lawContext.collectAsState()
@@ -47,7 +49,7 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             fontFamily = FontFamily.SansSerif,
         )
         Text(
-            text = "Phase 2 — state expression",
+            text = "Substrate growth — state + stage",
             fontSize = 13.sp,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
         )
@@ -58,6 +60,8 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
             stage = stage,
             law = law,
             bodyExpression = bodyExpression,
+            growthState = growthState,
+            onCanvasSize = { w, h -> viewModel.setGrowthCanvasSize(w, h) },
         )
 
         StatusOverlay(
@@ -86,6 +90,8 @@ fun VelithorneScreen(viewModel: VelithorneViewModel) {
                 law = law,
                 somaticHints = somaticHints,
                 bodyExpression = bodyExpression,
+                stage = stage,
+                growthDebug = growthDebug,
             )
         }
 
