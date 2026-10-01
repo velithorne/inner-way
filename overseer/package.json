@@ -20,7 +20,9 @@
     "test": "vitest run",
     "build": "pnpm -r build",
     "secrets:scan": "node scripts/scan-secrets.mjs",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan",
+    "gate:p0:wait-infra": "node scripts/p0-health-gate.mjs wait-infra",
+    "gate:p0:health": "node scripts/p0-health-gate.mjs run"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

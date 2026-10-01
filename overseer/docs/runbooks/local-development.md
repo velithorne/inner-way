@@ -35,6 +35,21 @@ Stop everything: `pnpm infra:down` (add `-v` to also delete local data volumes).
 | `pnpm secrets:scan` | Secret scanner; prints rule/file/line only, never the value               |
 | `pnpm check`        | format:check + lint + typecheck + test + secrets:scan                     |
 
+## The P0 live-infrastructure gate (same proof CI runs)
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm infra:up                 # canonical: docker compose up -d --wait
+pnpm gate:p0:health           # 200 -> stop object store -> 503 -> restart -> 200
+pnpm infra:down
+```
+
+Works unchanged in Windows PowerShell with Docker Desktop (Compose v2). It uses `.env` if present,
+else the committed fake values in `.env.example`, and runs its own API on port 4010 so it does not
+collide with `pnpm dev:api`. Evidence is written to `.data/p0-health-gate.json`. CI runs exactly
+this (`.github/workflows/p0-gate.yml`).
+
 ## Manual checks for P0 acceptance
 
 1. Fresh clone: `pnpm install --frozen-lockfile` succeeds with no production credentials.
@@ -49,8 +64,10 @@ start redis` -> back to 200.
 
 ## Troubleshooting
 
-- Right after `pnpm infra:up`, `/health` may report `objectStore` failing for a few seconds
-  (`ECONNREFUSED`) while the object store boots. Retry.
+- `pnpm infra:up` waits for the object store's healthcheck; if `/health` still shows `objectStore`
+  failing for a moment after a restart, retry (the JVM-based store takes a few seconds).
+- `objectStore: HTTP_500` means the object store is up but cannot use its storage; do not mount a
+  root-owned volume into it (see ADR 0001 amendment).
 
 - Port already in use: change `POSTGRES_PORT` / `REDIS_PORT` / `S3_PORT` in `.env` and update
   the matching `DATABASE_URL` / `REDIS_URL` / `S3_ENDPOINT`.

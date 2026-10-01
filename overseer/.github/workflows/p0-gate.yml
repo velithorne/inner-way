@@ -1,0 +1,166 @@
+# P0 gate - automated proof for build package v1.1 phase P0 (docs/gates/P0.md).
+#
+# Runs on a standard GitHub-hosted Ubuntu VM (full Docker daemon, Compose v2), with the real
+# PostgreSQL / Redis / S3-compatible object store from docker-compose.yml. No mocks.
+#
+# This is the canonical workflow for the standalone OVERSEER repository. While the project
+# still lives in the inner-way repository it runs from a root-level copy that differs only in
+# name, triggers, OVERSEER_DIR and `defaults.run.working-directory`
+# (.github/workflows/overseer-p0-gate.yml there).
+name: P0 gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p0-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OVERSEER_DIR: .
+
+jobs:
+  p0-gate:
+    name: P0 gate (checks, builds, live infrastructure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      # 1 ---------------------------------------------------------------------------
+      - name: '1. Check out the exact commit'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record commit under test
+        run: |
+          echo "Commit under test: ${GITHUB_SHA}"
+          {
+            echo "## Commit under test"
+            echo
+            echo "\`${GITHUB_SHA}\` (ref \`${GITHUB_REF}\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 2 ---------------------------------------------------------------------------
+      - name: '2. Install the pinned Node version (.nvmrc)'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.OVERSEER_DIR }}/.nvmrc
+
+      # 3 ---------------------------------------------------------------------------
+      - name: '3. Install the pinned pnpm version (package.json packageManager)'
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ${{ env.OVERSEER_DIR }}/package.json
+
+      - name: Prove the pinned toolchain is what is running
+        shell: bash
+        run: |
+          want_node="v$(cat .nvmrc)"
+          want_pnpm="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          echo "node: $(node -v) (pinned ${want_node}); pnpm: $(pnpm -v) (pinned ${want_pnpm})"
+          test "$(node -v)" = "${want_node}"
+          test "$(pnpm -v)" = "${want_pnpm}"
+
+      # 4 ---------------------------------------------------------------------------
+      - name: '4. Secret scan'
+        shell: bash
+        run: pnpm secrets:scan
+
+      # 5 ---------------------------------------------------------------------------
+      - name: '5. Clean dependency install (frozen lockfile)'
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        shell: bash
+        run: pnpm format:check
+
+      # 6 ---------------------------------------------------------------------------
+      - name: '6. Lint'
+        shell: bash
+        run: pnpm lint
+
+      # 7 ---------------------------------------------------------------------------
+      - name: '7. Typecheck'
+        shell: bash
+        run: pnpm typecheck
+
+      # 8 ---------------------------------------------------------------------------
+      - name: '8. Tests'
+        shell: bash
+        run: |
+          pnpm test 2>&1 | tee "${RUNNER_TEMP}/vitest.log"
+          {
+            echo "## Tests"
+            echo
+            echo '```'
+            grep -E "Test Files|Tests " "${RUNNER_TEMP}/vitest.log" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 9 ---------------------------------------------------------------------------
+      - name: '9. Production builds'
+        shell: bash
+        run: pnpm build
+
+      # 10 --------------------------------------------------------------------------
+      - name: '10. Verify Docker and Docker Compose v2'
+        shell: bash
+        run: |
+          docker --version
+          docker compose version
+          major="$(docker compose version --short | sed -E 's/^v?([0-9]+)\..*/\1/')"
+          test "${major}" -ge 2
+
+      # 11 --------------------------------------------------------------------------
+      - name: '11. Start the P0 infrastructure (canonical: pnpm infra:up)'
+        shell: bash
+        run: |
+          # Local/test-only configuration: the committed fake values, no secrets.
+          cp .env.example .env
+          # Registry pulls can be rate-limited; retry the pull a bounded number of times.
+          for attempt in 1 2 3 4; do
+            docker compose pull && break
+            if [ "${attempt}" = "4" ]; then echo "image pull failed after 4 attempts"; exit 1; fi
+            echo "pull attempt ${attempt} failed; retrying in $((attempt * 20))s"
+            sleep $((attempt * 20))
+          done
+          pnpm infra:up
+          docker compose ps
+
+      # 12 --------------------------------------------------------------------------
+      - name: '12. Wait for infrastructure (bounded health polling)'
+        shell: bash
+        run: pnpm gate:p0:wait-infra
+
+      # 13-19 -----------------------------------------------------------------------
+      - name: '13-19. Live /health: 200, stop object store -> 503, restart -> 200'
+        shell: bash
+        run: pnpm gate:p0:health
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-health-gate-evidence
+          path: ${{ env.OVERSEER_DIR }}/.data/p0-health-gate.json
+          if-no-files-found: warn
+
+      - name: Container logs (diagnostics, only on failure)
+        if: failure()
+        shell: bash
+        run: docker compose logs --no-color --tail 60
+
+      # 20 --------------------------------------------------------------------------
+      - name: '20. Shut everything down cleanly'
+        if: always()
+        shell: bash
+        run: |
+          pnpm infra:down
+          docker compose ps --all

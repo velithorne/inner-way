@@ -45,6 +45,15 @@ needed.
 mistakes cannot be caught by the local object store. Production uses a real S3-compatible
 service (P18), and the S3 adapter is the only code that talks to it.
 
+**Amendment (2026-10-01, found by running the real stack).** The first compose definition
+mounted a named volume at `/data` and set `COM_ADOBE_TESTING_S3MOCK_STORE_ROOT=/data`. S3Mock
+runs as a non-root user (uid 1000) and a fresh named volume is root-owned, so every bucket
+operation failed with HTTP 500 and `/health` reported `objectStore: HTTP_500`. The volume and the
+store-root/retain settings were removed (storage is ephemeral; the bucket is recreated at each
+start) and a `wget` healthcheck against the documented always-available `/favicon.ico` was added
+so `docker compose up --wait` and the CI readiness polling are meaningful. A persistent object
+store volume can return in a later phase, with correct ownership.
+
 ### 5. Local safety guard
 
 When `OVERSEER_ENV=local`, the API refuses to start if `DATABASE_URL`, `REDIS_URL` or

@@ -37,20 +37,22 @@ services:
   # S3-compatible local object storage. MinIO's official images are no longer published on
   # Docker Hub, so this uses Adobe S3Mock (see docs/ADR/0001-toolchain-and-local-infra.md).
   # S3Mock does not validate credentials; production must use a real S3-compatible service.
-  # No healthcheck: the image's shell tooling is undocumented, and a wrong check would break
-  # `--wait`. It starts in a few seconds; /health reports objectStore failing until then.
+  # /favicon.ico is documented as always available once S3Mock is serving; `wget` is present
+  # in the image. Storage is deliberately ephemeral: S3Mock runs as a non-root user, so a root-owned named
+  # volume makes every bucket call fail with HTTP 500. The bucket is recreated at each start.
   objectstore:
     image: adobe/s3mock:5.2.3
     environment:
       COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: ${S3_BUCKET:-overseer-local}
-      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: 'true'
-      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
     ports:
       - '127.0.0.1:${S3_PORT:-9000}:9090'
-    volumes:
-      - objectstore-data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:9090/favicon.ico']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
 volumes:
   postgres-data:
   redis-data:
-  objectstore-data:

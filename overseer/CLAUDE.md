@@ -52,7 +52,8 @@ The standard prompt wrapper is in `docs/runbooks/phase-prompt-wrapper.md`.
   (`exports` -> `src/index.ts`); only deployables (`apps/*`) have a build step.
 - Core commands (run from `overseer/`):
   `pnpm lint` - `pnpm format:check` - `pnpm typecheck` - `pnpm test` - `pnpm build` -
-  `pnpm secrets:scan` - `pnpm check` (runs all but build).
+  `pnpm secrets:scan` - `pnpm check` (runs all but build) - `pnpm infra:up` / `pnpm infra:down` -
+  `pnpm gate:p0:health` (live-infrastructure proof; needs `pnpm build` and `pnpm infra:up`).
 - Schema or contract changes require an ADR (`docs/ADR/`). Any change to approval or spending
   semantics requires workflow + security tests and manual acceptance.
 - Never commit `.env` or any real credential. `.env.example` holds fake/local values only.
