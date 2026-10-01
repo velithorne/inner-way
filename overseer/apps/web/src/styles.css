@@ -1,0 +1,135 @@
+/* Visual canon (spec §6.6): near-black teal/graphite, restrained bronze framing, parchment text.
+   Colour only communicates state: amber = human attention, red = blocked/error, teal = active. */
+:root {
+  --bg: #0b1416;
+  --panel: #111d20;
+  --frame: #8a6a3b;
+  --text: #ece4d0;
+  --muted: #9a9684;
+  --teal: #2fb5a3;
+  --amber: #e0a23a;
+  --red: #d8574b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 1440px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.shell__header h1 {
+  margin: 0;
+  letter-spacing: 0.3em;
+  font-weight: 600;
+}
+
+.shell__header p {
+  margin: 4px 0 16px;
+  color: var(--muted);
+}
+
+.shell__footer {
+  margin-top: 32px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--frame);
+  padding: 16px 20px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid currentColor;
+}
+
+.tile--ok {
+  color: var(--teal);
+}
+
+.tile--fail {
+  color: var(--red);
+}
+
+.tile__name {
+  color: var(--text);
+}
+
+.tile__latency {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.note--fail {
+  color: var(--red);
+}
+
+.banner {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+}
+
+.banner--quiet {
+  color: var(--muted);
+}
+
+.banner--caution {
+  color: var(--amber);
+}
+
+.banner--prominent {
+  color: var(--bg);
+  background: var(--red);
+  border-color: var(--red);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

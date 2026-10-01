@@ -1,0 +1,35 @@
+{
+  "name": "overseer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "OVERSEER - AI commerce command-centre (build package v1.1). Phase P0: repository & safety spine.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @overseer/api dev",
+    "dev:web": "pnpm --filter @overseer/web dev",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "vitest run",
+    "build": "pnpm -r build",
+    "secrets:scan": "node scripts/scan-secrets.mjs",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.3",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

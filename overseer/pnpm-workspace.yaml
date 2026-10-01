@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 10 blocks dependency lifecycle scripts unless allow-listed.
+# esbuild (used by vite/tsup/tsx) is the only build script we permit.
+onlyBuiltDependencies:
+  - esbuild
