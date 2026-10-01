@@ -62,7 +62,11 @@ Safest GitHub-only path (no local machine needed):
    (the temporary workflow copy and, at the user's discretion, `overseer/`). Nothing in the
    Biofield Scanner application is modified by this process.
 
-Status is recorded in `docs/gates/P0.md`.
+Rehearsed and verified (2026-10-01): the split yields the 3 P0 commits, a tree identical to
+`overseer/`, and a project that installs, checks and builds from a fresh clone. Automated creation
+of the repository was attempted and refused (`403 Resource not accessible by integration`), so
+step 1 is a user action. Exact steps: `docs/runbooks/repository-split.md`. Status is recorded in
+`docs/gates/P0.md`.
 
 ## Consequences
 
