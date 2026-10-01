@@ -37,6 +37,8 @@ services:
   # S3-compatible local object storage. MinIO's official images are no longer published on
   # Docker Hub, so this uses Adobe S3Mock (see docs/ADR/0001-toolchain-and-local-infra.md).
   # S3Mock does not validate credentials; production must use a real S3-compatible service.
+  # No healthcheck: the image's shell tooling is undocumented, and a wrong check would break
+  # `--wait`. It starts in a few seconds; /health reports objectStore failing until then.
   objectstore:
     image: adobe/s3mock:5.2.3
     environment:

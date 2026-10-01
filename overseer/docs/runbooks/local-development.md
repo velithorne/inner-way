@@ -49,6 +49,9 @@ start redis` -> back to 200.
 
 ## Troubleshooting
 
+- Right after `pnpm infra:up`, `/health` may report `objectStore` failing for a few seconds
+  (`ECONNREFUSED`) while the object store boots. Retry.
+
 - Port already in use: change `POSTGRES_PORT` / `REDIS_PORT` / `S3_PORT` in `.env` and update
   the matching `DATABASE_URL` / `REDIS_URL` / `S3_ENDPOINT`.
 - `pnpm dev:api` exits with "Invalid configuration": the message lists the variable names to fix.
